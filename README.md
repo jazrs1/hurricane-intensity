@@ -15,9 +15,11 @@ The number hides a real problem, though. The model consistently guesses too low
 on strong storms, by about 19 kt at Category 4. That is discussed further down
 and it is the more interesting part of the result.
 
-![Michael at 35 kt](figures/michael_35kt.png)
-![Michael at 112 kt](figures/michael_112kt.png)
-![Michael at 125 kt](figures/michael_125kt.png)
+<p align="center">
+<img src="figures/michael_35kt.png" width="32%">
+<img src="figures/michael_112kt.png" width="32%">
+<img src="figures/michael_125kt.png" width="32%">
+</p>
 
 Hurricane Michael over roughly three days in October 2018, from a
 disorganized tropical storm to a Category 5 at landfall. Every frame is
