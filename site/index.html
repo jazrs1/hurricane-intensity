@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tropical cyclone intensity from satellite imagery — John Azer</title>
+<meta name="description" content="A convolutional network that estimates a hurricane's maximum sustained wind from a single infrared satellite frame. 9.00 kt mean absolute error on held-out storms.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,380;6..72,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EDEDE7;
+    --ink: #22201C;
+    --body: #4A463E;
+    --muted: #6E6859;
+    --rule: #B6B2A5;
+    --hair: #D6D2C6;
+    --accent: #8A6A3C;
+    --serif: "Newsreader", Georgia, serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.6;
+    font-weight: 380;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 32px 120px;
+  }
+
+  .label {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 72px;
+  }
+
+  header .who { color: var(--muted); }
+
+  .kicker { display: block; color: var(--accent); margin-bottom: 20px; }
+
+  h1 {
+    font-size: 34px;
+    line-height: 1.3;
+    font-weight: 380;
+    letter-spacing: -0.005em;
+    margin: 0 0 24px;
+    max-width: 19em;
+  }
+
+  .standfirst {
+    font-size: 18px;
+    color: var(--body);
+    margin: 0;
+    max-width: 33em;
+  }
+
+  .metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 56px;
+    margin: 56px 0;
+    padding: 26px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .metric .v {
+    font-family: var(--mono);
+    font-size: 25px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    display: block;
+  }
+
+  .metric .k { display: block; margin-top: 7px; }
+
+  section { margin-top: 72px; }
+
+  h2 {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    font-weight: 400;
+    margin: 0 0 20px;
+  }
+
+  p { max-width: 33em; color: var(--body); }
+
+  p.lead { color: var(--ink); }
+
+  figure { margin: 0; }
+
+  .frames {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .frames img {
+    width: 100%;
+    display: block;
+    background: #1b1b1b;
+  }
+
+  .frames figcaption { margin-top: 9px; }
+
+  .caption {
+    font-size: 15.5px;
+    color: var(--muted);
+    max-width: 33em;
+    margin: 20px 0 0;
+    line-height: 1.55;
+  }
+
+  ol.method {
+    list-style: none;
+    counter-reset: step;
+    padding: 0;
+    margin: 0;
+    max-width: 34em;
+  }
+
+  ol.method li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 16px;
+    padding: 13px 0;
+    border-top: 1px solid var(--hair);
+    color: var(--body);
+    font-size: 17px;
+  }
+
+  ol.method li:last-child { border-bottom: 1px solid var(--hair); }
+
+  ol.method li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--accent);
+    padding-top: 5px;
+  }
+
+  .scatter { width: 100%; max-width: 560px; display: block; }
+
+  table {
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    margin-top: 40px;
+    width: 100%;
+    max-width: 460px;
+  }
+
+  th {
+    text-align: right;
+    font-weight: 400;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    font-size: 11.5px;
+    padding: 0 0 9px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  th:first-child, td:first-child { text-align: left; }
+
+  td {
+    text-align: right;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--hair);
+    color: var(--body);
+    font-variant-numeric: tabular-nums;
+  }
+
+  tr.flag td { color: var(--ink); }
+  tr.flag td:last-child { color: var(--accent); }
+
+  footer {
+    margin-top: 88px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 28px;
+  }
+
+  a {
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 1px;
+  }
+
+  a:hover { border-bottom-color: var(--accent); }
+
+  footer a { font-family: var(--mono); font-size: 13px; border-bottom-color: var(--hair); }
+
+  a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 1px;
+  }
+
+  @media (max-width: 620px) {
+    body { font-size: 17px; }
+    .page { padding: 28px 22px 80px; }
+    h1 { font-size: 27px; }
+    header { margin-bottom: 48px; }
+    section { margin-top: 56px; }
+    .metrics { gap: 32px; }
+    .frames { gap: 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <span class="label">hurricane.johnazer.com</span>
+    <span class="label who">John Azer, September 2026</span>
+  </header>
+
+  <span class="label kicker">Tropical cyclone intensity from satellite imagery</span>
+
+  <h1>A convolutional network estimates a hurricane's maximum sustained wind from a single infrared satellite frame.</h1>
+
+  <p class="standfirst">Trained on 2,092 storm-centered crops from 15 Atlantic storms between 2018 and 2024, labeled against the NOAA best track.</p>
+
+  <div class="metrics">
+    <div class="metric">
+      <span class="v">9.00 kt</span>
+      <span class="k label">mean absolute error</span>
+    </div>
+    <div class="metric">
+      <span class="v">393</span>
+      <span class="k label">frames, unseen storms</span>
+    </div>
+    <div class="metric">
+      <span class="v">&minus;19.5 kt</span>
+      <span class="k label">bias at category 4</span>
+    </div>
+  </div>
+
+  <section>
+    <h2>Figure 1</h2>
+    <figure>
+      <div class="frames">
+        <div>
+          <img src="figures/michael_35kt.png" alt="Infrared satellite frame of a disorganized tropical storm, bright convective cloud tops against dark ocean." width="224" height="224">
+          <figcaption class="label">7 Oct, 35 kt</figcaption>
+        </div>
+        <div>
+          <img src="figures/michael_112kt.png" alt="Infrared satellite frame showing a tightly wound storm with a forming eye." width="224" height="224">
+          <figcaption class="label">10 Oct, 112 kt</figcaption>
+        </div>
+        <div>
+          <img src="figures/michael_125kt.png" alt="Infrared satellite frame showing a symmetric hurricane with a small clear eye." width="224" height="224">
+          <figcaption class="label">10 Oct, 125 kt</figcaption>
+        </div>
+      </div>
+      <p class="caption">Hurricane Michael over roughly three days in October 2018, from a disorganized tropical storm to a category 5 at landfall. Every frame is centered on the best-track position and shown exactly as the network receives it, at 224 by 224 pixels. The middle label is interpolated between six-hourly fixes; the outer two are true fixes.</p>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Method</h2>
+    <ol class="method">
+      <li>Parse the NOAA HURDAT2 best track, drop entries the record marks extratropical, and interpolate the six-hourly fixes to hourly.</li>
+      <li>Match each position to the nearest GOES-16 ABI band 13 scan, accepting a time offset of up to ten minutes and logging it.</li>
+      <li>Cut a 600 kilometre box around the storm center, working in the satellite's own fixed-grid projection so the box stays square on the ground.</li>
+      <li>Clamp brightness temperature to 180&ndash;320 K, resize to 224 by 224, and regress wind speed directly with a ResNet-18.</li>
+      <li>Split the data by storm rather than by frame. Hourly frames of the same storm are near-duplicates, so a random split would leak the answer.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Results</h2>
+    <p class="lead">Three storms were held out entirely: Ian, Nicole and Claudette. The network never saw a frame of any of them during training.</p>
+    <figure>
+      <img class="scatter" src="figures/heldout_scatter.png" alt="Scatter plot of predicted against best-track wind speed for 393 held-out frames, clustered around the one-to-one line and falling below it above about 120 knots." width="560" height="580">
+      <p class="caption">Each point is one frame. The diagonal is perfect agreement. Best-track winds are recorded in five-knot steps, which is why the points stand in columns. Interpolated labels are drawn open; the 77 true best-track fixes are filled.</p>
+    </figure>
+
+    <table>
+      <thead>
+        <tr><th>Category</th><th>Frames</th><th>MAE</th><th>Bias</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Depression</td><td>83</td><td>5.50</td><td>+2.38</td></tr>
+        <tr><td>Storm</td><td>187</td><td>7.59</td><td>&minus;2.74</td></tr>
+        <tr class="flag"><td>Category 1</td><td>58</td><td>15.76</td><td>&minus;14.58</td></tr>
+        <tr><td>Category 2</td><td>9</td><td>3.96</td><td>+0.24</td></tr>
+        <tr><td>Category 3</td><td>25</td><td>10.50</td><td>+7.68</td></tr>
+        <tr class="flag"><td>Category 4</td><td>15</td><td>19.49</td><td>&minus;19.49</td></tr>
+        <tr class="flag"><td>Category 5</td><td>4</td><td>18.25</td><td>&minus;18.25</td></tr>
+      </tbody>
+    </table>
+    <p class="caption">Knots. Bias is the mean signed error, so a negative figure means the network guessed low.</p>
+  </section>
+
+  <section>
+    <h2>Where it fails</h2>
+    <p>The network is accurate on weak systems and underestimates strong ones. At category 4 it reads a storm roughly 19 knots too low, and at category 5 about 18. Those bands hold 15 and 4 frames respectively, against 270 below hurricane strength, so the most likely explanation is that the model rarely saw a major hurricane and hedges toward the middle of the distribution it did see.</p>
+    <p>Category 1 is a separate problem. Its error is nearly as large, and most of those frames belong to Ian on either side of its rapid intensification, where the storm changed faster than a six-hourly best track resolves.</p>
+    <p>Both are testable, and neither is fixed here on purpose. Adding major hurricanes to the training set after seeing this failure would make the 9.00 knot figure difficult to trust, so it stands as a baseline and the class-imbalance experiment comes next, measured against it.</p>
+  </section>
+
+  <footer>
+    <a href="https://github.com/jazrs1/hurricane-intensity">Source and data pipeline on GitHub</a>
+    <a href="https://www.nhc.noaa.gov/data/#hurdat">HURDAT2 best track</a>
+  </footer>
+
+</div>
+</body>
+</html>

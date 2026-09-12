@@ -4,3 +4,4 @@ models/
 __pycache__/
 *.nc
 *.egg-info/
+*.pt

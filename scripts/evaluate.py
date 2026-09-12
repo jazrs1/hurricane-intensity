@@ -4,6 +4,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 from torchvision.models import resnet18
 from hurricane_intensity.dataset import TCDataset
+from pathlib import Path
 
 HOLDOUT_STORMS = ["AL092022", "AL172022", "AL032021"]
 PROCESSED_ROOT = "data/processed"
@@ -48,3 +49,14 @@ cat1 = (truths >= 64) & (truths <= 82)
 sub = ds.df[cat1].copy()
 sub["error"] = errors[cat1]
 print(sub.groupby("storm_name")["error"].agg(["count", "mean"]))
+
+
+out = ds.df.copy()
+out["pred"] = preds
+out["truth"] = truths
+out["signed_error"] = preds - truths
+out["abs_error"] = errors
+
+Path("results").mkdir(exist_ok=True)
+out.to_csv("results/heldout_predictions.csv", index=False)
+print(f"\nwrote results/heldout_predictions.csv  ({len(out)} rows)")
