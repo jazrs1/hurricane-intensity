@@ -18,12 +18,15 @@ and it is the more interesting part of the result.
 <p align="center">
 <img src="figures/michael_35kt.png" width="32%">
 <img src="figures/michael_112kt.png" width="32%">
-<img src="figures/michael_125kt.png" width="32%">
+<img src="figures/michael_140kt.png" width="32%">
 </p>
 
 Hurricane Michael over roughly three days in October 2018, from a
-disorganized tropical storm to a Category 5 at landfall. Every frame is
-centered on the HURDAT2 best-track position.
+disorganized tropical storm to a Category 5 at landfall: 35 kt at 7 Oct
+12:00 UTC, an interpolated 112 kt at 10 Oct 01:00, and the 10 Oct 17:30
+landfall fix at 140 kt. Every frame is centered on the HURDAT2 best-track
+position and shown exactly as the network receives it, so cold cloud tops
+are dark.
 
 ## Building the dataset
 

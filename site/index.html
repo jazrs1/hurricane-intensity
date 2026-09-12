@@ -125,6 +125,7 @@
 
   .frames img {
     width: 100%;
+    height: auto;
     display: block;
     background: #1b1b1b;
     border: 1px solid var(--rule);
@@ -169,7 +170,7 @@
     padding-top: 5px;
   }
 
-  .scatter { width: 100%; max-width: 560px; display: block; }
+  .scatter { width: 100%; height: auto; max-width: 560px; display: block; }
 
   table {
     border-collapse: collapse;
@@ -405,16 +406,16 @@
     <figure>
       <div class="frames">
         <div>
-          <img src="figures/michael_35kt.png" alt="Infrared satellite frame of a disorganized tropical storm, bright convective cloud tops against dark ocean." width="224" height="224">
+          <img src="figures/michael_35kt.png" alt="Infrared satellite frame of a disorganized tropical storm, scattered dark convective cells with no clear center." width="224" height="224">
           <figcaption class="label">7 Oct, 35 kt</figcaption>
         </div>
         <div>
-          <img src="figures/michael_112kt.png" alt="Infrared satellite frame showing a tightly wound storm with a forming eye." width="224" height="224">
+          <img src="figures/michael_112kt.png" alt="Infrared satellite frame of a strengthening hurricane, banding wrapped around a small forming eye." width="224" height="224">
           <figcaption class="label">10 Oct, 112 kt</figcaption>
         </div>
         <div>
-          <img src="figures/michael_125kt.png" alt="Infrared satellite frame showing a symmetric hurricane with a small clear eye." width="224" height="224">
-          <figcaption class="label">10 Oct, 125 kt</figcaption>
+          <img src="figures/michael_140kt.png" alt="Infrared satellite frame of a symmetric hurricane at landfall, with a small round eye inside a compact eyewall." width="224" height="224">
+          <figcaption class="label">10 Oct, 140 kt</figcaption>
         </div>
       </div>
       <p class="caption">Hurricane Michael over roughly three days in October 2018, from a disorganized tropical storm to a category 5 at landfall. Every frame is centered on the best-track position and shown exactly as the network receives it, at 224 by 224 pixels. The middle label is interpolated between six-hourly fixes; the outer two are true fixes.</p>
@@ -436,7 +437,7 @@
     <h2>Results</h2>
     <p class="lead">Three storms were held out entirely: Ian, Nicole and Claudette. The network never saw a frame of any of them during training.</p>
     <figure>
-      <img class="scatter" src="figures/heldout_scatter.png" alt="Scatter plot of predicted against best-track wind speed for 393 held-out frames, clustered around the one-to-one line and falling below it above about 120 knots." width="560" height="580">
+      <img class="scatter" src="figures/heldout_scatter.png" alt="Scatter plot of predicted against best-track wind speed for 393 held-out frames, clustered around the one-to-one line and falling below it above about 120 knots." width="1246" height="1212">
       <p class="caption">Each point is one frame. The diagonal is perfect agreement. Best-track winds are recorded in five-knot steps, which is why the points stand in columns. Interpolated labels are drawn open; the 77 true best-track fixes are filled.</p>
     </figure>
 
