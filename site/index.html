@@ -62,7 +62,7 @@
 
   header .who { color: var(--muted); }
 
-  .kicker { display: block; color: var(--accent); margin-bottom: 20px; }
+  .kicker { display: block; color: var(--muted); margin-bottom: 20px; }
 
   h1 {
     font-size: 34px;
@@ -120,13 +120,14 @@
   .frames {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
+    gap: 20px;
   }
 
   .frames img {
     width: 100%;
     display: block;
     background: #1b1b1b;
+    border: 1px solid var(--rule);
   }
 
   .frames figcaption { margin-top: 9px; }
@@ -164,7 +165,7 @@
     content: counter(step, decimal-leading-zero);
     font-family: var(--mono);
     font-size: 12.5px;
-    color: var(--accent);
+    color: var(--muted);
     padding-top: 5px;
   }
 
@@ -175,8 +176,8 @@
     font-family: var(--mono);
     font-size: 13.5px;
     margin-top: 40px;
-    width: 100%;
-    max-width: 460px;
+    width: auto;
+    max-width: 100%;
   }
 
   th {
@@ -190,6 +191,8 @@
   }
 
   th:first-child, td:first-child { text-align: left; }
+
+  th + th, td + td { padding-left: 26px; }
 
   td {
     text-align: right;
@@ -218,14 +221,142 @@
     padding-bottom: 1px;
   }
 
-  a:hover { border-bottom-color: var(--accent); }
+  a:hover { border-bottom-color: var(--ink); }
 
   footer a { font-family: var(--mono); font-size: 13px; border-bottom-color: var(--hair); }
 
   a:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--ink);
     outline-offset: 3px;
     border-radius: 1px;
+  }
+
+  /* --- Ian scrubber --- */
+
+  .scrub {
+    display: grid;
+    grid-template-columns: 224px 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+
+  .scrub-frame {
+    width: 224px;
+    aspect-ratio: 1 / 1;
+    background: #1b1b1b;
+  }
+
+  .scrub-frame img {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .scrub-read {
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    gap: 16px 20px;
+    margin: 0;
+    align-content: start;
+  }
+
+  .scrub-read dd { margin: 0; }
+
+  .scrub-read .v {
+    display: block;
+    font-family: var(--mono);
+    font-size: 19px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    margin-top: 6px;
+    min-height: 1.5em;
+  }
+
+  .scrub-read .v.truth { color: var(--ink); }
+  .scrub-read .v.pred { color: var(--ink); }
+  .scrub-read .v.note { font-size: 13.5px; color: var(--body); }
+
+  .scrub-chart { margin-top: 28px; }
+
+  .scrub-chart svg { width: 100%; height: auto; display: block; }
+
+  .scrub-chart .grid { stroke: var(--hair); stroke-width: 1; }
+  .scrub-chart line, .scrub-chart polyline { vector-effect: non-scaling-stroke; }
+  .scrub-chart .tick { fill: var(--muted); font-family: var(--mono); font-size: 10px; }
+  .scrub-chart .fix { stroke: var(--rule); stroke-width: 1; }
+  .scrub-chart .line-truth { fill: none; stroke: var(--ink); stroke-width: 1.4; }
+  .scrub-chart .line-pred { fill: none; stroke: var(--muted); stroke-width: 1.4; stroke-dasharray: 3.5 2.5; }
+  .scrub-chart .marker { stroke: var(--muted); stroke-width: 1; }
+  .scrub-chart .dot-truth { fill: var(--ink); }
+  .scrub-chart .dot-pred { fill: var(--muted); }
+
+  .scrub-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-top: 10px;
+  }
+
+  .scrub-legend span { display: inline-flex; align-items: center; gap: 7px; }
+
+  .scrub-legend i {
+    width: 15px;
+    height: 0;
+    border-top: 1.4px solid currentColor;
+    display: block;
+  }
+
+  .scrub-legend .sw-truth { color: var(--ink); }
+  .scrub-legend .sw-pred { color: var(--muted); }
+  .scrub-legend .sw-pred i { border-top-style: dashed; }
+
+  .scrub-ctl { margin-top: 18px; }
+
+  .scrub-ctl label { display: block; margin-bottom: 8px; }
+
+  .scrub-ctl input[type="range"] {
+    width: 100%;
+    display: block;
+    margin: 0;
+    accent-color: var(--ink);
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .scrub-ctl input[type="range"]:disabled { cursor: default; opacity: 0.45; }
+
+  .scrub-ctl input[type="range"]:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 4px;
+    border-radius: 2px;
+  }
+
+  .scrub-status { margin: 14px 0 0; }
+
+  /* While the chart is previewing a frame, the satellite image still shows the
+     scrubbed frame, so it dims to say the numbers have gone somewhere else. */
+  .scrub.previewing .scrub-frame img { opacity: 0.4; }
+
+  .scrub.previewing .scrub-read {
+    outline: 1px dashed var(--rule);
+    outline-offset: 9px;
+  }
+
+  .scrub.previewing ~ .scrub-chart .marker { stroke-dasharray: 2 2; }
+
+  @media (hover: hover) and (pointer: fine) {
+    .scrub-chart svg { cursor: pointer; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .scrub-chart .marker,
+    .scrub-chart .dot-truth,
+    .scrub-chart .dot-pred {
+      transition: x 90ms linear, cx 90ms linear, cy 90ms linear;
+    }
+
+    .scrub-frame img { transition: opacity 90ms linear; }
   }
 
   @media (max-width: 620px) {
@@ -235,7 +366,12 @@
     header { margin-bottom: 48px; }
     section { margin-top: 56px; }
     .metrics { gap: 32px; }
-    .frames { gap: 10px; }
+    .frames { gap: 12px; }
+    .scrub { grid-template-columns: 1fr; gap: 20px; }
+    .scrub-frame { width: 100%; max-width: 224px; }
+    .scrub-read { grid-template-columns: minmax(0, 1fr); }
+    .scrub-read .v { font-size: 18px; }
+    .scrub-chart .tick { display: none; }
   }
 </style>
 </head>
@@ -294,7 +430,7 @@
     <ol class="method">
       <li>Parse the NOAA HURDAT2 best track, drop entries the record marks extratropical, and interpolate the six-hourly fixes to hourly.</li>
       <li>Match each position to the nearest GOES-16 ABI band 13 scan, accepting a time offset of up to ten minutes and logging it.</li>
-      <li>Cut a 600 kilometre box around the storm center, working in the satellite's own fixed-grid projection so the box stays square on the ground.</li>
+      <li>Cut a 600 kilometer box around the storm center, working in the satellite's own fixed-grid projection so the box stays square on the ground.</li>
       <li>Clamp brightness temperature to 180&ndash;320 K, resize to 224 by 224, and regress wind speed directly with a ResNet-18.</li>
       <li>Split the data by storm rather than by frame. Hourly frames of the same storm are near-duplicates, so a random split would leak the answer.</li>
     </ol>
@@ -325,6 +461,54 @@
     <p class="caption">Knots. Bias is the mean signed error, so a negative figure means the network guessed low.</p>
   </section>
 
+  <section id="ian-scrubber" hidden>
+    <h2>Hurricane Ian, hour by hour</h2>
+    <figure>
+      <div class="scrub">
+        <div class="scrub-frame">
+          <img id="ian-frame" src="" alt="Infrared satellite frame of Hurricane Ian, centered on the best-track position." width="160" height="160" decoding="sync">
+        </div>
+        <dl class="scrub-read">
+          <div class="cell">
+            <dt class="k label">Best track</dt>
+            <dd class="v truth" id="ian-truth">&nbsp;</dd>
+          </div>
+          <div class="cell">
+            <dt class="k label">Model</dt>
+            <dd class="v pred" id="ian-pred">&nbsp;</dd>
+          </div>
+          <div class="cell">
+            <dt class="k label">Difference</dt>
+            <dd class="v" id="ian-diff">&nbsp;</dd>
+          </div>
+          <div class="cell">
+            <dt class="k label">Label</dt>
+            <dd class="v note" id="ian-kind">&nbsp;</dd>
+          </div>
+          <div class="cell">
+            <dt class="k label">Time</dt>
+            <dd class="v" id="ian-time">&nbsp;</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="scrub-chart" id="ian-chart"></div>
+      <div class="scrub-legend label">
+        <span class="sw-truth"><i></i>best track</span>
+        <span class="sw-pred"><i></i>model</span>
+        <span>ticks mark true six-hourly fixes</span>
+      </div>
+
+      <div class="scrub-ctl">
+        <label class="label" for="ian-range">Scrub through the storm</label>
+        <input type="range" id="ian-range" min="0" max="0" step="1" value="0" disabled aria-describedby="ian-caption">
+      </div>
+      <p class="label scrub-status" id="ian-status">Loading frames&hellip;</p>
+
+      <p class="caption" id="ian-caption">Every hour of Hurricane Ian, from a depression east of the Windward Islands on 22 September 2022 to landfall in South Carolina on 30 September. Ian was held out of training entirely, so every reading here is an out-of-sample estimate made from one frame. The model tracks the intensification closely, undershoots the peak by fourteen knots, then falls away faster than the storm does and stays about seventeen knots low through the weakening. Its line is the busier of the two because the best track is interpolated hourly between six-hourly fixes and can only bend in straight lines, while the model answers every frame on its own.</p>
+    </figure>
+  </section>
+
   <section>
     <h2>Where it fails</h2>
     <p>The network is accurate on weak systems and underestimates strong ones. At category 4 it reads a storm roughly 19 knots too low, and at category 5 about 18. Those bands hold 15 and 4 frames respectively, against 270 below hurricane strength, so the most likely explanation is that the model rarely saw a major hurricane and hedges toward the middle of the distribution it did see.</p>
@@ -338,5 +522,266 @@
   </footer>
 
 </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var section = document.getElementById("ian-scrubber");
+  if (!section) return;
+
+  var frameImg = document.getElementById("ian-frame");
+  var range = document.getElementById("ian-range");
+  var status = document.getElementById("ian-status");
+  var chartBox = document.getElementById("ian-chart");
+  var elTime = document.getElementById("ian-time");
+  var elTruth = document.getElementById("ian-truth");
+  var elPred = document.getElementById("ian-pred");
+  var elDiff = document.getElementById("ian-diff");
+  var elKind = document.getElementById("ian-kind");
+
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var MINUS = "\u2212";
+  var W = 720, H = 132, PAD_L = 34, PAD_R = 6, PAD_T = 10, PAD_B = 20;
+
+  var scrubBox = section.querySelector(".scrub");
+
+  var frames = [];
+  var preloaded = [];
+  var chartSvg = null;
+  var marker = null, dotTruth = null, dotPred = null;
+  var xOf = null, yOf = null;
+  var scrubIndex = 0;
+  var previewIndex = null;
+
+  function pad(n, width) {
+    var out = String(n);
+    while (out.length < width) out = "0" + out;
+    return out;
+  }
+
+  // Mirrors the zero-padding scripts/export_scrubber.py gives the filenames.
+  function frameUrl(i, count) {
+    return "frames/ian/" + pad(i, Math.max(3, String(count - 1).length)) + ".png";
+  }
+
+  function stamp(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return pad(d.getUTCDate(), 2) + " " + MONTHS[d.getUTCMonth()] + " " + d.getUTCFullYear() +
+      " \u00b7 " + pad(d.getUTCHours(), 2) + ":" + pad(d.getUTCMinutes(), 2) + " UTC";
+  }
+
+  function kt(v) { return v.toFixed(1) + " kt"; }
+
+  function signed(v) {
+    return (v < 0 ? MINUS : "+") + Math.abs(v).toFixed(1) + " kt";
+  }
+
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
+  function buildChart(storm) {
+    var n = frames.length;
+    var top = 0;
+    for (var i = 0; i < n; i++) {
+      top = Math.max(top, frames[i].truth, frames[i].pred);
+    }
+    var yMax = Math.max(40, Math.ceil(top / 40) * 40);
+    var plotW = W - PAD_L - PAD_R;
+    var plotH = H - PAD_T - PAD_B;
+    var base = PAD_T + plotH;
+
+    xOf = function (i) {
+      return n > 1 ? PAD_L + (i * plotW) / (n - 1) : PAD_L + plotW / 2;
+    };
+    yOf = function (v) {
+      return PAD_T + plotH - (v / yMax) * plotH;
+    };
+
+    var svg = svgEl("svg", {
+      viewBox: "0 0 " + W + " " + H,
+      role: "img",
+      "aria-labelledby": "ian-chart-title"
+    });
+    var title = svgEl("title", { id: "ian-chart-title" });
+    title.textContent = "Best-track and predicted wind speed across " + storm + ", " + n +
+      " hourly frames in knots, with a marker at the frame shown above.";
+    svg.appendChild(title);
+
+    for (var t = 0; t <= yMax; t += 40) {
+      svg.appendChild(svgEl("line", {
+        "class": "grid", x1: PAD_L, x2: W - PAD_R, y1: yOf(t), y2: yOf(t)
+      }));
+      var lab = svgEl("text", {
+        "class": "tick", x: PAD_L - 7, y: yOf(t) + 3.5, "text-anchor": "end"
+      });
+      lab.textContent = t;
+      svg.appendChild(lab);
+    }
+
+    for (var f = 0; f < n; f++) {
+      if (!frames[f].is_interpolated) {
+        svg.appendChild(svgEl("line", {
+          "class": "fix", x1: xOf(f), x2: xOf(f), y1: base + 2, y2: base + 8
+        }));
+      }
+    }
+
+    var ptsTruth = [], ptsPred = [];
+    for (var j = 0; j < n; j++) {
+      ptsTruth.push(xOf(j).toFixed(2) + "," + yOf(frames[j].truth).toFixed(2));
+      ptsPred.push(xOf(j).toFixed(2) + "," + yOf(frames[j].pred).toFixed(2));
+    }
+    svg.appendChild(svgEl("polyline", { "class": "line-truth", points: ptsTruth.join(" ") }));
+    svg.appendChild(svgEl("polyline", { "class": "line-pred", points: ptsPred.join(" ") }));
+
+    marker = svgEl("line", { "class": "marker", x1: xOf(0), x2: xOf(0), y1: PAD_T, y2: base });
+    dotTruth = svgEl("circle", { "class": "dot-truth", cx: xOf(0), cy: yOf(frames[0].truth), r: 2.6 });
+    dotPred = svgEl("circle", { "class": "dot-pred", cx: xOf(0), cy: yOf(frames[0].pred), r: 2.6 });
+    svg.appendChild(marker);
+    svg.appendChild(dotTruth);
+    svg.appendChild(dotPred);
+
+    chartBox.appendChild(svg);
+    chartSvg = svg;
+  }
+
+  // The readout and the chart marker, which the chart preview also drives.
+  // Deliberately does not touch the satellite image: swapping it under the
+  // pointer would flicker, and the image is not what the preview is about.
+  function paint(i) {
+    var f = frames[i];
+    elTime.textContent = stamp(f.time);
+    elTruth.textContent = kt(f.truth);
+    elPred.textContent = kt(f.pred);
+    elDiff.textContent = signed(f.pred - f.truth);
+    elKind.textContent = f.is_interpolated ? "interpolated" : "six-hourly fix";
+
+    marker.setAttribute("x1", xOf(i));
+    marker.setAttribute("x2", xOf(i));
+    dotTruth.setAttribute("cx", xOf(i));
+    dotTruth.setAttribute("cy", yOf(f.truth));
+    dotPred.setAttribute("cx", xOf(i));
+    dotPred.setAttribute("cy", yOf(f.pred));
+  }
+
+  function render(i) {
+    var f = frames[i];
+    scrubIndex = i;
+    if (previewIndex !== null) {
+      previewIndex = null;
+      scrubBox.classList.remove("previewing");
+    }
+    frameImg.src = frameUrl(i, frames.length);
+    frameImg.alt = "Infrared satellite frame of Hurricane Ian at " + stamp(f.time) +
+      ", best-track wind " + kt(f.truth) + ".";
+    paint(i);
+    range.setAttribute("aria-valuetext",
+      "Frame " + (i + 1) + " of " + frames.length + ", " + stamp(f.time) +
+      ", best track " + kt(f.truth) + ", model " + kt(f.pred) + ", " +
+      (f.is_interpolated ? "interpolated label" : "true six-hourly fix") + ".");
+  }
+
+  function preview(i) {
+    if (i === previewIndex) return;
+    if (i === scrubIndex) { endPreview(); return; }
+    previewIndex = i;
+    scrubBox.classList.add("previewing");
+    paint(i);
+  }
+
+  function endPreview() {
+    if (previewIndex === null) return;
+    previewIndex = null;
+    scrubBox.classList.remove("previewing");
+    paint(scrubIndex);
+  }
+
+  function indexAt(clientX) {
+    var r = chartSvg.getBoundingClientRect();
+    if (!r.width) return scrubIndex;
+    var units = ((clientX - r.left) / r.width) * W;
+    var t = (units - PAD_L) / (W - PAD_L - PAD_R);
+    var i = Math.round(t * (frames.length - 1));
+    return Math.max(0, Math.min(frames.length - 1, i));
+  }
+
+  // Hover reads the chart without moving the scrubber; a click commits.
+  // Touch never previews, so a tap cannot leave the readout stranded on a
+  // frame the scrubber is not on.
+  function bindChart() {
+    chartSvg.addEventListener("pointermove", function (e) {
+      if (e.pointerType === "touch") return;
+      preview(indexAt(e.clientX));
+    });
+    chartSvg.addEventListener("pointerleave", endPreview);
+    chartSvg.addEventListener("pointercancel", endPreview);
+    chartSvg.addEventListener("click", function (e) {
+      var i = indexAt(e.clientX);
+      range.value = i;
+      render(i);
+    });
+  }
+
+  // Hold a reference to every decoded image, so scrubbing never waits on a
+  // network round trip or on a cache eviction.
+  function preload(count) {
+    return new Promise(function (resolve) {
+      var pending = count, settled = 0, loaded = 0;
+      for (var i = 0; i < count; i++) {
+        (function (idx) {
+          var img = new Image();
+          preloaded.push(img);
+          var done = function (ok) {
+            if (ok) loaded++;
+            settled++;
+            status.textContent = "Loading frames\u2026 " + settled + " of " + count;
+            if (--pending === 0) resolve(loaded);
+          };
+          img.onload = function () {
+            if (img.decode) {
+              img.decode().then(function () { done(true); }, function () { done(true); });
+            } else {
+              done(true);
+            }
+          };
+          img.onerror = function () { done(false); };
+          img.src = frameUrl(idx, count);
+        })(i);
+      }
+    });
+  }
+
+  fetch("frames/ian.json", { cache: "no-cache" }).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (data) {
+    if (!data || !Array.isArray(data.frames) || !data.frames.length) throw new Error("no frames");
+    frames = data.frames.slice().sort(function (a, b) { return a.index - b.index; });
+    section.hidden = false;
+    status.textContent = "Loading frames\u2026 0 of " + frames.length;
+    range.max = frames.length - 1;
+    range.setAttribute("aria-busy", "true");
+    buildChart(data.storm || "Ian");
+    return preload(frames.length);
+  }).then(function (loaded) {
+    if (!loaded) throw new Error("nothing loaded");
+    render(0);
+    range.value = 0;
+    range.disabled = false;
+    range.removeAttribute("aria-busy");
+    status.hidden = true;
+    range.addEventListener("input", function () { render(Number(range.value)); });
+    bindChart();
+  }).catch(function () {
+    section.remove();
+  });
+})();
+</script>
+
 </body>
 </html>
