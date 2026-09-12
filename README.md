@@ -15,6 +15,14 @@ The number hides a real problem, though. The model consistently guesses too low
 on strong storms, by about 19 kt at Category 4. That is discussed further down
 and it is the more interesting part of the result.
 
+![Michael at 35 kt](figures/michael_35kt.png)
+![Michael at 112 kt](figures/michael_112kt.png)
+![Michael at 125 kt](figures/michael_125kt.png)
+
+Hurricane Michael over roughly three days in October 2018, from a
+disorganized tropical storm to a Category 5 at landfall. Every frame is
+centered on the HURDAT2 best-track position.
+
 ## Building the dataset
 
 The two data sources do not line up. HURDAT2 gives you a storm's position and
@@ -155,6 +163,8 @@ has some temporal context, adding the Band 8/9 water vapor channels (which
 would also give the pretrained weights three real channels instead of three
 copies of one), and running it against live NHC advisories during an active
 storm.
+
+
 
 ## Repository
 

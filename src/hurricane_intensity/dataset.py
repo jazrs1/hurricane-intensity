@@ -19,6 +19,18 @@ class TCDataset(Dataset):
             df = pd.read_csv(manifest_path)
             frames.append(df)
         df = pd.concat(frames, ignore_index=True)
+        df = df[df["crop_path"].notna()]
+
+        df = pd.concat(frames, ignore_index=True)
+        df = df[df["crop_path"].notna()]
+
+        excluded_file = Path("excluded_crops.txt")
+        if excluded_file.exists():
+            excluded = set(excluded_file.read_text().split())
+            df = df[~df["crop_path"].isin(excluded)]
+        print(f"after exclusion: {len(df)}")
+
+
         exists = df["crop_path"].apply(lambda p: (Path(processed_root) / p).exists())
         self.df = df[exists].reset_index(drop=True)
     def __len__(self):
