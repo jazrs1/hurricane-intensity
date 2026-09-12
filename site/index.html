@@ -334,13 +334,12 @@
 
   .scrub-status { margin: 14px 0 0; }
 
-  /* While the chart is previewing a frame, the satellite image still shows the
-     scrubbed frame, so it dims to say the numbers have gone somewhere else. */
-  .scrub.previewing .scrub-frame img { opacity: 0.4; }
-
-  .scrub.previewing .scrub-read {
+  /* Everything inside the block follows the pointer while previewing, so the
+     rule says "this is not where the scrubber is parked" rather than dimming
+     an image that is perfectly current. */
+  .scrub.previewing {
     outline: 1px dashed var(--rule);
-    outline-offset: 9px;
+    outline-offset: 12px;
   }
 
   .scrub.previewing ~ .scrub-chart .marker { stroke-dasharray: 2 2; }
@@ -355,8 +354,6 @@
     .scrub-chart .dot-pred {
       transition: x 90ms linear, cx 90ms linear, cy 90ms linear;
     }
-
-    .scrub-frame img { transition: opacity 90ms linear; }
   }
 
   @media (max-width: 620px) {
@@ -552,6 +549,9 @@
   var xOf = null, yOf = null;
   var scrubIndex = 0;
   var previewIndex = null;
+  var drawnIndex = -1;
+  var queuedIndex = null;
+  var queuedRaf = null;
 
   function pad(n, width) {
     var out = String(n);
@@ -649,9 +649,8 @@
     chartSvg = svg;
   }
 
-  // The readout and the chart marker, which the chart preview also drives.
-  // Deliberately does not touch the satellite image: swapping it under the
-  // pointer would flicker, and the image is not what the preview is about.
+  // The readout and the chart marker. Kept separate from the image swap so
+  // that leaving the chart can restore everything synchronously.
   function paint(i) {
     var f = frames[i];
     elTime.textContent = stamp(f.time);
@@ -668,16 +667,47 @@
     dotPred.setAttribute("cy", yOf(f.pred));
   }
 
+  // Only ever assigns a URL that preload() already fetched and decoded, so the
+  // swap is served from memory and paints in the same frame. Skipping the
+  // assignment when the index has not changed keeps a slow drag from touching
+  // the DOM on every pointer event.
+  function showImage(i) {
+    if (i === drawnIndex) return;
+    drawnIndex = i;
+    var f = frames[i];
+    frameImg.src = preloaded[i] ? preloaded[i].src : frameUrl(i, frames.length);
+    frameImg.alt = "Infrared satellite frame of Hurricane Ian at " + stamp(f.time) +
+      ", best-track wind " + kt(f.truth) + ".";
+  }
+
+  // One pending frame at a time: pointer events between now and the next paint
+  // collapse into a single update, and the numbers, the marker and the image
+  // all change together rather than a frame apart.
+  function queueDraw(i) {
+    queuedIndex = i;
+    if (queuedRaf !== null) return;
+    queuedRaf = requestAnimationFrame(function () {
+      queuedRaf = null;
+      paint(queuedIndex);
+      showImage(queuedIndex);
+    });
+  }
+
+  function cancelQueued() {
+    if (queuedRaf === null) return;
+    cancelAnimationFrame(queuedRaf);
+    queuedRaf = null;
+  }
+
   function render(i) {
     var f = frames[i];
     scrubIndex = i;
+    cancelQueued();
     if (previewIndex !== null) {
       previewIndex = null;
       scrubBox.classList.remove("previewing");
     }
-    frameImg.src = frameUrl(i, frames.length);
-    frameImg.alt = "Infrared satellite frame of Hurricane Ian at " + stamp(f.time) +
-      ", best-track wind " + kt(f.truth) + ".";
+    showImage(i);
     paint(i);
     range.setAttribute("aria-valuetext",
       "Frame " + (i + 1) + " of " + frames.length + ", " + stamp(f.time) +
@@ -690,14 +720,16 @@
     if (i === scrubIndex) { endPreview(); return; }
     previewIndex = i;
     scrubBox.classList.add("previewing");
-    paint(i);
+    queueDraw(i);
   }
 
   function endPreview() {
     if (previewIndex === null) return;
     previewIndex = null;
+    cancelQueued();
     scrubBox.classList.remove("previewing");
     paint(scrubIndex);
+    showImage(scrubIndex);
   }
 
   function indexAt(clientX) {
