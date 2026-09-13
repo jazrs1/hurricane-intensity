@@ -349,7 +349,7 @@
 
   .scrub-chart .grid { stroke: var(--hair); stroke-width: 1; }
   .scrub-chart line, .scrub-chart polyline { vector-effect: non-scaling-stroke; }
-  .scrub-chart .tick { fill: var(--muted); font-family: var(--mono); font-size: 10px; }
+  .scrub-chart .tick { fill: var(--muted); font-family: var(--mono); }
   .scrub-chart .fix { stroke: var(--muted); stroke-width: 1; }
   .scrub-chart .line-truth { fill: none; stroke: var(--ink); stroke-width: 1.4; }
   .scrub-chart .line-pred { fill: none; stroke: var(--model); stroke-width: 1.4; stroke-dasharray: 3.5 2.5; }
@@ -357,12 +357,12 @@
   .scrub-chart .dot-truth { fill: var(--ink); }
   .scrub-chart .dot-pred { fill: var(--model); }
 
-  /* 9. axis annotation */
+  /* 9. axis annotation. Sizes are set per build in chartGeom, because a
+     value in viewBox units means different rendered pixels at each width. */
   .scrub-chart .axis-unit,
   .scrub-chart .xtick {
     fill: var(--muted);
     font-family: var(--mono);
-    font-size: 11px;
   }
 
   .scrub-legend {
@@ -476,7 +476,18 @@
     h2 { font-size: 21px; }
     header { margin-bottom: 40px; }
     section { margin-top: 56px; }
-    .metrics { gap: 32px; }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0 10px;
+    }
+    .metric .v { font-size: 19px; }
+    .metric .k {
+      margin-top: 5px;
+      font-size: 10.5px;
+      letter-spacing: 0.03em;
+      line-height: 1.5;
+    }
     .frames { gap: 12px; }
     .frames figcaption { letter-spacing: 0; font-size: 11px; }
     #ian-scrubber figure { padding: 16px; }
@@ -491,7 +502,6 @@
     .scrub-chart { margin-top: 18px; }
     .scrub-legend { margin-top: 8px; gap: 6px 14px; }
     .scrub-ctl { margin-top: 10px; }
-    .scrub-chart .tick,
     .scrub-chart .xtick { display: none; }
   }
 </style>
@@ -624,7 +634,7 @@
     <figure>
       <div class="scrub">
         <div class="scrub-frame">
-          <img id="ian-frame" src="" alt="Infrared satellite frame of Hurricane Ian, centered on the best-track position." width="160" height="160" decoding="sync">
+          <img id="ian-frame" src="" alt="Infrared satellite frame of Hurricane Ian, centered on the best-track position." width="224" height="224" decoding="sync">
         </div>
         <dl class="scrub-read">
           <div class="cell">
@@ -712,11 +722,31 @@
 
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   var MINUS = "\u2212";
-  var W = 720, H = 152, PAD_L = 34, PAD_R = 8, PAD_T = 20, PAD_B = 40;
+  var W = 720, PAD_R = 8;
+
+  // A phone has vertical room to spare, and eight days of storm squeezed into
+  // 67px hides the peak and the crossover. The viewBox gets taller rather than
+  // the rendered box getting stretched, so scaling stays uniform and strokes
+  // keep their weight.
+  var narrowMq = window.matchMedia
+    ? window.matchMedia("(max-width: 620px)")
+    : { matches: false };
+
+  // TICK is in viewBox units. The narrow build is drawn at roughly 0.39 of
+  // its viewBox, so 28 units lands near 11px on screen; PAD_L widens to make
+  // room for the bigger labels.
+  function chartGeom() {
+    return narrowMq.matches
+      ? { H: 300, PAD_T: 44, PAD_B: 46, PAD_L: 62, FIX: 14, TICK: 28, XTICK: 11 }
+      : { H: 152, PAD_T: 20, PAD_B: 40, PAD_L: 34, FIX: 6, TICK: 10, XTICK: 11 };
+  }
+
+  var geomNow = chartGeom();
 
   var scrubBox = section.querySelector(".scrub");
 
   var frames = [];
+  var stormName = "Ian";
   var preloaded = [];
   var chartSvg = null;
   var marker = null, dotTruth = null, dotPred = null;
@@ -770,6 +800,9 @@
 
   function buildChart(storm) {
     var n = frames.length;
+    var geom = chartGeom();
+    geomNow = geom;
+    var H = geom.H, PAD_T = geom.PAD_T, PAD_B = geom.PAD_B, PAD_L = geom.PAD_L;
     var top = 0;
     for (var i = 0; i < n; i++) {
       top = Math.max(top, frames[i].truth, frames[i].pred);
@@ -801,14 +834,16 @@
         "class": "grid", x1: PAD_L, x2: W - PAD_R, y1: yOf(t), y2: yOf(t)
       }));
       var lab = svgEl("text", {
-        "class": "tick", x: PAD_L - 7, y: yOf(t) + 3.5, "text-anchor": "end"
+        "class": "tick", x: PAD_L - 7, y: yOf(t) + geom.TICK * 0.35,
+        "font-size": geom.TICK, "text-anchor": "end"
       });
       lab.textContent = t;
       svg.appendChild(lab);
     }
 
     var unit = svgEl("text", {
-      "class": "axis-unit", x: PAD_L - 7, y: PAD_T - 7, "text-anchor": "end"
+      "class": "axis-unit", x: PAD_L - 7, y: PAD_T - geom.TICK * 0.7,
+      "font-size": geom.TICK, "text-anchor": "end"
     });
     unit.textContent = "kt";
     svg.appendChild(unit);
@@ -816,7 +851,7 @@
     for (var f = 0; f < n; f++) {
       if (!frames[f].is_interpolated) {
         svg.appendChild(svgEl("line", {
-          "class": "fix", x1: xOf(f), x2: xOf(f), y1: base + 2, y2: base + 8
+          "class": "fix", x1: xOf(f), x2: xOf(f), y1: base + 2, y2: base + 2 + geom.FIX
         }));
       }
     }
@@ -825,7 +860,8 @@
     for (var d = 0; d < n; d += xStep) {
       var anchor = d === 0 ? "start" : (d + xStep >= n ? "end" : "middle");
       var xt = svgEl("text", {
-        "class": "xtick", x: xOf(d), y: base + 24, "text-anchor": anchor
+        "class": "xtick", x: xOf(d), y: base + 2 + geom.FIX + 14,
+        "font-size": geom.XTICK, "text-anchor": anchor
       });
       xt.textContent = shortDate(frames[d].time);
       svg.appendChild(xt);
@@ -848,6 +884,16 @@
 
     chartBox.appendChild(svg);
     chartSvg = svg;
+  }
+
+  // Crossing the breakpoint changes the viewBox, so the chart is rebuilt and
+  // rebound, then repainted at whatever frame is currently showing.
+  function rebuildChart() {
+    if (!frames.length) return;
+    chartBox.textContent = "";
+    buildChart(stormName);
+    bindChart();
+    paint(previewIndex === null ? scrubIndex : previewIndex);
   }
 
   // The readout and the chart marker. Kept separate from the image swap so
@@ -937,7 +983,7 @@
     var r = chartSvg.getBoundingClientRect();
     if (!r.width) return scrubIndex;
     var units = ((clientX - r.left) / r.width) * W;
-    var t = (units - PAD_L) / (W - PAD_L - PAD_R);
+    var t = (units - geomNow.PAD_L) / (W - geomNow.PAD_L - PAD_R);
     var i = Math.round(t * (frames.length - 1));
     return Math.max(0, Math.min(frames.length - 1, i));
   }
@@ -1032,7 +1078,8 @@
     status.textContent = "Loading frames\u2026 0 of " + frames.length;
     range.max = frames.length - 1;
     range.setAttribute("aria-busy", "true");
-    buildChart(data.storm || "Ian");
+    stormName = data.storm || "Ian";
+    buildChart(stormName);
     return preload(frames.length);
   }).then(function (loaded) {
     if (!loaded) throw new Error("nothing loaded");
@@ -1047,6 +1094,11 @@
       render(Number(range.value));
     });
     bindChart();
+    if (narrowMq.addEventListener) {
+      narrowMq.addEventListener("change", rebuildChart);
+    } else if (narrowMq.addListener) {
+      narrowMq.addListener(rebuildChart);
+    }
 
     dateStart.textContent = shortDate(frames[0].time);
     dateEnd.textContent = shortDate(frames[frames.length - 1].time);

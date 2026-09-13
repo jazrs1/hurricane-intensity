@@ -29,13 +29,18 @@ plt.rcParams["font.family"] = "DejaVu Sans Mono"
 # drawn twice, each with type scaled for the width it is actually displayed at,
 # and the page picks between them with <picture media>.
 VARIANTS = [
-    # name,               figsize, dpi, tick, label, legend, s_interp, s_fix, note
-    ("heldout_scatter",       6.2, 200,  9.0,   9.5,    9.0,       13,    17, "desktop, shown at 560px"),
-    ("heldout_scatter_narrow", 5.0, 126, 13.0,  13.5,   12.5,      22,    26, "phone, shown at ~316px"),
+    # name,               figsize, dpi, tick, label, legend, s_interp, s_fix, diag, note
+    ("heldout_scatter",       6.2, 200,  9.0,   9.5,    9.0,       13,    17, True,
+     "desktop, shown at 560px"),
+    # No diagonal label on the phone render: rotated onto the line it was
+    # barely legible at 316px and it covered the densest part of the cloud.
+    # The caption already says the diagonal is perfect agreement.
+    ("heldout_scatter_narrow", 5.0, 126, 13.0,  13.5,   12.5,      22,    26, False,
+     "phone, shown at ~316px"),
 ]
 
 
-def render(name, figsize, dpi, fs_tick, fs_label, fs_legend, s_interp, s_fix, note):
+def render(name, figsize, dpi, fs_tick, fs_label, fs_legend, s_interp, s_fix, diag, note):
     fig, ax = plt.subplots(figsize=(figsize, figsize), dpi=dpi)
     fig.patch.set_facecolor(PAPER)
     ax.set_facecolor(PAPER)
@@ -43,16 +48,13 @@ def render(name, figsize, dpi, fs_tick, fs_label, fs_legend, s_interp, s_fix, no
     lim = (15, 150)
     ax.plot(lim, lim, color=RULE, lw=1.0, zorder=1)
 
-    # Names the diagonal on the figure itself, rotated onto the line -- the
-    # axes are equal-aspect and square, so 45 degrees is exact. It rides the
-    # stretch where the cloud has dropped below the line, and the paper-colored
-    # backing keeps it legible over the few points it crosses.
-    ax.text(
-        100, 100, "perfect agreement",
-        color=MUTED, fontsize=fs_tick, rotation=45,
-        rotation_mode="anchor", ha="center", va="bottom", zorder=4,
-        bbox=dict(facecolor=PAPER, edgecolor="none", pad=1.5),
-    )
+    # Horizontal and set above the upper end of the line, in the corner the
+    # cloud never reaches -- no rotation to read around, and nothing covered.
+    if diag:
+        ax.text(
+            138, 144, "perfect agreement",
+            color=MUTED, fontsize=fs_tick, ha="right", va="center", zorder=4,
+        )
 
     # alpha dropped from 0.55 to 1.0: blended against the paper the hollow
     # points came out at 2.18:1, under the 4.5:1 floor.

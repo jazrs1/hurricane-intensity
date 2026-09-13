@@ -1,6 +1,6 @@
 """Export frame PNGs + metadata for the Hurricane Ian scrubber on the project site.
 
-Writes site/frames/ian/NNN.png (160x160 grayscale, chronological) and
+Writes site/frames/ian/NNN.png (224x224 grayscale, chronological) and
 site/frames/ian.json, pairing each frame with its held-out prediction.
 """
 import json
@@ -30,7 +30,10 @@ IAN_ATCF_ID = "AL092022"
 OUT_DIR = REPO_ROOT / "site" / "frames"
 FRAME_DIR = OUT_DIR / "ian"
 JSON_PATH = OUT_DIR / "ian.json"
-FRAME_SIZE = 160
+# The post-transform tensor is already 224x224, so exporting at that size
+# removes a downsample rather than upscaling anything, and stops the page
+# from enlarging a 160px frame on a high-DPI screen.
+FRAME_SIZE = 224
 
 
 def main():
@@ -68,9 +71,9 @@ def main():
         image, _ = ds[int(ds_ian_positions[k])]
         # Channel 0 of the post-transform tensor is the normalized BT field in [0, 1].
         gray = np.clip(image[0].numpy() * 255.0, 0, 255).astype(np.uint8)
-        png = Image.fromarray(gray, mode="L").resize(
-            (FRAME_SIZE, FRAME_SIZE), Image.LANCZOS
-        )
+        png = Image.fromarray(gray, mode="L")
+        if png.size != (FRAME_SIZE, FRAME_SIZE):
+            png = png.resize((FRAME_SIZE, FRAME_SIZE), Image.LANCZOS)
         name = f"{index:0{width}d}.png"
         png.save(FRAME_DIR / name, optimize=True)
         total_bytes += (FRAME_DIR / name).stat().st_size
