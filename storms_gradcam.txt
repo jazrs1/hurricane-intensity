@@ -1,0 +1,22 @@
+# Grad-CAM attribution test subjects ONLY.
+#
+# These storms are NOT part of the training set (storms_train.txt) or the
+# held-out evaluation set (storms_holdout.txt). They exist purely so
+# scripts/gradcam.py has more Cat 3+ material to test attribution against.
+# Do not fold them into training, into results/heldout_predictions.csv, or
+# into any reported MAE -- see results/gradcam/findings.md for what they're
+# actually used for.
+#
+# All Atlantic, Cat 3+ (>=96kt peak per HURDAT2), within GOES-16 full-disk
+# coverage (2018-2024), and absent from both storms_train.txt and
+# storms_holdout.txt. Picked for a mix of years and storm behavior (two
+# open-ocean, non-landfalling majors plus one rapid-intensification/
+# landfalling major), each reaching at least Ian's Cat 4 peak (140kt) so
+# the >96kt comparison isn't just Ian again by other means.
+#
+# AL022024  Beryl, 2024-06-28 to 2024-07-11, peak 145kt (Cat 5) -- earliest-ever Atlantic Cat 5
+# AL132023  Lee,   2023-09-05 to 2023-09-18, peak 145kt (Cat 5) -- long-lived, open ocean, no landfall
+# AL182021  Sam,   2021-09-22 to 2021-10-07, peak 135kt (Cat 4) -- long-lived, open ocean, no landfall
+AL022024
+AL132023
+AL182021

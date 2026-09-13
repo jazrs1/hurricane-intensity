@@ -184,6 +184,29 @@
 
   .frames figcaption { margin-top: 9px; }
 
+  .gradcam-legend { width: 100%; height: auto; display: block; margin-top: 16px; }
+
+  .frames-4 { grid-template-columns: repeat(4, 1fr); }
+
+  .frame-weak {
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--hair);
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+  }
+  .frame-weak > div { flex: 0 0 130px; }
+  .frame-weak img {
+    width: 100%;
+    height: auto;
+    display: block;
+    background: #1b1b1b;
+    border: 1px solid var(--rule);
+  }
+  .frame-weak figcaption { margin-top: 9px; width: 154px; }
+  .frame-weak .aside { margin: 0; padding-top: 2px; }
+
   .caption {
     font-size: 15.5px;
     color: var(--muted);
@@ -489,7 +512,10 @@
       line-height: 1.5;
     }
     .frames { gap: 12px; }
+    .frames-4 { grid-template-columns: repeat(2, 1fr); }
     .frames figcaption { letter-spacing: 0; font-size: 11px; }
+    .frame-weak { flex-direction: column; gap: 14px; }
+    .frame-weak > div { flex-basis: auto; max-width: 130px; }
     #ian-scrubber figure { padding: 16px; }
     .scrub { grid-template-columns: 1fr; gap: 14px; }
     .scrub-frame { width: 100%; max-width: 224px; }
@@ -515,11 +541,13 @@
   </header>
 
   <nav class="jump" aria-label="Sections">
-    <a href="#ian-scrubber">Explore</a>
+    <a href="#method">Method</a>
     <span aria-hidden="true">&middot;</span>
     <a href="#results">Results</a>
     <span aria-hidden="true">&middot;</span>
-    <a href="#method">Method</a>
+    <a href="#ian-scrubber">Explore</a>
+    <span aria-hidden="true">&middot;</span>
+    <a href="#gradcam">Attention</a>
     <span aria-hidden="true">&middot;</span>
     <a href="https://github.com/jazrs1/hurricane-intensity">Code</a>
   </nav>
@@ -691,6 +719,42 @@
     <h3 class="subhead">Rapid intensity changes</h3>
     <p>Category 1 is a separate problem. Its error is nearly as large, and most of those frames are Ian on either side of its rapid intensification, where the storm changed faster than a six-hourly best track resolves.</p>
     <p>Both are testable, and neither is fixed here on purpose. Adding major hurricanes after seeing this failure would make the 9.00 knot figure hard to trust, so it stands as a baseline and the class-imbalance experiment comes next, measured against it.</p>
+  </section>
+
+  <section id="gradcam">
+    <h2>What the model looks at</h2>
+    <p>Grad-CAM shows which regions pushed the model's estimate up. The network's last convolutional layer is the final place where what it detected still has a location attached, so weighting those feature maps by the gradient of the predicted wind speed shows which regions raised the estimate. That layer is a 7 by 7 grid before it is stretched back over the frame. Each cell covers roughly 85 kilometers of the 600 kilometer crop, so what follows shows regions, not fine structure.</p>
+    <p>Across 454 frames above 96 knots from four storms the network never trained on, attribution overlaps the coldest cloud tops far more than chance: a mean correlation near +0.57, with almost no frame negative. Below hurricane strength the same measurement is noisy, with no reliable direction. The model attends most clearly at the intensities where it is least accurate.</p>
+    <figure>
+      <div class="frames frames-4">
+        <div>
+          <img src="figures/ian_140kt.png" alt="Infrared satellite frame of Hurricane Ian near peak intensity, overlaid with a Grad-CAM wash concentrated over the central dense overcast." width="224" height="224">
+          <figcaption class="label">Ian, 28 Sep 2022,<br>140 kt</figcaption>
+        </div>
+        <div>
+          <img src="figures/beryl_145kt.png" alt="Infrared satellite frame of Hurricane Beryl near peak intensity, overlaid with a Grad-CAM wash concentrated over the central dense overcast." width="224" height="224">
+          <figcaption class="label">Beryl, 2 Jul 2024,<br>145 kt</figcaption>
+        </div>
+        <div>
+          <img src="figures/lee_145kt.png" alt="Infrared satellite frame of Hurricane Lee near peak intensity, overlaid with a Grad-CAM wash concentrated over the central dense overcast." width="224" height="224">
+          <figcaption class="label">Lee, 8 Sep 2023,<br>145 kt</figcaption>
+        </div>
+        <div>
+          <img src="figures/sam_135kt.png" alt="Infrared satellite frame of Hurricane Sam near peak intensity, overlaid with a Grad-CAM wash concentrated over the central dense overcast." width="224" height="224">
+          <figcaption class="label">Sam, 26 Sep 2021,<br>135 kt</figcaption>
+        </div>
+      </div>
+      <img class="gradcam-legend" src="figures/gradcam_legend.png" alt="Color scale: plasma, transparent below a CAM value of 0.5, ramping through rose to bright yellow at 1.0." width="760" height="76">
+      <p class="caption">Four different storms near peak intensity, all held out of training. In each, attribution concentrates on the central deep convection, a filled region over the dense overcast rather than a ring on the eyewall. The overlay is transparent below a threshold, so plain gray means attribution there was below it.</p>
+    </figure>
+
+    <figure class="frame-weak">
+      <div>
+        <img src="figures/ian_30kt.png" alt="Infrared satellite frame of Hurricane Ian at 30 knots, overlaid with a Grad-CAM wash away from the storm's center." width="224" height="224">
+        <figcaption class="label">Ian, 22 Sep 2022,<br>30 kt</figcaption>
+      </div>
+      <p class="caption aside">Here the attributed region sits in a corner of the frame, away from the storm's most organized convection. That placement isn't consistent across weak-intensity frames as a group.</p>
+    </figure>
   </section>
 
   <footer>
