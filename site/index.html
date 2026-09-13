@@ -16,7 +16,8 @@
     --muted: #6E6859;
     --rule: #B6B2A5;
     --hair: #D6D2C6;
-    --accent: #8A6A3C;
+    --accent: #7D5F33;
+    --model: #8C4A32;
     --serif: "Newsreader", Georgia, serif;
     --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   }
@@ -24,6 +25,10 @@
   * { box-sizing: border-box; }
 
   html { -webkit-text-size-adjust: 100%; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
 
   body {
     margin: 0;
@@ -61,6 +66,34 @@
   }
 
   header .who { color: var(--muted); }
+
+  .jump {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 14px;
+    margin: -12px 0 28px;
+  }
+
+  .jump a,
+  .jump span {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+
+  /* padding, not height, so the row stays visually light while the tap
+     target reaches 44px */
+  .jump a {
+    display: inline-block;
+    line-height: 20px;
+    padding: 12px 0;
+    border-bottom: 0;
+  }
+
+  .jump a:hover { color: var(--ink); }
+  .jump span { color: var(--rule); }
 
   .kicker { display: block; color: var(--muted); margin-bottom: 20px; }
 
@@ -103,15 +136,33 @@
   section { margin-top: 72px; }
 
   h2 {
-    font-family: var(--mono);
-    font-size: 11.5px;
-    letter-spacing: 0.07em;
-    color: var(--muted);
-    font-weight: 400;
-    margin: 0 0 20px;
+    font-family: var(--serif);
+    font-size: 23px;
+    line-height: 1.25;
+    letter-spacing: -0.005em;
+    color: var(--ink);
+    font-weight: 500;
+    margin: 0 0 18px;
   }
 
   p { max-width: 33em; color: var(--body); }
+
+  .step-title,
+  .subhead {
+    font-family: var(--serif);
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1.35;
+  }
+
+  .step-title { margin: 0 0 3px; }
+
+  .step-detail { margin: 0; font-size: 16px; }
+
+  .subhead { margin: 30px 0 6px; }
+
+  .subhead:first-of-type { margin-top: 0; }
 
   p.lead { color: var(--ink); }
 
@@ -177,9 +228,13 @@
     font-family: var(--mono);
     font-size: 13.5px;
     margin-top: 40px;
-    width: auto;
-    max-width: 100%;
+    width: 100%;
+    max-width: 560px;
+    table-layout: fixed;
   }
+
+  th:first-child { width: 34%; }
+  th + th { width: 22%; }
 
   th {
     text-align: right;
@@ -192,8 +247,6 @@
   }
 
   th:first-child, td:first-child { text-align: left; }
-
-  th + th, td + td { padding-left: 26px; }
 
   td {
     text-align: right;
@@ -224,7 +277,14 @@
 
   a:hover { border-bottom-color: var(--ink); }
 
-  footer a { font-family: var(--mono); font-size: 13px; border-bottom-color: var(--hair); }
+  footer a {
+    font-family: var(--mono);
+    font-size: 13px;
+    border-bottom-color: var(--hair);
+    display: inline-block;
+    line-height: 22px;
+    padding: 11px 0;
+  }
 
   a:focus-visible {
     outline: 2px solid var(--ink);
@@ -233,6 +293,11 @@
   }
 
   /* --- Ian scrubber --- */
+
+  #ian-scrubber figure {
+    border: 1px solid var(--rule);
+    padding: 28px;
+  }
 
   .scrub {
     display: grid;
@@ -275,7 +340,7 @@
   }
 
   .scrub-read .v.truth { color: var(--ink); }
-  .scrub-read .v.pred { color: var(--ink); }
+  .scrub-read .v.pred { color: var(--model); }
   .scrub-read .v.note { font-size: 13.5px; color: var(--body); }
 
   .scrub-chart { margin-top: 28px; }
@@ -285,12 +350,20 @@
   .scrub-chart .grid { stroke: var(--hair); stroke-width: 1; }
   .scrub-chart line, .scrub-chart polyline { vector-effect: non-scaling-stroke; }
   .scrub-chart .tick { fill: var(--muted); font-family: var(--mono); font-size: 10px; }
-  .scrub-chart .fix { stroke: var(--rule); stroke-width: 1; }
+  .scrub-chart .fix { stroke: var(--muted); stroke-width: 1; }
   .scrub-chart .line-truth { fill: none; stroke: var(--ink); stroke-width: 1.4; }
-  .scrub-chart .line-pred { fill: none; stroke: var(--muted); stroke-width: 1.4; stroke-dasharray: 3.5 2.5; }
+  .scrub-chart .line-pred { fill: none; stroke: var(--model); stroke-width: 1.4; stroke-dasharray: 3.5 2.5; }
   .scrub-chart .marker { stroke: var(--muted); stroke-width: 1; }
   .scrub-chart .dot-truth { fill: var(--ink); }
-  .scrub-chart .dot-pred { fill: var(--muted); }
+  .scrub-chart .dot-pred { fill: var(--model); }
+
+  /* 9. axis annotation */
+  .scrub-chart .axis-unit,
+  .scrub-chart .xtick {
+    fill: var(--muted);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
 
   .scrub-legend {
     display: flex;
@@ -309,7 +382,7 @@
   }
 
   .scrub-legend .sw-truth { color: var(--ink); }
-  .scrub-legend .sw-pred { color: var(--muted); }
+  .scrub-legend .sw-pred { color: var(--model); }
   .scrub-legend .sw-pred i { border-top-style: dashed; }
 
   .scrub-ctl { margin-top: 18px; }
@@ -318,11 +391,50 @@
 
   .scrub-ctl input[type="range"] {
     width: 100%;
+    height: 44px;
     display: block;
     margin: 0;
     accent-color: var(--ink);
     background: transparent;
     cursor: pointer;
+  }
+
+  .scrub-dates {
+    display: flex;
+    justify-content: space-between;
+    margin-top: -2px;
+  }
+
+  .scrub-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 14px;
+  }
+
+  .play {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    min-height: 44px;
+    min-width: 84px;
+    padding: 0 16px;
+    cursor: pointer;
+  }
+
+  .play:hover { border-color: var(--ink); }
+
+  .play:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .play { display: none; }
   }
 
   .scrub-ctl input[type="range"]:disabled { cursor: default; opacity: 0.45; }
@@ -361,15 +473,26 @@
     body { font-size: 17px; }
     .page { padding: 28px 22px 80px; }
     h1 { font-size: 27px; }
-    header { margin-bottom: 48px; }
+    h2 { font-size: 21px; }
+    header { margin-bottom: 40px; }
     section { margin-top: 56px; }
     .metrics { gap: 32px; }
     .frames { gap: 12px; }
-    .scrub { grid-template-columns: 1fr; gap: 20px; }
+    .frames figcaption { letter-spacing: 0; font-size: 11px; }
+    #ian-scrubber figure { padding: 16px; }
+    .scrub { grid-template-columns: 1fr; gap: 14px; }
     .scrub-frame { width: 100%; max-width: 224px; }
-    .scrub-read { grid-template-columns: minmax(0, 1fr); }
-    .scrub-read .v { font-size: 18px; }
-    .scrub-chart .tick { display: none; }
+    .scrub-read {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 12px 16px;
+    }
+    .scrub-read .cell:last-child { grid-column: 1 / -1; }
+    .scrub-read .v { font-size: 18px; margin-top: 4px; }
+    .scrub-chart { margin-top: 18px; }
+    .scrub-legend { margin-top: 8px; gap: 6px 14px; }
+    .scrub-ctl { margin-top: 10px; }
+    .scrub-chart .tick,
+    .scrub-chart .xtick { display: none; }
   }
 </style>
 </head>
@@ -380,6 +503,16 @@
     <span class="label">hurricane.johnazer.com</span>
     <span class="label who">John Azer, September 2026</span>
   </header>
+
+  <nav class="jump" aria-label="Sections">
+    <a href="#ian-scrubber">Explore</a>
+    <span aria-hidden="true">&middot;</span>
+    <a href="#results">Results</a>
+    <span aria-hidden="true">&middot;</span>
+    <a href="#method">Method</a>
+    <span aria-hidden="true">&middot;</span>
+    <a href="https://github.com/jazrs1/hurricane-intensity">Code</a>
+  </nav>
 
   <span class="label kicker">Tropical cyclone intensity from satellite imagery</span>
 
@@ -422,28 +555,56 @@
     </figure>
   </section>
 
-  <section>
+  <section id="method">
     <h2>Method</h2>
     <ol class="method">
-      <li>Parse the NOAA HURDAT2 best track, drop entries the record marks extratropical, and interpolate the six-hourly fixes to hourly.</li>
-      <li>Match each position to the nearest GOES-16 ABI band 13 scan, accepting a time offset of up to ten minutes and logging it.</li>
-      <li>Cut a 600 kilometer box around the storm center, working in the satellite's own fixed-grid projection so the box stays square on the ground.</li>
-      <li>Clamp brightness temperature to 180&ndash;320 K, resize to 224 by 224, and regress wind speed directly with a ResNet-18.</li>
-      <li>Split the data by storm rather than by frame. Hourly frames of the same storm are near-duplicates, so a random split would leak the answer.</li>
+      <li>
+        <div>
+          <h3 class="step-title">Prepare storm records</h3>
+          <p class="step-detail">Parse the NOAA HURDAT2 best track, drop entries the record marks extratropical, and interpolate the six-hourly fixes to hourly.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3 class="step-title">Match satellite scans</h3>
+          <p class="step-detail">Match each position to the nearest GOES-16 ABI band 13 scan, accepting a time offset of up to ten minutes and logging it.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3 class="step-title">Crop storm imagery</h3>
+          <p class="step-detail">Cut a 600 kilometer box around the storm center, working in the satellite's own fixed-grid projection so the box stays square on the ground.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3 class="step-title">Normalize and regress</h3>
+          <p class="step-detail">Clamp brightness temperature to 180&ndash;320 K, resize to 224 by 224, and regress wind speed directly with a ResNet-18.</p>
+        </div>
+      </li>
+      <li>
+        <div>
+          <h3 class="step-title">Split by storm</h3>
+          <p class="step-detail">Split the data by storm rather than by frame. Hourly frames of the same storm are near-duplicates, so a random split would leak the answer.</p>
+        </div>
+      </li>
     </ol>
   </section>
 
-  <section>
+  <section id="results">
     <h2>Results</h2>
     <p class="lead">Three storms were held out entirely: Ian, Nicole and Claudette. The network never saw a frame of any of them during training.</p>
     <figure>
-      <img class="scatter" src="figures/heldout_scatter.png" alt="Scatter plot of predicted against best-track wind speed for 393 held-out frames, clustered around the one-to-one line and falling below it above about 120 knots." width="1246" height="1212">
+      <picture>
+        <source media="(max-width: 620px)" srcset="figures/heldout_scatter_narrow.png" width="633" height="601">
+        <img class="scatter" src="figures/heldout_scatter.png" alt="Scatter plot of predicted against best-track wind speed for 393 held-out frames, clustered around the one-to-one line and falling below it above about 120 knots, with the line labeled perfect agreement." width="1246" height="1213">
+      </picture>
       <p class="caption">Each point is one frame. The diagonal is perfect agreement. Best-track winds are recorded in five-knot steps, which is why the points stand in columns. Interpolated labels are drawn open; the 77 true best-track fixes are filled.</p>
     </figure>
 
     <table>
       <thead>
-        <tr><th>Category</th><th>Frames</th><th>MAE</th><th>Bias</th></tr>
+        <tr><th>Category</th><th>Frames</th><th>MAE (kt)</th><th>Bias (kt)</th></tr>
       </thead>
       <tbody>
         <tr><td>Depression</td><td>83</td><td>5.50</td><td>+2.38</td></tr>
@@ -455,7 +616,7 @@
         <tr class="flag"><td>Category 5</td><td>4</td><td>18.25</td><td>&minus;18.25</td></tr>
       </tbody>
     </table>
-    <p class="caption">Knots. Bias is the mean signed error, so a negative figure means the network guessed low.</p>
+    <p class="caption">Bias is the mean signed error, so a negative figure means the network guessed low.</p>
   </section>
 
   <section id="ian-scrubber" hidden>
@@ -499,18 +660,27 @@
       <div class="scrub-ctl">
         <label class="label" for="ian-range">Scrub through the storm</label>
         <input type="range" id="ian-range" min="0" max="0" step="1" value="0" disabled aria-describedby="ian-caption">
+        <div class="scrub-dates label">
+          <span id="ian-date-start">&nbsp;</span>
+          <span id="ian-date-end">&nbsp;</span>
+        </div>
+        <div class="scrub-actions">
+          <button type="button" class="play" id="ian-play" aria-pressed="false">Play</button>
+        </div>
       </div>
       <p class="label scrub-status" id="ian-status">Loading frames&hellip;</p>
 
-      <p class="caption" id="ian-caption">Every hour of Hurricane Ian, from a depression east of the Windward Islands on 22 September 2022 to landfall in South Carolina on 30 September. Ian was held out of training entirely, so every reading here is an out-of-sample estimate made from one frame. The model tracks the intensification closely, undershoots the peak by fourteen knots, then falls away faster than the storm does and stays about seventeen knots low through the weakening. Its line is the busier of the two because the best track is interpolated hourly between six-hourly fixes and can only bend in straight lines, while the model answers every frame on its own.</p>
+      <p class="caption" id="ian-caption">Every hour of Hurricane Ian, from a depression east of the Windward Islands on 22 September 2022 to landfall in South Carolina on 30 September. Ian was held out of training, so every reading is an out-of-sample estimate from a single frame. The model tracks the intensification closely, undershoots the peak by fourteen knots, then falls away faster than the storm and stays about seventeen knots low through the weakening. Its line is the busier of the two: the best track is interpolated hourly between six-hourly fixes and can only bend in straight lines, while the model answers every frame on its own.</p>
     </figure>
   </section>
 
   <section>
     <h2>Where it fails</h2>
-    <p>The network is accurate on weak systems and underestimates strong ones. At category 4 it reads a storm roughly 19 knots too low, and at category 5 about 18. Those bands hold 15 and 4 frames respectively, against 270 below hurricane strength, so the most likely explanation is that the model rarely saw a major hurricane and hedges toward the middle of the distribution it did see.</p>
-    <p>Category 1 is a separate problem. Its error is nearly as large, and most of those frames belong to Ian on either side of its rapid intensification, where the storm changed faster than a six-hourly best track resolves.</p>
-    <p>Both are testable, and neither is fixed here on purpose. Adding major hurricanes to the training set after seeing this failure would make the 9.00 knot figure difficult to trust, so it stands as a baseline and the class-imbalance experiment comes next, measured against it.</p>
+    <h3 class="subhead">Strong storms</h3>
+    <p>The network is accurate on weak systems and underestimates strong ones: roughly 19 knots low at category 4, about 18 at category 5. Those bands hold 15 and 4 frames against 270 below hurricane strength, so the likeliest explanation is that the model rarely saw a major hurricane and hedges toward the middle of the distribution it did see.</p>
+    <h3 class="subhead">Rapid intensity changes</h3>
+    <p>Category 1 is a separate problem. Its error is nearly as large, and most of those frames are Ian on either side of its rapid intensification, where the storm changed faster than a six-hourly best track resolves.</p>
+    <p>Both are testable, and neither is fixed here on purpose. Adding major hurricanes after seeing this failure would make the 9.00 knot figure hard to trust, so it stands as a baseline and the class-imbalance experiment comes next, measured against it.</p>
   </section>
 
   <footer>
@@ -536,10 +706,13 @@
   var elPred = document.getElementById("ian-pred");
   var elDiff = document.getElementById("ian-diff");
   var elKind = document.getElementById("ian-kind");
+  var playBtn = document.getElementById("ian-play");
+  var dateStart = document.getElementById("ian-date-start");
+  var dateEnd = document.getElementById("ian-date-end");
 
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   var MINUS = "\u2212";
-  var W = 720, H = 132, PAD_L = 34, PAD_R = 6, PAD_T = 10, PAD_B = 20;
+  var W = 720, H = 152, PAD_L = 34, PAD_R = 8, PAD_T = 20, PAD_B = 40;
 
   var scrubBox = section.querySelector(".scrub");
 
@@ -553,6 +726,11 @@
   var drawnIndex = -1;
   var queuedIndex = null;
   var queuedRaf = null;
+  var playing = false;
+  var playTimer = null;
+  var reduceMotion = window.matchMedia
+    ? window.matchMedia("(prefers-reduced-motion: reduce)")
+    : { matches: false };
 
   function pad(n, width) {
     var out = String(n);
@@ -573,6 +751,12 @@
   }
 
   function kt(v) { return v.toFixed(1) + " kt"; }
+
+  function shortDate(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return d.getUTCDate() + " " + MONTHS[d.getUTCMonth()];
+  }
 
   function signed(v) {
     return (v < 0 ? MINUS : "+") + Math.abs(v).toFixed(1) + " kt";
@@ -623,12 +807,28 @@
       svg.appendChild(lab);
     }
 
+    var unit = svgEl("text", {
+      "class": "axis-unit", x: PAD_L - 7, y: PAD_T - 7, "text-anchor": "end"
+    });
+    unit.textContent = "kt";
+    svg.appendChild(unit);
+
     for (var f = 0; f < n; f++) {
       if (!frames[f].is_interpolated) {
         svg.appendChild(svgEl("line", {
           "class": "fix", x1: xOf(f), x2: xOf(f), y1: base + 2, y2: base + 8
         }));
       }
+    }
+
+    var xStep = Math.max(1, Math.round((n - 1) / 4));
+    for (var d = 0; d < n; d += xStep) {
+      var anchor = d === 0 ? "start" : (d + xStep >= n ? "end" : "middle");
+      var xt = svgEl("text", {
+        "class": "xtick", x: xOf(d), y: base + 24, "text-anchor": anchor
+      });
+      xt.textContent = shortDate(frames[d].time);
+      svg.appendChild(xt);
     }
 
     var ptsTruth = [], ptsPred = [];
@@ -742,6 +942,39 @@
     return Math.max(0, Math.min(frames.length - 1, i));
   }
 
+  // Steps one frame at a time, slow enough to read the numbers, and stops
+  // itself at the last frame. Any manual scrub or chart click cancels it.
+  function stopPlay() {
+    if (playTimer !== null) { clearTimeout(playTimer); playTimer = null; }
+    if (!playing) return;
+    playing = false;
+    playBtn.textContent = "Play";
+    playBtn.setAttribute("aria-pressed", "false");
+  }
+
+  function startPlay() {
+    if (reduceMotion.matches || playing) return;
+    if (scrubIndex >= frames.length - 1) {
+      range.value = 0;
+      render(0);
+    }
+    playing = true;
+    playBtn.textContent = "Pause";
+    playBtn.setAttribute("aria-pressed", "true");
+    step();
+  }
+
+  function step() {
+    playTimer = setTimeout(function () {
+      if (!playing) return;
+      var next = scrubIndex + 1;
+      if (next > frames.length - 1) { stopPlay(); return; }
+      range.value = next;
+      render(next);
+      step();
+    }, 130);
+  }
+
   // Hover reads the chart without moving the scrubber; a click commits.
   // Touch never previews, so a tap cannot leave the readout stranded on a
   // frame the scrubber is not on.
@@ -754,6 +987,7 @@
     chartSvg.addEventListener("pointercancel", endPreview);
     chartSvg.addEventListener("click", function (e) {
       var i = indexAt(e.clientX);
+      stopPlay();
       range.value = i;
       render(i);
     });
@@ -807,10 +1041,29 @@
     range.disabled = false;
     range.removeAttribute("aria-busy");
     status.hidden = true;
-    range.addEventListener("input", function () { render(Number(range.value)); });
+    // Only user input fires this; setting range.value in code does not.
+    range.addEventListener("input", function () {
+      stopPlay();
+      render(Number(range.value));
+    });
     bindChart();
+
+    dateStart.textContent = shortDate(frames[0].time);
+    dateEnd.textContent = shortDate(frames[frames.length - 1].time);
+    if (reduceMotion.matches) {
+      playBtn.remove();
+    } else {
+      playBtn.addEventListener("click", function () {
+        if (playing) { stopPlay(); } else { startPlay(); }
+      });
+    }
   }).catch(function () {
     section.remove();
+    var link = document.querySelector('.jump a[href="#ian-scrubber"]');
+    if (link) {
+      if (link.nextElementSibling) link.nextElementSibling.remove();
+      link.remove();
+    }
   });
 })();
 </script>
