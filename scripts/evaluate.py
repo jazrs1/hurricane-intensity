@@ -38,14 +38,16 @@ print(f"overall MAE:      {errors.mean():.2f} kt")
 print(f"true fixes only:  {errors[is_fix].mean():.2f} kt  (n={is_fix.sum()})")
 print()
 
-BANDS = [(0, 33, "TD"), (34, 63, "TS"), (64, 82, "Cat 1"), (83, 95, "Cat 2"),
-         (96, 112, "Cat 3"), (113, 136, "Cat 4"), (137, 999, "Cat 5")]
+# Contiguous, lower bound inclusive, upper bound exclusive: interpolated
+# labels are fractional (e.g. 33.5 kt) and must land in exactly one band.
+BANDS = [(0, 34, "TD"), (34, 64, "TS"), (64, 83, "Cat 1"), (83, 96, "Cat 2"),
+         (96, 113, "Cat 3"), (113, 137, "Cat 4"), (137, float("inf"), "Cat 5")]
 
 for lo, hi, name in BANDS:
-    mask = (truths >= lo) & (truths <= hi)
+    mask = (truths >= lo) & (truths < hi)
     if mask.sum() > 0:
         print(f"{name:6s} {mask.sum():4d} samples   MAE {errors[mask].mean():6.2f} kt   bias {(preds[mask] - truths[mask]).mean():+6.2f} kt")
-cat1 = (truths >= 64) & (truths <= 82)
+cat1 = (truths >= 64) & (truths < 83)
 sub = ds.df[cat1].copy()
 sub["error"] = errors[cat1]
 print(sub.groupby("storm_name")["error"].agg(["count", "mean"]))
