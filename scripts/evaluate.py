@@ -1,23 +1,37 @@
+import argparse
 import torch
 import torch.nn as nn
 import numpy as np
 from torch.utils.data import DataLoader
 from torchvision.models import resnet18
 from hurricane_intensity.dataset import TCDataset
+from hurricane_intensity.splits import HOLDOUT_LIST, TRAIN_LIST, load_splits
 from pathlib import Path
 
-HOLDOUT_STORMS = ["AL092022", "AL172022", "AL032021"]
+parser = argparse.ArgumentParser()
+parser.add_argument("--checkpoint", default="best_model.pt")
+parser.add_argument("--holdout-list", default=str(HOLDOUT_LIST), help="storm list to evaluate on")
+parser.add_argument("--train-list", default=str(TRAIN_LIST),
+                    help="list the checkpoint was trained on; evaluation refuses any held-out storm that appears in it")
+parser.add_argument("--out", default="results/heldout_predictions.csv", help="per-sample predictions CSV")
+parser.add_argument("--circular-mask", action="store_true", help="fill outside the inscribed circle with 300 K (no rotation)")
+args = parser.parse_args()
+
+HOLDOUT_STORMS = load_splits(train_list=args.train_list, holdout_list=args.holdout_list)[2]
 PROCESSED_ROOT = "data/processed"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"checkpoint: {args.checkpoint}")
+print(f"held-out storms: {HOLDOUT_STORMS}")
 
 model = resnet18(weights=None)
 model.fc = nn.Linear(model.fc.in_features, 1)
-model.load_state_dict(torch.load("best_model.pt"))
+model.load_state_dict(torch.load(args.checkpoint))
 model = model.to(device)
 model.eval()
 
-ds = TCDataset(PROCESSED_ROOT, HOLDOUT_STORMS)
+ds = TCDataset(PROCESSED_ROOT, HOLDOUT_STORMS, circular_mask=args.circular_mask)
+print(f"circular mask: {args.circular_mask}")
 loader = DataLoader(ds, batch_size=32, shuffle=False)
 
 preds, truths = [], []
@@ -59,6 +73,6 @@ out["truth"] = truths
 out["signed_error"] = preds - truths
 out["abs_error"] = errors
 
-Path("results").mkdir(exist_ok=True)
-out.to_csv("results/heldout_predictions.csv", index=False)
-print(f"\nwrote results/heldout_predictions.csv  ({len(out)} rows)")
+Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+out.to_csv(args.out, index=False)
+print(f"\nwrote {args.out}  ({len(out)} rows)")
