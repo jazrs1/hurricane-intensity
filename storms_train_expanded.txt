@@ -1,0 +1,29 @@
+# Expanded arm of the more-distinct-storms experiment: storms_train_control2.txt
+# plus ten new training storms, built at 3-hourly sampling. Use with
+# --val-list storms_val_expanded.txt. Beryl, Lee and Sam are not here.
+AL142018
+AL142024
+AL052019
+AL062020
+AL092021
+AL142021
+AL102023
+AL012024
+AL042024
+# new training storms
+AL062018
+AL092019
+AL132019
+AL262020
+AL292020
+AL122021
+AL062022
+AL202023
+AL092024
+AL182024
+# validation (taken out of training by --val-list)
+AL192020
+AL162023
+AL132020
+AL202020
+AL082023

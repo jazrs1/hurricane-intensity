@@ -1,0 +1,13 @@
+# Nine-storm held-out set (H9) for the more-distinct-storms experiment: H6
+# plus Fiona, Kirk and Iota, all built hourly. Valid only for checkpoints
+# trained on storms_train_control2.txt or storms_train_expanded.txt; pass
+# that list to evaluate.py with --train-list so the overlap check uses it.
+AL092022
+AL172022
+AL032021
+AL022024
+AL132023
+AL182021
+AL072022
+AL122024
+AL312020

@@ -1,0 +1,8 @@
+# Expanded validation set for the more-distinct-storms experiment (both arms).
+# The original three plus two majors, so checkpoint selection sees more than
+# Laura above 96 kt. Pass with --val-list; storms_val.txt is unchanged.
+AL192020
+AL162023
+AL132020
+AL202020
+AL082023

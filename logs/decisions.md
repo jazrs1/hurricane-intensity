@@ -1282,3 +1282,181 @@ Caveat: validation's high end is one storm, Laura, 25 frames, maximum
 130 kt. The correction is fitted mostly on weaker frames, so it can only
 test linear recalibration. A correction specific to the high end cannot
 be fitted without high-end validation data.
+
+2026-10-14, 15:07. More-distinct-storms experiment, design (approved
+with changes). Written before the build and before any training.
+
+Hypothesis. The high-end bias is a representation problem: held-out Cat 4
+frames sit among training frames averaging 103 kt, and the embedding is
+organized by storm, most at Cat 4/5. Training on more distinct storms
+should improve how the embedding places and ranks strong storms it has not
+seen.
+
+Storms (all GOES-16, 2018-2024, from the 2025 HURDAT2 release):
+- New training, 3-hourly: Florence 2018, Humberto 2019, Lorenzo 2019,
+  Delta 2020, Eta 2020, Larry 2021, Earl 2022, Tammy 2023, Helene 2024,
+  Rafael 2024.
+- Validation, both arms, hourly: Sally, Ophelia, Laura (as before), plus
+  Teddy 2020 and Franklin 2023.
+- Held-out H9, hourly: H6 (Ian, Nicole, Claudette, Beryl, Lee, Sam) plus
+  Fiona 2022, Kirk 2024 and Iota 2020.
+- Beryl, Lee and Sam are never in training.
+
+Lorenzo was moved from held-out to training at approval, to add a fourth
+distinct Cat 5 storm to training. Its Cat 5 is a single special HURDAT2
+fix: 140 kt at 2019-09-29 03:00, with 130 kt six hours either side. So it
+adds ONE frame at >= 137 kt at either sampling (training Cat 5 frames
+66 -> 67), plus 14 frames at >= 113 kt and 27 at >= 96 kt at 3-hourly.
+This experiment therefore tests storm variety mostly at Cat 3/4; it does
+not materially change Cat 5 scarcity.
+
+Per split. Frames as sampled, and storm-hours on the hourly grid. Counts
+for storms not yet built are pipeline-grid estimates, which reproduced
+existing manifests exactly; actual counts are recorded after the build.
+
+| split | storms | frames | frames >=96 / >=113 / >=137 | storm-hours >=96 / >=113 / >=137 |
+|---|---|---|---|---|
+| control training (original nine, hourly) | 9 | 1307 | 258 / 174 / 66 | 260 / 174 / 66 |
+| expanded training: control + new ten (3-hourly) | 19 | 2084 (1307 + 777) | 394 / 220 / 67 | 672 / 313 / 67 |
+| validation, both arms (hourly) | 5 | 952 (386 + 566) | 134 / 61 / 0 | 134 / 61 / 0 |
+| held-out H9 (hourly) | 9 | 1756 (1197 + 559) | 653 / 379 / 31 | 659 / 381 / 31 |
+
+New storms, frames as sampled (>=96 / >=113 / >=137):
+- Training, 3-hourly: Florence 146 (34/18/0), Humberto 59 (13/0/0),
+  Lorenzo 77 (27/14/1), Delta 49 (12/1/0), Eta 104 (11/10/0), Larry 86
+  (28/0/0), Earl 63 (0), Tammy 106 (0), Helene 37 (5/3/0), Rafael 50
+  (6/0/0).
+- Validation, hourly: Teddy 259 (61/15/0), Franklin 307 (48/29/0).
+- Held-out, hourly: Fiona 232 (89/61/0), Kirk 181 (78/35/0), Iota 146
+  (32/26/0).
+- H9 above 96 kt: 653 frames from 7 storms (Ian 47, Beryl 104, Lee 115,
+  Sam 188, Fiona 89, Kirk 78, Iota 32).
+
+Sampling and weighting:
+- New training storms are 3-hourly; validation and held-out storms are
+  hourly. The original nine stay hourly as built.
+- Dorian's share of training: 27.3% (control) -> 17.1% (expanded).
+- The largest new storm is Florence, 7.0%. The new storms are 37% of
+  expanded training frames and 10 of 19 storms.
+- Known consequence: each original storm is still sampled three times as
+  densely as each new one.
+
+Arms (L1, unmasked, unrotated, ResNet-18 IMAGENET1K_V1, Adam lr 1e-4,
+batch 32, checkpoint selected on validation MAE; seeds 0-9; 20 runs;
+round-robin by seed, arm order alternating each round):
+
+| arm | train list | frames | batches/epoch | epochs | steps |
+|---|---|---|---|---|---|
+| control | storms_train_control2.txt | 1307 | 41 | 40 | 1640 |
+| expanded | storms_train_expanded.txt | ~2084 | 66 | 25 | 1650 (+0.6%) |
+
+Both arms use --val-list storms_val_expanded.txt. The expanded arm's final
+epoch count is fixed after the build: the whole number of epochs whose
+step total is nearest 1640, from the actual post-exclusion frame count.
+It is recorded here before training.
+
+Validation change. Both arms select on the expanded validation set, so the
+control differs from the expanded arm in training storms only. This
+control is NOT identical to earlier L1 runs (the 9.00 kt baseline, the
+seed and epoch reruns, arm A, the loss experiment's L1 arm), because
+validation changed. Checkpoint selection now sees Teddy and Franklin.
+
+Primary tests: on H9 pooled, expanded - control, two-sided exact
+permutation test on the difference of arm means (all 184,756 splits),
+Bonferroni 0.05 / 3 = 0.0167.
+1. Spearman correlation between prediction and best track over all H9
+   frames > 96 kt (653 frames). The metric no intervention has moved yet.
+2. >96 kt bias.
+3. Overall MAE.
+
+Pre-registered secondary (alpha 0.05): the same-storm neighbour fraction
+(k = 20, same-storm frames within +-6 h excluded, Euclidean on the 512-d
+features). It is computed on a frame set common to both arms: the original
+nine storms' 1307 training frames, with neighbours searched only among
+them, so the chance level is identical. (Over each arm's own training set
+it would be confounded: more storms lowers chance mechanically.) Expected
+direction: down.
+
+Exploratory, labelled as such:
+- per-storm >96 kt Spearman, MAE and bias, and the mean of per-storm
+  Spearman values;
+- per-band bias;
+- the H6 and H3 subsets;
+- the Ian Cat 3 / Cat 4-5 check;
+- selected epochs (most runs at 24-25 is flagged as possibly
+  under-trained, not rerun);
+- run order.
+All 20 runs are reported.
+
+Approximate detectable effects at alpha 0.0167 and 80% power (1.57 x
+run-to-run sd): Spearman about 0.05, >96 kt bias about 2.3-5 kt, overall
+MAE about 0.9 kt.
+
+Not chosen:
+- Leslie 2018 and Paulette 2020 (481 and 518 frames of Cat 1-2 would
+  dominate).
+- Bonnie 2022 (major phase in the East Pacific).
+- Grace 2021, Epsilon and Zeta 2020 (short major phases; alternates).
+
+2025 / GOES-19 storms: Dexter, Erin (140 kt), Gabrielle (120), Humberto
+(140, 11 h >= 137), Imelda and Melissa (165 kt, 37 h >= 137). GOES-19
+replaced GOES-16 as GOES-East on 2025-04-07, and the pipeline reads the
+noaa-goes16 bucket by default. These storms are a candidate future
+cross-satellite test set. They are left untouched, not downloaded, and
+in no split, until that test is designed.
+
+Code and data for this design:
+- train.py --val-list.
+- List files storms_val_expanded.txt, storms_train_control2.txt,
+  storms_train_expanded.txt and storms_holdout_h9.txt. Checked: the
+  control trains on exactly the original nine; both arms share validation
+  and H9; no overlaps.
+- Build with scripts/build_batch.py: the ten training storms at
+  --sample-interval 3h; Teddy, Franklin, Fiona, Kirk and Iota at 1h.
+  About 1902 frames, 2.5-2.9 h.
+- Then check_nan.py regenerates excluded_crops.txt.
+- No training until the build is done and the exclusions have been
+  reviewed.
+
+2026-10-14, 17:31. More-distinct-storms build and exclusions. No
+training yet.
+
+Build (scripts/build_batch.py; logs in logs/storm_build/), all 15 storms
+succeeded:
+- Ten training storms at 3h: 775 of 777 sample times matched (Helene
+  36/37, Rafael 49/50). 15:07-16:06.
+- Five validation and held-out storms at 1h: 1121 of 1125 matched (Kirk
+  177/181). 16:06-17:29.
+- About 4.6 s per frame.
+
+check_nan.py regenerated excluded_crops.txt: 21 of 4794 frames on disk,
+was 8. None removed; 13 added, all crops with missing pixels in the source
+full-disk scan (blocks of 6-100% of the crop):
+- Teddy (validation), 10 frames, 2020-09-17 18Z to 09-18 14Z, 108-120 kt,
+  including the 120 kt peak fix. NaN blocks of 6-57% that move from hour
+  to hour: data dropouts across consecutive scans. Teddy keeps 51 of its 61
+  frames >= 96 kt and 10 of 15 >= 113 kt.
+- Franklin (validation), 2 frames: 2023-08-31 05Z (86 kt, 33% NaN) and
+  09-01 05Z (71 kt, 100% NaN).
+- Larry (training), 1 frame: 2021-09-11 06Z (65 kt, 100% NaN).
+
+Actual counts after exclusion. Frames, then >= 96 / >= 113 / >= 137 kt:
+- control training: 1307; 258 / 174 / 66
+- expanded training: 2081 (1307 + 774); 394 / 220 / 67
+- validation: 940; 124 / 56 / 0 (Teddy's exclusions take 10 of the 134
+  frames >= 96 and 5 of the 61 >= 113)
+- H9: 1752; 653 / 379 / 31 (Fiona, Kirk, Iota: 555; 199 / 122 / 0)
+
+Step budget, fixed now:
+- control: 40 epochs x 41 batches = 1640 steps
+- expanded: 25 epochs x 66 batches = 1650 steps (+0.6%)
+Dorian is 27.3% of control training and 17.2% of expanded.
+
+2026-10-14, 18:08. Exclusions approved; the rule is unchanged (any NaN pixel
+excludes the frame), including the ten Teddy frames at its peak.
+
+Validation has no frames at or above 137 kt: Sally, Ophelia, Laura, Teddy
+(peak 120) and Franklin (peak 130). Epoch selection is therefore blind at
+Cat 5 in both arms. Validation MAE says nothing about how a checkpoint
+does on Cat 5 frames, and any Cat 5 result on H9 (31 frames: Ian 4,
+Beryl 18, Lee 9) comes from checkpoints chosen without seeing that range.

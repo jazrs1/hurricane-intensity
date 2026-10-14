@@ -1,0 +1,18 @@
+# Control arm of the more-distinct-storms experiment: the original nine
+# training storms, plus the five storms of storms_val_expanded.txt (listed
+# here because a train list names every storm a checkpoint sees; they are
+# taken out of training by --val-list storms_val_expanded.txt).
+AL142018
+AL142024
+AL052019
+AL062020
+AL092021
+AL142021
+AL102023
+AL012024
+AL042024
+AL192020
+AL162023
+AL132020
+AL202020
+AL082023
