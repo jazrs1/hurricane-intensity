@@ -21,8 +21,9 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 os.chdir(REPO_ROOT)
 
 from hurricane_intensity.dataset import TCDataset  # noqa: E402
+from hurricane_intensity.splits import load_splits  # noqa: E402
 
-HOLDOUT_STORMS = ["AL092022", "AL172022", "AL032021"]
+HOLDOUT_STORMS = load_splits()[2]
 PROCESSED_ROOT = REPO_ROOT / "data" / "processed"
 PREDICTIONS_CSV = REPO_ROOT / "results" / "heldout_predictions.csv"
 IAN_ATCF_ID = "AL092022"

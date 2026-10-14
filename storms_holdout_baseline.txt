@@ -1,0 +1,6 @@
+# Baseline held-out set, frozen: storms_holdout.txt as it was when the
+# 9.00 kt result was reported (Ian, Nicole, Claudette). Do not add storms
+# here; pass it with --holdout-list for numbers comparable to that baseline.
+AL092022
+AL172022
+AL032021

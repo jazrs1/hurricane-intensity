@@ -2,10 +2,9 @@ import torch
 from pathlib import Path
 from hurricane_intensity.dataset import TCDataset
 
-ALL_STORMS = ["AL142018", "AL142024", "AL052019", "AL062020", "AL092021",
-              "AL142021", "AL102023", "AL012024", "AL042024",
-              "AL192020", "AL162023", "AL132020",
-              "AL092022", "AL172022", "AL032021"]
+# Every storm with crops on disk, whichever list it is in, so regenerating
+# the exclusion file can't drop a storm that was added after this was written.
+ALL_STORMS = sorted(p.parent.name for p in Path("data/processed").glob("*/manifest.csv"))
 Path("excluded_crops.txt").unlink(missing_ok=True)
 ds = TCDataset("data/processed", ALL_STORMS)
 

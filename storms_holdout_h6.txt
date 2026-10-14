@@ -1,0 +1,12 @@
+# Six-storm held-out set (H6) for checkpoints trained on the original nine
+# storms (storms_train_baseline.txt) only. Beryl, Lee and Sam are not in that
+# list, so they are unseen here. NOT valid for anything trained on the live
+# 11-storm storms_train.txt, which contains Beryl and Lee; pass
+# --train-list storms_train_baseline.txt to evaluate.py so the overlap check
+# runs against the list the checkpoint was actually trained on.
+AL092022
+AL172022
+AL032021
+AL022024
+AL132023
+AL182021

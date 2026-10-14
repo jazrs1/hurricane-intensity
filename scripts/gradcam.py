@@ -39,6 +39,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 os.chdir(REPO_ROOT)
 
 from hurricane_intensity.dataset import TCDataset  # noqa: E402
+from hurricane_intensity.splits import load_splits, load_storm_list  # noqa: E402
 
 PROCESSED_ROOT = REPO_ROOT / "data" / "processed"
 MODEL_PATH = REPO_ROOT / "best_model.pt"
@@ -401,22 +402,12 @@ def resolve_frame(ds, storm_id, timestamp):
     return int(matches[0])
 
 
-# Same three storms scripts/evaluate.py holds out -- kept as a separate
-# constant here (not imported) since evaluate.py isn't a module, only a
-# script; if that list changes there, change it here too. This is the
-# --survey default, but --storms/--storms-file can point it at any other
-# list (e.g. storms_gradcam.txt) -- those are attribution test subjects
-# only, never held-out evaluation data, and must not be reported as such.
-HOLDOUT_STORMS = ["AL092022", "AL172022", "AL032021"]
-
-
-def load_storm_list(path):
-    ids = []
-    for line in Path(path).read_text().splitlines():
-        line = line.split("#", 1)[0].strip()
-        if line:
-            ids.append(line.upper())
-    return ids
+# The storms scripts/evaluate.py holds out, read from the same
+# storms_holdout.txt. This is the --survey default, but --storms-file can
+# point it at any other list (e.g. storms_gradcam.txt) -- a list passed
+# that way is not thereby held-out evaluation data and must not be
+# reported as such.
+HOLDOUT_STORMS = load_splits()[2]
 
 
 def run_alignment_survey(model, device, min_kt, max_kt, storms=HOLDOUT_STORMS):

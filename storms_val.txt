@@ -1,0 +1,6 @@
+# Validation storms: drive checkpoint selection in scripts/train.py.
+# Each must also be listed in storms_train.txt; hurricane_intensity.splits
+# takes them out of the training set.
+AL192020
+AL162023
+AL132020

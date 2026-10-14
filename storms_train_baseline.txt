@@ -1,0 +1,16 @@
+# Baseline split, frozen: storms_train.txt as it was when the 9.00 kt
+# checkpoint (models/baseline_9kt.pt) was trained -- nine training storms plus
+# the three validation storms. Do not add storms here; pass it with
+# --train-list to reproduce the baseline.
+AL142018
+AL142024
+AL052019
+AL132020
+AL192020
+AL062020
+AL092021
+AL142021
+AL102023
+AL162023
+AL012024
+AL042024
