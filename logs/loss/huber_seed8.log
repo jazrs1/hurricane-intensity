@@ -1,0 +1,67 @@
+RUN loss=huber seed=8 order=27 list=storms_train_baseline.txt epochs=40
+START 2026-10-14T12:35:42-04:00 | 2026/10/14 12:35:42.694, 42, 2550 MHz, 57.93 W, 0 %, Not Active, Not Active, Not Active
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024']
+val storms:   ['AL192020', 'AL162023', 'AL132020']
+seed: 8  checkpoint: models/loss/huber/seed8.pt  loss: huber
+after exclusion: 1307
+after exclusion: 386
+train samples: 1307  val samples: 386
+epoch 1: train 45.52 kt  val 42.41 kt  (huber loss: train 0.011908  val 0.010998)
+  saved
+epoch 2: train 28.84 kt  val 25.32 kt  (huber loss: train 0.007084  val 0.006093)
+  saved
+epoch 3: train 19.60 kt  val 16.47 kt  (huber loss: train 0.004414  val 0.003566)
+  saved
+epoch 4: train 14.40 kt  val 29.10 kt  (huber loss: train 0.002948  val 0.007159)
+epoch 5: train 11.54 kt  val 14.29 kt  (huber loss: train 0.002198  val 0.002915)
+  saved
+epoch 6: train 9.76 kt  val 11.26 kt  (huber loss: train 0.001702  val 0.002086)
+  saved
+epoch 7: train 7.86 kt  val 11.75 kt  (huber loss: train 0.001229  val 0.002251)
+epoch 8: train 7.35 kt  val 11.00 kt  (huber loss: train 0.001096  val 0.002022)
+  saved
+epoch 9: train 6.28 kt  val 13.02 kt  (huber loss: train 0.000855  val 0.002578)
+epoch 10: train 8.19 kt  val 10.65 kt  (huber loss: train 0.001332  val 0.001942)
+  saved
+epoch 11: train 6.38 kt  val 10.06 kt  (huber loss: train 0.000865  val 0.001776)
+  saved
+epoch 12: train 6.03 kt  val 11.10 kt  (huber loss: train 0.000790  val 0.002037)
+epoch 13: train 5.20 kt  val 9.94 kt  (huber loss: train 0.000616  val 0.001752)
+  saved
+epoch 14: train 5.56 kt  val 16.66 kt  (huber loss: train 0.000677  val 0.003525)
+epoch 15: train 6.60 kt  val 9.69 kt  (huber loss: train 0.000927  val 0.001684)
+  saved
+epoch 16: train 6.33 kt  val 11.17 kt  (huber loss: train 0.000867  val 0.002039)
+epoch 17: train 5.20 kt  val 11.10 kt  (huber loss: train 0.000636  val 0.002033)
+epoch 18: train 4.57 kt  val 9.33 kt  (huber loss: train 0.000499  val 0.001567)
+  saved
+epoch 19: train 3.79 kt  val 9.20 kt  (huber loss: train 0.000341  val 0.001547)
+  saved
+epoch 20: train 4.14 kt  val 11.57 kt  (huber loss: train 0.000437  val 0.002158)
+epoch 21: train 5.03 kt  val 9.10 kt  (huber loss: train 0.000581  val 0.001529)
+  saved
+epoch 22: train 3.88 kt  val 8.81 kt  (huber loss: train 0.000364  val 0.001479)
+  saved
+epoch 23: train 3.90 kt  val 8.72 kt  (huber loss: train 0.000355  val 0.001415)
+  saved
+epoch 24: train 3.83 kt  val 9.04 kt  (huber loss: train 0.000348  val 0.001474)
+epoch 25: train 3.44 kt  val 8.89 kt  (huber loss: train 0.000283  val 0.001470)
+epoch 26: train 3.67 kt  val 9.02 kt  (huber loss: train 0.000316  val 0.001504)
+epoch 27: train 3.18 kt  val 9.37 kt  (huber loss: train 0.000236  val 0.001575)
+epoch 28: train 2.95 kt  val 9.11 kt  (huber loss: train 0.000202  val 0.001527)
+epoch 29: train 2.59 kt  val 9.00 kt  (huber loss: train 0.000166  val 0.001466)
+epoch 30: train 2.69 kt  val 8.86 kt  (huber loss: train 0.000176  val 0.001460)
+epoch 31: train 2.70 kt  val 8.61 kt  (huber loss: train 0.000169  val 0.001402)
+  saved
+epoch 32: train 2.97 kt  val 9.96 kt  (huber loss: train 0.000213  val 0.001716)
+epoch 33: train 3.02 kt  val 8.85 kt  (huber loss: train 0.000229  val 0.001470)
+epoch 34: train 2.65 kt  val 9.43 kt  (huber loss: train 0.000166  val 0.001583)
+epoch 35: train 2.61 kt  val 8.76 kt  (huber loss: train 0.000163  val 0.001443)
+epoch 36: train 2.65 kt  val 9.11 kt  (huber loss: train 0.000168  val 0.001487)
+epoch 37: train 2.83 kt  val 9.83 kt  (huber loss: train 0.000192  val 0.001670)
+epoch 38: train 2.96 kt  val 8.74 kt  (huber loss: train 0.000211  val 0.001426)
+epoch 39: train 3.96 kt  val 8.55 kt  (huber loss: train 0.000348  val 0.001381)
+  saved
+epoch 40: train 2.89 kt  val 8.95 kt  (huber loss: train 0.000195  val 0.001458)
+END 2026-10-14T12:37:28-04:00 | 2026/10/14 12:37:28.872, 45, 2910 MHz, 86.42 W, 3 %, Not Active, Not Active, Not Active

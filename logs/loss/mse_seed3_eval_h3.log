@@ -1,0 +1,20 @@
+checkpoint: models/loss/mse/seed3.pt
+held-out storms: ['AL092022', 'AL172022', 'AL032021']
+after exclusion: 393
+held-out samples: 393
+overall MAE:      10.43 kt
+true fixes only:  11.43 kt  (n=77)
+
+TD       88 samples   MAE   6.52 kt   bias  +1.68 kt
+TS      189 samples   MAE   9.18 kt   bias  -3.97 kt
+Cat 1    60 samples   MAE  17.43 kt   bias -13.96 kt
+Cat 2     9 samples   MAE  10.57 kt   bias  +3.44 kt
+Cat 3    26 samples   MAE   6.44 kt   bias  +2.76 kt
+Cat 4    17 samples   MAE  20.95 kt   bias -20.95 kt
+Cat 5     4 samples   MAE  31.50 kt   bias -31.50 kt
+            count       mean
+storm_name                  
+IAN            48  16.402353
+NICOLE         12  21.558390
+
+wrote results/loss/mse_seed3_h3.csv  (393 rows)

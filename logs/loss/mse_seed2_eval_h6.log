@@ -1,0 +1,23 @@
+checkpoint: models/loss/mse/seed2.pt
+held-out storms: ['AL092022', 'AL172022', 'AL032021', 'AL022024', 'AL132023', 'AL182021']
+after exclusion: 1197
+held-out samples: 1197
+overall MAE:      13.05 kt
+true fixes only:  12.53 kt  (n=216)
+
+TD      123 samples   MAE   7.68 kt   bias  +4.26 kt
+TS      326 samples   MAE   9.42 kt   bias  -3.28 kt
+Cat 1   174 samples   MAE  11.78 kt   bias  -9.45 kt
+Cat 2   120 samples   MAE  12.22 kt   bias  -7.49 kt
+Cat 3   197 samples   MAE  14.65 kt   bias -10.14 kt
+Cat 4   226 samples   MAE  19.86 kt   bias -19.08 kt
+Cat 5    31 samples   MAE  22.84 kt   bias -22.84 kt
+            count       mean
+storm_name                  
+BERYL          27   8.927688
+IAN            48  15.002064
+LEE            58  11.003498
+NICOLE         12  21.138014
+SAM            29   6.800264
+
+wrote results/loss/mse_seed2_h6.csv  (1197 rows)

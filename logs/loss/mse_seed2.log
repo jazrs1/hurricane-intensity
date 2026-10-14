@@ -1,0 +1,63 @@
+RUN loss=mse seed=2 order=7 list=storms_train_baseline.txt epochs=40
+START 2026-10-14T11:58:09-04:00 | 2026/10/14 11:58:09.061, 43, 2580 MHz, 55.02 W, 3 %, Not Active, Not Active, Not Active
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024']
+val storms:   ['AL192020', 'AL162023', 'AL132020']
+seed: 2  checkpoint: models/loss/mse/seed2.pt  loss: mse
+after exclusion: 1307
+after exclusion: 386
+train samples: 1307  val samples: 386
+epoch 1: train 37.49 kt  val 62.15 kt  (mse loss: train 0.069176  val 0.146429)
+  saved
+epoch 2: train 23.45 kt  val 20.26 kt  (mse loss: train 0.026109  val 0.019656)
+  saved
+epoch 3: train 16.09 kt  val 14.60 kt  (mse loss: train 0.012093  val 0.009913)
+  saved
+epoch 4: train 12.84 kt  val 12.43 kt  (mse loss: train 0.007763  val 0.007164)
+  saved
+epoch 5: train 9.94 kt  val 11.87 kt  (mse loss: train 0.004554  val 0.006271)
+  saved
+epoch 6: train 7.76 kt  val 11.76 kt  (mse loss: train 0.002817  val 0.006269)
+  saved
+epoch 7: train 6.52 kt  val 12.42 kt  (mse loss: train 0.001985  val 0.006942)
+epoch 8: train 7.14 kt  val 13.04 kt  (mse loss: train 0.002375  val 0.007869)
+epoch 9: train 6.23 kt  val 11.24 kt  (mse loss: train 0.001832  val 0.005732)
+  saved
+epoch 10: train 6.87 kt  val 12.31 kt  (mse loss: train 0.002284  val 0.007119)
+epoch 11: train 7.22 kt  val 13.03 kt  (mse loss: train 0.002433  val 0.007712)
+epoch 12: train 7.13 kt  val 12.39 kt  (mse loss: train 0.002336  val 0.006956)
+epoch 13: train 7.18 kt  val 14.90 kt  (mse loss: train 0.002355  val 0.009857)
+epoch 14: train 5.72 kt  val 11.93 kt  (mse loss: train 0.001529  val 0.006388)
+epoch 15: train 5.19 kt  val 11.46 kt  (mse loss: train 0.001244  val 0.005714)
+epoch 16: train 4.39 kt  val 10.23 kt  (mse loss: train 0.000895  val 0.004927)
+  saved
+epoch 17: train 4.44 kt  val 10.63 kt  (mse loss: train 0.000942  val 0.005005)
+epoch 18: train 4.46 kt  val 10.66 kt  (mse loss: train 0.000903  val 0.005239)
+epoch 19: train 5.39 kt  val 10.92 kt  (mse loss: train 0.001326  val 0.005532)
+epoch 20: train 5.05 kt  val 10.18 kt  (mse loss: train 0.001168  val 0.004761)
+  saved
+epoch 21: train 5.27 kt  val 11.06 kt  (mse loss: train 0.001281  val 0.005540)
+epoch 22: train 4.45 kt  val 9.68 kt  (mse loss: train 0.000935  val 0.004154)
+  saved
+epoch 23: train 4.09 kt  val 10.34 kt  (mse loss: train 0.000771  val 0.004851)
+epoch 24: train 4.78 kt  val 9.76 kt  (mse loss: train 0.001047  val 0.004356)
+epoch 25: train 4.19 kt  val 10.64 kt  (mse loss: train 0.000821  val 0.005144)
+epoch 26: train 3.86 kt  val 9.73 kt  (mse loss: train 0.000706  val 0.004269)
+epoch 27: train 3.78 kt  val 8.96 kt  (mse loss: train 0.000645  val 0.003699)
+  saved
+epoch 28: train 4.54 kt  val 10.02 kt  (mse loss: train 0.000922  val 0.004533)
+epoch 29: train 3.78 kt  val 9.65 kt  (mse loss: train 0.000675  val 0.004180)
+epoch 30: train 3.94 kt  val 10.12 kt  (mse loss: train 0.000699  val 0.004755)
+epoch 31: train 3.91 kt  val 11.46 kt  (mse loss: train 0.000723  val 0.005717)
+epoch 32: train 4.50 kt  val 9.61 kt  (mse loss: train 0.000930  val 0.004113)
+epoch 33: train 3.91 kt  val 10.24 kt  (mse loss: train 0.000731  val 0.004762)
+epoch 34: train 4.48 kt  val 9.23 kt  (mse loss: train 0.000995  val 0.003769)
+epoch 35: train 4.33 kt  val 10.85 kt  (mse loss: train 0.000851  val 0.005071)
+epoch 36: train 3.59 kt  val 8.89 kt  (mse loss: train 0.000589  val 0.003689)
+  saved
+epoch 37: train 3.67 kt  val 9.91 kt  (mse loss: train 0.000598  val 0.004437)
+epoch 38: train 3.27 kt  val 8.61 kt  (mse loss: train 0.000511  val 0.003543)
+  saved
+epoch 39: train 3.72 kt  val 9.36 kt  (mse loss: train 0.000675  val 0.003873)
+epoch 40: train 3.14 kt  val 8.82 kt  (mse loss: train 0.000471  val 0.003551)
+END 2026-10-14T11:59:54-04:00 | 2026/10/14 11:59:54.168, 46, 2910 MHz, 89.34 W, 3 %, Not Active, Not Active, Not Active

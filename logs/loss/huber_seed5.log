@@ -1,0 +1,61 @@
+RUN loss=huber seed=5 order=18 list=storms_train_baseline.txt epochs=40
+START 2026-10-14T12:18:51-04:00 | 2026/10/14 12:18:51.199, 42, 2617 MHz, 62.71 W, 1 %, Not Active, Not Active, Not Active
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024']
+val storms:   ['AL192020', 'AL162023', 'AL132020']
+seed: 5  checkpoint: models/loss/huber/seed5.pt  loss: huber
+after exclusion: 1307
+after exclusion: 386
+train samples: 1307  val samples: 386
+epoch 1: train 41.81 kt  val 36.27 kt  (huber loss: train 0.010832  val 0.009234)
+  saved
+epoch 2: train 33.46 kt  val 25.13 kt  (huber loss: train 0.008414  val 0.005994)
+  saved
+epoch 3: train 24.60 kt  val 25.38 kt  (huber loss: train 0.005866  val 0.006080)
+epoch 4: train 21.92 kt  val 26.49 kt  (huber loss: train 0.005097  val 0.006368)
+epoch 5: train 17.17 kt  val 17.03 kt  (huber loss: train 0.003755  val 0.003718)
+  saved
+epoch 6: train 13.78 kt  val 13.18 kt  (huber loss: train 0.002776  val 0.002632)
+  saved
+epoch 7: train 11.80 kt  val 14.29 kt  (huber loss: train 0.002235  val 0.002921)
+epoch 8: train 8.58 kt  val 11.89 kt  (huber loss: train 0.001401  val 0.002273)
+  saved
+epoch 9: train 7.17 kt  val 13.59 kt  (huber loss: train 0.001068  val 0.002734)
+epoch 10: train 6.96 kt  val 12.02 kt  (huber loss: train 0.001001  val 0.002310)
+epoch 11: train 7.83 kt  val 12.42 kt  (huber loss: train 0.001214  val 0.002426)
+epoch 12: train 7.39 kt  val 10.68 kt  (huber loss: train 0.001129  val 0.001952)
+  saved
+epoch 13: train 7.46 kt  val 11.28 kt  (huber loss: train 0.001112  val 0.002130)
+epoch 14: train 7.03 kt  val 10.42 kt  (huber loss: train 0.001008  val 0.001861)
+  saved
+epoch 15: train 5.46 kt  val 11.09 kt  (huber loss: train 0.000652  val 0.002085)
+epoch 16: train 5.12 kt  val 10.48 kt  (huber loss: train 0.000605  val 0.001910)
+epoch 17: train 5.26 kt  val 11.84 kt  (huber loss: train 0.000640  val 0.002248)
+epoch 18: train 5.05 kt  val 12.22 kt  (huber loss: train 0.000590  val 0.002372)
+epoch 19: train 4.73 kt  val 10.52 kt  (huber loss: train 0.000522  val 0.001941)
+epoch 20: train 5.22 kt  val 11.05 kt  (huber loss: train 0.000614  val 0.002044)
+epoch 21: train 5.41 kt  val 10.26 kt  (huber loss: train 0.000645  val 0.001857)
+  saved
+epoch 22: train 4.83 kt  val 10.43 kt  (huber loss: train 0.000552  val 0.001901)
+epoch 23: train 4.23 kt  val 11.33 kt  (huber loss: train 0.000424  val 0.002125)
+epoch 24: train 4.73 kt  val 10.02 kt  (huber loss: train 0.000511  val 0.001793)
+  saved
+epoch 25: train 4.64 kt  val 9.91 kt  (huber loss: train 0.000514  val 0.001778)
+  saved
+epoch 26: train 4.01 kt  val 11.44 kt  (huber loss: train 0.000383  val 0.002118)
+epoch 27: train 3.74 kt  val 11.04 kt  (huber loss: train 0.000328  val 0.002070)
+epoch 28: train 3.36 kt  val 11.49 kt  (huber loss: train 0.000270  val 0.002113)
+epoch 29: train 3.37 kt  val 10.42 kt  (huber loss: train 0.000259  val 0.001862)
+epoch 30: train 3.59 kt  val 10.44 kt  (huber loss: train 0.000307  val 0.001865)
+epoch 31: train 3.50 kt  val 10.80 kt  (huber loss: train 0.000309  val 0.001980)
+epoch 32: train 3.76 kt  val 9.98 kt  (huber loss: train 0.000349  val 0.001771)
+epoch 33: train 4.56 kt  val 10.50 kt  (huber loss: train 0.000520  val 0.001885)
+epoch 34: train 3.86 kt  val 10.68 kt  (huber loss: train 0.000339  val 0.001893)
+epoch 35: train 3.50 kt  val 9.60 kt  (huber loss: train 0.000281  val 0.001642)
+  saved
+epoch 36: train 3.60 kt  val 10.60 kt  (huber loss: train 0.000298  val 0.001908)
+epoch 37: train 3.42 kt  val 12.42 kt  (huber loss: train 0.000288  val 0.002428)
+epoch 38: train 3.63 kt  val 9.68 kt  (huber loss: train 0.000310  val 0.001677)
+epoch 39: train 3.14 kt  val 13.17 kt  (huber loss: train 0.000243  val 0.002578)
+epoch 40: train 3.05 kt  val 10.18 kt  (huber loss: train 0.000245  val 0.001776)
+END 2026-10-14T12:20:35-04:00 | 2026/10/14 12:20:35.649, 45, 2910 MHz, 92.43 W, 0 %, Not Active, Not Active, Not Active

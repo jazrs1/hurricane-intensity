@@ -1,0 +1,66 @@
+RUN loss=huber seed=6 order=20 list=storms_train_baseline.txt epochs=40
+START 2026-10-14T12:22:34-04:00 | 2026/10/14 12:22:34.759, 42, 2640 MHz, 66.37 W, 0 %, Not Active, Not Active, Not Active
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024']
+val storms:   ['AL192020', 'AL162023', 'AL132020']
+seed: 6  checkpoint: models/loss/huber/seed6.pt  loss: huber
+after exclusion: 1307
+after exclusion: 386
+train samples: 1307  val samples: 386
+epoch 1: train 43.21 kt  val 36.10 kt  (huber loss: train 0.011241  val 0.009182)
+  saved
+epoch 2: train 32.07 kt  val 23.32 kt  (huber loss: train 0.008013  val 0.005461)
+  saved
+epoch 3: train 22.19 kt  val 74.25 kt  (huber loss: train 0.005164  val 0.020235)
+epoch 4: train 16.34 kt  val 14.54 kt  (huber loss: train 0.003503  val 0.002967)
+  saved
+epoch 5: train 11.07 kt  val 13.42 kt  (huber loss: train 0.002053  val 0.002658)
+  saved
+epoch 6: train 9.33 kt  val 16.71 kt  (huber loss: train 0.001602  val 0.003579)
+epoch 7: train 7.79 kt  val 11.37 kt  (huber loss: train 0.001195  val 0.002129)
+  saved
+epoch 8: train 7.75 kt  val 9.64 kt  (huber loss: train 0.001197  val 0.001672)
+  saved
+epoch 9: train 5.96 kt  val 11.66 kt  (huber loss: train 0.000753  val 0.002189)
+epoch 10: train 5.48 kt  val 9.07 kt  (huber loss: train 0.000673  val 0.001513)
+  saved
+epoch 11: train 5.46 kt  val 11.08 kt  (huber loss: train 0.000661  val 0.002039)
+epoch 12: train 4.98 kt  val 9.52 kt  (huber loss: train 0.000572  val 0.001617)
+epoch 13: train 5.45 kt  val 10.52 kt  (huber loss: train 0.000657  val 0.001880)
+epoch 14: train 4.99 kt  val 8.98 kt  (huber loss: train 0.000560  val 0.001510)
+  saved
+epoch 15: train 5.14 kt  val 8.82 kt  (huber loss: train 0.000614  val 0.001442)
+  saved
+epoch 16: train 4.22 kt  val 8.78 kt  (huber loss: train 0.000406  val 0.001429)
+  saved
+epoch 17: train 3.99 kt  val 8.74 kt  (huber loss: train 0.000360  val 0.001437)
+  saved
+epoch 18: train 3.70 kt  val 9.06 kt  (huber loss: train 0.000309  val 0.001490)
+epoch 19: train 4.37 kt  val 8.78 kt  (huber loss: train 0.000420  val 0.001427)
+epoch 20: train 4.59 kt  val 9.28 kt  (huber loss: train 0.000498  val 0.001558)
+epoch 21: train 4.29 kt  val 8.57 kt  (huber loss: train 0.000418  val 0.001370)
+  saved
+epoch 22: train 3.79 kt  val 9.92 kt  (huber loss: train 0.000329  val 0.001709)
+epoch 23: train 3.75 kt  val 8.61 kt  (huber loss: train 0.000331  val 0.001369)
+epoch 24: train 3.19 kt  val 8.51 kt  (huber loss: train 0.000239  val 0.001387)
+  saved
+epoch 25: train 4.14 kt  val 9.30 kt  (huber loss: train 0.000381  val 0.001561)
+epoch 26: train 3.40 kt  val 9.01 kt  (huber loss: train 0.000263  val 0.001488)
+epoch 27: train 3.13 kt  val 8.81 kt  (huber loss: train 0.000221  val 0.001447)
+epoch 28: train 2.86 kt  val 8.64 kt  (huber loss: train 0.000195  val 0.001412)
+epoch 29: train 3.31 kt  val 8.73 kt  (huber loss: train 0.000245  val 0.001397)
+epoch 30: train 3.62 kt  val 8.33 kt  (huber loss: train 0.000297  val 0.001317)
+  saved
+epoch 31: train 2.24 kt  val 8.84 kt  (huber loss: train 0.000124  val 0.001452)
+epoch 32: train 2.69 kt  val 8.51 kt  (huber loss: train 0.000166  val 0.001366)
+epoch 33: train 3.12 kt  val 8.91 kt  (huber loss: train 0.000235  val 0.001466)
+epoch 34: train 2.66 kt  val 8.37 kt  (huber loss: train 0.000169  val 0.001340)
+epoch 35: train 3.78 kt  val 8.39 kt  (huber loss: train 0.000311  val 0.001355)
+epoch 36: train 3.25 kt  val 8.63 kt  (huber loss: train 0.000237  val 0.001386)
+epoch 37: train 2.87 kt  val 9.39 kt  (huber loss: train 0.000189  val 0.001582)
+epoch 38: train 3.38 kt  val 8.64 kt  (huber loss: train 0.000254  val 0.001409)
+epoch 39: train 2.60 kt  val 8.31 kt  (huber loss: train 0.000158  val 0.001316)
+  saved
+epoch 40: train 2.51 kt  val 8.15 kt  (huber loss: train 0.000152  val 0.001271)
+  saved
+END 2026-10-14T12:24:19-04:00 | 2026/10/14 12:24:19.943, 45, 2910 MHz, 74.22 W, 1 %, Not Active, Not Active, Not Active

@@ -1,0 +1,20 @@
+checkpoint: models/loss/huber/seed7.pt
+held-out storms: ['AL092022', 'AL172022', 'AL032021']
+after exclusion: 393
+held-out samples: 393
+overall MAE:      9.79 kt
+true fixes only:  10.30 kt  (n=77)
+
+TD       88 samples   MAE   7.30 kt   bias  +5.53 kt
+TS      189 samples   MAE   8.29 kt   bias  -2.50 kt
+Cat 1    60 samples   MAE  14.15 kt   bias -11.44 kt
+Cat 2     9 samples   MAE   9.07 kt   bias  +7.34 kt
+Cat 3    26 samples   MAE  11.19 kt   bias  +8.06 kt
+Cat 4    17 samples   MAE  20.08 kt   bias -20.08 kt
+Cat 5     4 samples   MAE  18.45 kt   bias -18.45 kt
+            count       mean
+storm_name                  
+IAN            48  13.141675
+NICOLE         12  18.198267
+
+wrote results/loss/huber_seed7_h3.csv  (393 rows)
