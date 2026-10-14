@@ -1,0 +1,60 @@
+RUN arm=A_baseline_40ep seed=4 order=13 list=storms_train_baseline.txt epochs=40
+START 2026-10-13T22:33:46-04:00 | 2026/10/13 22:33:46.241, 41, 2550 MHz, 58.64 W, 0 %, Not Active, Not Active, Not Active
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024']
+val storms:   ['AL192020', 'AL162023', 'AL132020']
+seed: 4  checkpoint: models/imbalance/A_baseline_40ep/seed4/best_val.pt
+after exclusion: 1307
+after exclusion: 386
+train samples: 1307  val samples: 386
+epoch 1: train 55.02 kt  val 113.78 kt
+  saved
+epoch 2: train 37.29 kt  val 26.30 kt
+  saved
+epoch 3: train 24.43 kt  val 20.41 kt
+  saved
+epoch 4: train 18.33 kt  val 28.65 kt
+epoch 5: train 13.61 kt  val 11.69 kt
+  saved
+epoch 6: train 11.94 kt  val 14.44 kt
+epoch 7: train 12.74 kt  val 15.44 kt
+epoch 8: train 8.50 kt  val 10.14 kt
+  saved
+epoch 9: train 10.70 kt  val 10.62 kt
+epoch 10: train 8.07 kt  val 10.38 kt
+epoch 11: train 7.47 kt  val 13.62 kt
+epoch 12: train 7.04 kt  val 10.15 kt
+epoch 13: train 6.93 kt  val 12.08 kt
+epoch 14: train 7.32 kt  val 9.52 kt
+  saved
+epoch 15: train 6.19 kt  val 9.77 kt
+epoch 16: train 6.16 kt  val 9.01 kt
+  saved
+epoch 17: train 4.66 kt  val 9.49 kt
+epoch 18: train 6.07 kt  val 12.74 kt
+epoch 19: train 6.30 kt  val 10.08 kt
+epoch 20: train 4.57 kt  val 10.21 kt
+epoch 21: train 6.36 kt  val 9.63 kt
+epoch 22: train 4.94 kt  val 9.36 kt
+epoch 23: train 4.17 kt  val 9.40 kt
+epoch 24: train 4.64 kt  val 9.61 kt
+epoch 25: train 4.29 kt  val 9.09 kt
+epoch 26: train 4.26 kt  val 10.50 kt
+epoch 27: train 4.56 kt  val 8.96 kt
+  saved
+epoch 28: train 4.09 kt  val 9.37 kt
+epoch 29: train 4.42 kt  val 8.35 kt
+  saved
+epoch 30: train 3.88 kt  val 9.30 kt
+epoch 31: train 3.97 kt  val 8.53 kt
+epoch 32: train 3.24 kt  val 8.90 kt
+epoch 33: train 3.67 kt  val 8.91 kt
+epoch 34: train 4.01 kt  val 9.15 kt
+epoch 35: train 3.11 kt  val 8.97 kt
+epoch 36: train 3.26 kt  val 9.24 kt
+epoch 37: train 3.25 kt  val 9.46 kt
+epoch 38: train 3.01 kt  val 9.04 kt
+epoch 39: train 3.90 kt  val 8.28 kt
+  saved
+epoch 40: train 4.33 kt  val 8.99 kt
+END 2026-10-13T22:35:29-04:00 | 2026/10/13 22:35:29.564, 46, 2910 MHz, 102.32 W, 10 %, Not Active, Not Active, Not Active

@@ -1,0 +1,21 @@
+checkpoint: models/imbalance/C_expanded_40ep/seed7/best_val.pt
+held-out storms: ['AL092022', 'AL172022', 'AL032021', 'AL182021']
+after exclusion: 688
+held-out samples: 688
+overall MAE:      10.99 kt
+true fixes only:  11.16 kt  (n=127)
+
+TD       99 samples   MAE   6.71 kt   bias  +4.14 kt
+TS      213 samples   MAE   7.61 kt   bias  -2.69 kt
+Cat 1    89 samples   MAE  11.00 kt   bias  -8.99 kt
+Cat 2    52 samples   MAE  11.34 kt   bias  -8.72 kt
+Cat 3    69 samples   MAE  14.41 kt   bias  -5.74 kt
+Cat 4   162 samples   MAE  16.01 kt   bias -15.96 kt
+Cat 5     4 samples   MAE  29.19 kt   bias -29.19 kt
+            count       mean
+storm_name                  
+IAN            48  11.963722
+NICOLE         12  13.207870
+SAM            29   8.501119
+
+wrote results/imbalance/C_expanded_40ep_seed7_holdout4.csv  (688 rows)
