@@ -23,7 +23,7 @@ from torchvision.models import resnet18
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 from hurricane_intensity.dataset import TCDataset  # noqa: E402
-from hurricane_intensity.splits import load_splits  # noqa: E402
+from hurricane_intensity.splits import load_splits, load_storm_list  # noqa: E402
 
 K = 20
 BANDS = [(0, 34, "TD"), (34, 64, "TS"), (64, 83, "Cat 1"), (83, 96, "Cat 2"), (96, 113, "Cat 3"), (113, 137, "Cat 4"), (137, np.inf, "Cat 5")]
@@ -32,10 +32,16 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--checkpoint", required=True)
 parser.add_argument("--circular-mask", action="store_true")
 parser.add_argument("--out", required=True)
+parser.add_argument("--storms-list", default=None,
+                    help="storm list whose frames make up the frame set (neighbours are searched among them); "
+                         "default: the original nine training storms (storms_train_baseline.txt minus validation)")
 args = parser.parse_args()
 
-train_ids = load_splits(train_list=REPO / "storms_train_baseline.txt")[0]
-ds = TCDataset("data/processed", train_ids, circular_mask=args.circular_mask)
+if args.storms_list:
+    frame_ids = load_storm_list(args.storms_list)
+else:
+    frame_ids = load_splits(train_list=REPO / "storms_train_baseline.txt")[0]
+ds = TCDataset("data/processed", frame_ids, circular_mask=args.circular_mask)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = resnet18(weights=None)
 model.fc = nn.Linear(model.fc.in_features, 1)
@@ -66,6 +72,7 @@ def frac(window_h):
 
 f6, f24 = frac(6), frac(24)
 out = {"checkpoint": str(args.checkpoint), "circular_mask": args.circular_mask, "n_frames": len(df),
+       "frame_set": args.storms_list or "original nine training storms", "n_storms": int(df.atcf_id.nunique()),
        "same_storm_frac_6h": float(f6.mean()), "same_storm_frac_24h": float(f24.mean()),
        "by_band_6h": {b: float(f6[band == b].mean()) for *_, b in BANDS}, "by_band_24h": {b: float(f24[band == b].mean()) for *_, b in BANDS}}
 Path(args.out).parent.mkdir(parents=True, exist_ok=True)

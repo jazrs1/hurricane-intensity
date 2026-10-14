@@ -27,6 +27,9 @@ parser.add_argument("--circular-mask", action="store_true",
                     help="fill outside the inscribed circle with 300 K, on training and validation frames")
 parser.add_argument("--rotate", action="store_true",
                     help="rotate each training sample by a uniform random angle (requires --circular-mask); validation is not rotated")
+parser.add_argument("--frame-list", default=None,
+                    help="text file of crop paths (as in the manifests); train only on these frames, which must all "
+                         "belong to the training storms of --train-list; default: every training frame")
 args = parser.parse_args()
 if args.rotate and not args.circular_mask:
     parser.error("--rotate requires --circular-mask")
@@ -62,6 +65,15 @@ if args.epoch_dir:
 
 train_ds = TCDataset(PROCESSED_ROOT, TRAIN_STORMS, circular_mask=args.circular_mask, rotate=args.rotate, generator=rotation_generator)
 val_ds = TCDataset(PROCESSED_ROOT, VAL_STORMS, circular_mask=args.circular_mask)
+if args.frame_list:
+    wanted = [line.strip() for line in Path(args.frame_list).read_text(encoding="utf-8").splitlines() if line.strip()]
+    if len(set(wanted)) != len(wanted):
+        raise SystemExit(f"{args.frame_list} lists a frame more than once")
+    missing = sorted(set(wanted) - set(train_ds.df["crop_path"]))
+    if missing:
+        raise SystemExit(f"{len(missing)} frames in {args.frame_list} are not training frames of {args.train_list} (first: {missing[0]})")
+    train_ds.df = train_ds.df[train_ds.df["crop_path"].isin(set(wanted))].reset_index(drop=True)
+    print(f"frame list: {args.frame_list}: {len(train_ds)} frames from {train_ds.df['atcf_id'].nunique()} storms")
 print(f"train samples: {len(train_ds)}  val samples: {len(val_ds)}")
 
 train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, num_workers=0, generator=shuffle_generator)

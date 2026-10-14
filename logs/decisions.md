@@ -1588,3 +1588,186 @@ The bias and overall-MAE results hold. The ranking result does not: its
 gain halves and misses the threshold. That result depends partly on the
 control's later, worse runs and is treated as suggestive, not
 established, in results/storms/findings.md.
+
+2026-10-14, 18:58. Variety-against-volume experiment, design (DRAFT, not
+approved, nothing run). Uses only data already on disk; no downloads.
+
+Question: the more-distinct-storms experiment improved >96 kt bias,
+overall MAE and (less robustly) high-end ranking, but its expanded arm had
+more storms, more frames and more high-end frames at once. Holding the
+number of frames and their intensity mix fixed, does drawing them from
+many storms at sparse sampling beat drawing them from fewer storms at
+dense sampling?
+
+Pools (training storms only; never validation or H9):
+- Dense pool: the original nine storms at hourly, as built. 1307 frames.
+- Sparse pool: all 19 training storms at 3-hourly. The original nine are
+  thinned to their 3-hourly grid points, which are a subset of the hourly
+  crops on disk because the 3-hour grid and every exact fix are on the
+  hourly grid. That gives 457 frames, plus the ten new storms as built
+  (774), for 1231 frames.
+
+Matching, per intensity band: each arm draws exactly target = min(dense
+pool, sparse pool) frames.
+
+| band | dense pool | sparse pool | target | dense kept | sparse kept |
+|---|---|---|---|---|---|
+| TD | 304 | 192 | 192 | 63% | 100% |
+| TS | 462 | 437 | 437 | 95% | 100% |
+| Cat 1 | 157 | 220 | 157 | 100% | 71% |
+| Cat 2 | 126 | 152 | 126 | 100% | 83% |
+| Cat 3 | 84 | 119 | 84 | 100% | 71% |
+| Cat 4 | 108 | 85 | 85 | 79% | 100% |
+| Cat 5 | 66 | 26 | 26 | 39% | 100% |
+| total | 1307 | 1231 | 1107 | 85% | 90% |
+
+Both arms therefore have 1107 frames: 195 above 96 kt, 111 at >= 113 kt,
+26 at >= 137 kt, identical in every band.
+
+| arm | storms | storms with frames >= 96 / >= 113 / >= 137 | largest storm (expected) | sampling |
+|---|---|---|---|---|
+| dense (few storms) | 9 | 5 / 5 / 3 | Dorian ~29% | ~0.85 frames per storm-hour |
+| sparse (many storms) | 19 | 13 / 10 / 4 | Florence ~12%; Dorian ~10% | ~0.33 frames per storm-hour |
+
+Known limit: at Cat 5 both arms draw from the same storms (Michael,
+Dorian, Milton; the sparse arm also has Lorenzo's single frame), and the
+dense arm keeps only 39% of its Cat 5 frames. So there is almost no
+variety contrast at Cat 5. The contrast lives in Cat 3/4 and below.
+
+Draws: stratified random sampling without replacement within each band,
+drawn separately for each training seed (subset seed = training seed), so
+the comparison generalizes over the thinning, not one draw. All 20 frame
+lists are written before launch, and checked: per-band counts identical
+between arms for every seed, 1107 frames each, no validation or H9 frame.
+They are recorded with their hashes.
+
+Arms: L1, unmasked, unrotated, ResNet-18 IMAGENET1K_V1, Adam lr 1e-4,
+batch 32, seeds 0-9 (20 runs), round-robin with alternating arm order,
+--val-list storms_val_expanded.txt for both arms (no Cat 5 in
+validation, as before), evaluated on H9. Equal steps: 1107 frames is 35
+batches per epoch; 47 epochs is 1645 steps, the same in both arms and
++0.3% on the 1640 used before.
+
+Primary tests, unchanged from the more-distinct-storms experiment: on H9
+pooled, sparse - dense, two-sided exact permutation (all 184,756 splits),
+Bonferroni 0.05 / 3 = 0.0167.
+1. Spearman correlation over H9 frames > 96 kt.
+2. >96 kt bias.
+3. Overall MAE.
+
+Pre-registered secondary (alpha 0.05), changed from last time. The
+same-storm neighbour fraction is computed on the H9 frames (k = 20,
+Euclidean on the 512-d features; neighbours among the other H9 frames;
+same-storm frames within +-6 h excluded). Last time it was computed on
+the original nine storms' frames. Here the dense arm trains on about 85%
+of those frames and the sparse arm on about a third, so measuring there
+would be biased toward the dense arm. Neither arm sees H9 in training,
+and the chance level is identical. Expected direction if variety acts
+through less storm-specific features: lower in the sparse arm.
+
+Interpretation, fixed in advance:
+- Sparse beats dense on a primary: at fixed volume and intensity mix,
+  variety helps.
+- No difference on any primary: the more-distinct-storms gain is better
+  explained by volume (more frames, more high-end frames) than by variety.
+  This design can say that only at its own power: about 0.9 kt overall,
+  2-5 kt bias, 0.05 Spearman.
+- Dense beats sparse: density, within-storm detail, matters more.
+
+Exploratory, labelled as such:
+- per-storm > 96 kt Spearman, MAE and bias, and the mean of per-storm
+  Spearman values;
+- per-band bias and < 64 kt MAE;
+- H6 and H3 subsets;
+- the Ian check;
+- selected epochs (most runs at epoch 46-47 flagged as possibly
+  under-trained);
+- run order, with the control-seeds-0-4 robustness check repeated in
+  advance as: each arm's seeds 0-4 against the other arm's ten runs.
+
+Code needed before launch (after approval):
+- train.py --frame-list: restrict the training dataset to listed crop
+  paths.
+- scripts/variety_subsets.py: writes and checks the 20 frame lists.
+- storm_fraction.py: a held-out frame-set option.
+- The driver, and the analysis script written and hashed before launch.
+
+2026-10-14, 19:08. Variety-against-volume experiment, approved with two
+changes; final design with the resulting counts. Supersedes the draft
+above where they differ. No training before this entry.
+
+Change 1, per-seed draws. Each arm's training frames are drawn fresh for
+every seed, deterministic from the seed (numpy default_rng([seed, arm])),
+so the result averages over frame selection. All 20 frame lists are
+recorded in results/variety/frame_lists/<arm>_seed<s>.txt, with SHA-256s
+in sha256.txt (itself 2ec78fe0...0e). Re-running scripts/variety_subsets.py
+reproduces every list byte for byte (checked).
+
+Change 2, matching on 5 kt bins. Bins are 5 kt wide, split at the band
+edges (34/64/83/96/113/137) so every bin sits inside one Saffir-Simpson
+band: 36 bins. In every bin where both pools have frames, each arm draws
+min(dense, sparse) frames.
+- 33 bins match exactly.
+- 3 bins cannot, because only the dense pool has frames in them. All are
+  narrow slivers at band edges, holding hourly-interpolated labels the
+  3-hourly pool never produces: [34, 35) TS, 9 frames; [83, 85) Cat 2, 6;
+  [113, 115) Cat 4, 3.
+- Fallback: those orphan bins were pooled within their band and matched
+  by count. The sparse pool has no orphans in those bands, so the fallback
+  matched 0 frames, and the 18 dense frames are dropped. No frame is
+  matched at band level; every frame in both arms is matched within its
+  5 kt bin.
+
+Resulting per-arm counts, identical in every seed, checked:
+
+| band | frames per arm | dense mean kt | sparse mean kt | sparse - dense | storms dense / sparse |
+|---|---|---|---|---|---|
+| TD | 191 | 26.88 | 26.49 | -0.39 | 8 / 17 |
+| TS | 371 | 46.57 | 46.02 | -0.55 | 9 / 19 |
+| Cat 1 | 155 | 72.38 | 72.05 | -0.33 | 7 / 17 |
+| Cat 2 | 118 | 89.11 | 88.55 | -0.56 | 5 / 14.7 |
+| Cat 3 | 72 | 103.59 | 102.99 | -0.61 | 5 / 12.6 |
+| Cat 4 | 80 | 124.41 | 123.50 | -0.91 | 5 / 10 |
+| Cat 5 | 26 | 148.45 | 147.85 | -0.60 | 2.4 / 4 |
+| all | 1013 | 64.58 | 64.06 | -0.52 | 9 / 19 |
+
+Means and storm counts are averaged over the ten draws.
+- Both arms: 1013 frames; 178 at >= 96 kt, 106 at >= 113, 26 at >= 137.
+- Largest single storm: dense 28.4% (Dorian), sparse 11.5% (Florence).
+- Residual mismatch: the sparse arm is 0.3-0.9 kt lower within every
+  band, systematically. Within a 5 kt bin, 3-hourly labels sit more often
+  on best-track values at the bin floor, while hourly interpolated labels
+  spread across the bin. It is small against the effects this design can
+  detect (about 2 kt bias); it is reported, not corrected.
+
+Step budget: 1013 frames is 32 batches per epoch; 51 epochs is 1632
+steps (-0.5% on 1640), the same in both arms. Under-training flag, fixed
+now: most runs of an arm selecting epoch 50 or 51.
+
+Everything else as in the draft:
+- L1, unmasked, unrotated; --val-list storms_val_expanded.txt for both
+  arms; evaluated on H9; seeds 0-9 round-robin with alternating arm
+  order.
+- Primary tests: H9 pooled, sparse - dense, two-sided exact permutation,
+  0.0167. (1) Spearman over frames > 96 kt, (2) >96 kt bias, (3) overall
+  MAE.
+- Secondary (alpha 0.05): same-storm neighbour fraction on the H9 frames.
+- Robustness, not primary: each arm's seeds 0-4 against the other arm's
+  ten runs, same test and threshold.
+
+Code, all written before launch:
+- train.py --frame-list. Checked with --epochs 0, which trains nothing:
+  it filters to the 1013 listed frames from 19 storms, and it refuses a
+  list containing a validation frame.
+- storm_fraction.py --storms-list. The default is unchanged: it reproduces
+  the storms-experiment control seed 0 value, 0.3443, exactly. With
+  storms_holdout_h9.txt it runs on 1752 frames from 9 storms.
+- scripts/variety_subsets.py (SHA-256 417ca282...8b).
+- scripts/variety_experiment.sh (fa87e8d3...ef). It records the analysis
+  and frame-list hashes at launch and checks the frame lists are
+  unchanged at the end.
+- scripts/variety_analysis.py, SHA-256
+  2ba4d24709fc2c8be5ee2cab937e214373ba3f62951c4aa4714b54f651fe17a5. Its
+  primary tests, threshold, secondary and robustness check are
+  hard-coded. Smoke-tested on synthetic outputs (the planted effects were
+  recovered); the synthetic files were deleted.
