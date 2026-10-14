@@ -1,0 +1,2 @@
+after exclusion: 1307
+same-storm fraction (k=20, +-6 h excluded): 0.4265; +-24 h: 0.1852 -> results/rotation/control_seed9_storm_fraction.json

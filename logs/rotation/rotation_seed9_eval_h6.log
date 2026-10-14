@@ -1,0 +1,24 @@
+checkpoint: models/rotation/rotation/seed9.pt
+held-out storms: ['AL092022', 'AL172022', 'AL032021', 'AL022024', 'AL132023', 'AL182021']
+after exclusion: 1197
+circular mask: True
+held-out samples: 1197
+overall MAE:      11.81 kt
+true fixes only:  11.46 kt  (n=216)
+
+TD      123 samples   MAE   7.76 kt   bias  +5.98 kt
+TS      326 samples   MAE  10.87 kt   bias  -1.65 kt
+Cat 1   174 samples   MAE   9.97 kt   bias  -6.12 kt
+Cat 2   120 samples   MAE  10.11 kt   bias  -2.14 kt
+Cat 3   197 samples   MAE  11.57 kt   bias  -5.35 kt
+Cat 4   226 samples   MAE  17.54 kt   bias -15.96 kt
+Cat 5    31 samples   MAE  14.37 kt   bias -14.14 kt
+            count       mean
+storm_name                  
+BERYL          27   5.664349
+IAN            48  16.960072
+LEE            58   6.716562
+NICOLE         12  12.654670
+SAM            29   7.781320
+
+wrote results/rotation/rotation_seed9_h6.csv  (1197 rows)
