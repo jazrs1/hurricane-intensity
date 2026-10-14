@@ -1,0 +1,2 @@
+after exclusion: 1307
+same-storm fraction (k=20, +-6 h excluded): 0.3274; +-24 h: 0.1768 -> results/storms/expanded_seed8_storm_fraction.json

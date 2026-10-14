@@ -1,0 +1,2 @@
+after exclusion: 1307
+same-storm fraction (k=20, +-6 h excluded): 0.3646; +-24 h: 0.1838 -> results/storms/control_seed1_storm_fraction.json

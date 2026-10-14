@@ -1,0 +1,47 @@
+RUN arm=expanded seed=6 order=14 list=storms_train_expanded.txt val=storms_val_expanded.txt epochs=25
+START 2026-10-14T18:37:44-04:00 | 2026/10/14 18:37:44.846, 41, 2595 MHz, 59.28 W, 0 %, Not Active, Not Active, Not Active
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024', 'AL062018', 'AL092019', 'AL132019', 'AL262020', 'AL292020', 'AL122021', 'AL062022', 'AL202023', 'AL092024', 'AL182024']
+val storms:   ['AL192020', 'AL162023', 'AL132020', 'AL202020', 'AL082023']
+seed: 6  checkpoint: models/storms/expanded/seed6.pt  loss: l1  circular_mask: False  rotate: False
+after exclusion: 2081
+after exclusion: 940
+train samples: 2081  val samples: 940
+epoch 1: train 38.43 kt  val 30.51 kt
+  saved
+epoch 2: train 23.93 kt  val 23.05 kt
+  saved
+epoch 3: train 17.09 kt  val 20.90 kt
+  saved
+epoch 4: train 13.96 kt  val 18.64 kt
+  saved
+epoch 5: train 10.25 kt  val 10.63 kt
+  saved
+epoch 6: train 8.54 kt  val 10.42 kt
+  saved
+epoch 7: train 9.11 kt  val 10.36 kt
+  saved
+epoch 8: train 7.74 kt  val 10.51 kt
+epoch 9: train 6.48 kt  val 10.41 kt
+epoch 10: train 6.26 kt  val 10.25 kt
+  saved
+epoch 11: train 6.78 kt  val 9.04 kt
+  saved
+epoch 12: train 6.87 kt  val 8.69 kt
+  saved
+epoch 13: train 6.90 kt  val 9.71 kt
+epoch 14: train 5.59 kt  val 8.78 kt
+epoch 15: train 5.74 kt  val 10.31 kt
+epoch 16: train 4.84 kt  val 10.43 kt
+epoch 17: train 4.42 kt  val 8.82 kt
+epoch 18: train 4.73 kt  val 9.00 kt
+epoch 19: train 4.18 kt  val 8.83 kt
+epoch 20: train 4.87 kt  val 9.46 kt
+epoch 21: train 4.61 kt  val 8.62 kt
+  saved
+epoch 22: train 4.47 kt  val 9.21 kt
+epoch 23: train 4.03 kt  val 8.76 kt
+epoch 24: train 4.67 kt  val 8.52 kt
+  saved
+epoch 25: train 4.64 kt  val 8.62 kt
+END 2026-10-14T18:39:34-04:00 | 2026/10/14 18:39:34.305, 45, 2910 MHz, 73.31 W, 0 %, Not Active, Not Active, Not Active

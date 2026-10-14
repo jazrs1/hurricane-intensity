@@ -1460,3 +1460,131 @@ Validation has no frames at or above 137 kt: Sally, Ophelia, Laura, Teddy
 Cat 5 in both arms. Validation MAE says nothing about how a checkpoint
 does on Cat 5 frames, and any Cat 5 result on H9 (31 frames: Ian 4,
 Beryl 18, Lee 9) comes from checkpoints chosen without seeing that range.
+
+2026-10-14, 18:10. More-distinct-storms experiment, pre-launch. No training
+before this entry.
+
+- scripts/storms_analysis.py was written before launch, with the three
+  primary tests (H9 pooled: Spearman over frames > 96 kt, >96 kt bias,
+  overall MAE; expanded - control), THRESHOLD = 0.0167, the exact
+  permutation test and the secondary (same-storm fraction on the original
+  nine storms' 1307 frames) hard-coded.
+  - SHA-256 77aeb599585b861ed50c8f9c42cd0a46707713acc7eead419488b09ce26a946f.
+    The driver also records it at launch, in
+    logs/storms/analysis_sha256_at_launch.txt.
+  - It checks every run against the recorded design: lists, validation
+    list, epochs (40 / 25), storms (9 / 19), frames (1307 / 2081),
+    validation frames (940).
+  - Smoke-tested on synthetic outputs; the planted Spearman, bias and
+    secondary effects were all recovered. The synthetic files were
+    deleted.
+- scripts/storms_experiment.sh (SHA-256 9416dde0...2301ae8):
+  - L1, unmasked, unrotated, --val-list storms_val_expanded.txt for both
+    arms.
+  - Control: storms_train_control2.txt, 40 epochs. Expanded:
+    storms_train_expanded.txt, 25 epochs.
+  - Seeds 0-9, arm order alternating each round (C/E, E/C, ...).
+  - Evaluated on storms_holdout_h9.txt; the secondary comes from
+    storm_fraction.py.
+  - Keeps only each run's selected checkpoint (models/storms/), and
+    records both protected checkpoint hashes before and after.
+- Pre-training setup is committed and pushed (a9d07f4).
+
+2026-10-14, 18:53. More-distinct-storms experiment, results.
+
+All 20 runs completed, no failures. Both protected hashes unchanged. The
+analysis script's SHA-256 is identical at launch and after (77aeb599...).
+Every run matched the recorded design (lists, validation list, epochs
+40 / 25, storms 9 / 19, frames 1307 / 2081, validation 940). Output from
+scripts/storms_analysis.py, unedited. Tables in results/storms/. 20
+checkpoints kept in models/storms/ (855 MB).
+
+Primary tests: H9 pooled, expanded - control, two-sided exact
+permutation, threshold 0.0167.
+
+| test | control | expanded | difference | exact p | survives |
+|---|---|---|---|---|---|
+| Spearman, frames > 96 kt | 0.523 (0.053) | 0.580 (0.024) | +0.057 | 0.0024 | yes |
+| >96 kt bias | -13.12 (2.01) | -7.72 (1.43) | +5.40 | 0.00003 | yes |
+| overall MAE | 10.87 (0.63) | 9.27 (0.29) | -1.60 | 0.00001 | yes |
+
+All three survive, in the improving direction. It is the first time any
+intervention has moved high-end ranking. All ten expanded runs have lower
+overall MAE than the best control run.
+
+Secondary, pre-registered: same-storm neighbour fraction on the original
+nine storms' frames, 0.365 -> 0.369 (+0.004, p 0.78). Null. The
+improvement did not come with a less storm-organized embedding of those
+storms, so the pre-registered mechanism is not supported.
+
+Flags fixed in advance:
+- Under-training: 6 of 10 expanded runs selected epoch 24 or 25 (control
+  19-40). Flagged as possibly under-trained, not rerun. If so, the effect
+  is understated, not overstated.
+- Run order: in the control arm, H9 overall MAE rises with seed (Spearman
+  +0.72). The expanded arm is flat (+0.01). Pooled against run order, arm
+  means removed: +0.44 (p 0.05). No position-in-round effect (-0.00 kt,
+  p 0.99). By the rule fixed in advance, a trend in one arm only is read
+  as chance within that arm. It is strong here, so stated plainly: seed
+  and order are confounded within an arm and cannot be separated. It does
+  not decide the overall-MAE result: the best control run (9.88) is worse
+  than the worst expanded run (9.64).
+
+Exploratory (uncorrected):
+- Ranking within storms, > 96 kt Spearman: mean per-storm 0.523 -> 0.570
+  (p 0.0006).
+  - Gains on Sam (+0.089, p 0.0009), Fiona (+0.119, p 0.0006) and Lee
+    (+0.078, p 0.06).
+  - Unchanged on Kirk (0.821 both), Iota (+0.033) and Ian (0.03 -> 0.07;
+    Ian has essentially no ranking above 96 kt in either arm).
+  - Beryl -0.026 (p 0.14).
+  - Pooled Pearson above 96 kt +0.034 (p 0.08).
+- Bias by band, H9: TD 0.0, TS -0.4, Cat 1 +2.9, Cat 2 +3.5, Cat 3 +4.5,
+  Cat 4 +6.3, Cat 5 +2.7 (p 0.07). < 64 kt MAE unchanged (7.89 -> 7.84,
+  p 0.83). Unlike rotation, the high-end gain costs nothing at the weak
+  end.
+- Cat 5 underestimation remains: -21.6 -> -18.8, not significant.
+  Validation is blind at Cat 5, and Lorenzo added one frame.
+- > 96 kt MAE per storm, control -> expanded: Sam 16.8 -> 10.7, Kirk 10.5
+  -> 6.3, Iota 10.1 -> 6.2, Beryl 24.1 -> 21.3, Fiona 9.1 -> 6.4, Lee 13.4
+  -> 11.1, Ian 14.4 -> 14.5 (no change).
+- Ian check: Cat 3 +2.0 and Cat 4/5 +2.1 (neither significant); the
+  inverted predicted gap is unchanged (-2.8 -> -2.7). No separation on
+  Ian. Fiona's gap widens (+2.9, p 0.02); the other storms move together.
+- H6 subset: overall MAE -1.77, > 96 kt MAE -3.72, > 96 kt bias +5.33,
+  Spearman +0.053 (p 0.016).
+- H3 subset: overall MAE -0.52 (p 0.036); nothing above 96 kt, which on
+  H3 is Ian only.
+- Expanded runs are more consistent (H9 overall sd 0.63 -> 0.29).
+  Validation MAE at the selected epoch is 9.53 (control) and 8.52
+  (expanded).
+
+Caveat on attribution. The expanded arm has more distinct storms, but
+also more training frames (2081 against 1307) and more high-end frames
+(394 against 258 at >= 96 kt; 220 against 174 at >= 113), at equal steps.
+This design cannot separate "more distinct storms" from "more frames" or
+"more high-end frames". Cross-experiment and exploratory: adding Beryl
+and Lee hourly in the class-imbalance experiment (+509 frames, +219 >= 96)
+did not help, which suggests variety matters more than volume, but those
+experiments used different held-out sets and are not directly comparable.
+
+2026-10-14, 18:57. More-distinct-storms experiment, run-order robustness
+check. Asked for after the results; not a primary test. Script:
+scripts/storms_robustness.py; output:
+results/storms/robustness_control_seeds0-4.csv.
+
+The three primary comparisons were repeated using only control seeds 0-4
+(the earlier and better runs; run orders 1, 4, 5, 8, 9) against all ten
+expanded runs. Same two-sided exact permutation test (all 3003 splits of
+5 against 10), same 0.0167 threshold.
+
+| metric | control 0-4 | expanded | difference | exact p | passes |
+|---|---|---|---|---|---|
+| Spearman, frames > 96 kt | 0.555 | 0.580 | +0.025 | 0.053 | no |
+| >96 kt bias | -11.93 | -7.72 | +4.22 | 0.0010 | yes |
+| overall MAE | 10.40 | 9.27 | -1.13 | 0.0003 | yes |
+
+The bias and overall-MAE results hold. The ranking result does not: its
+gain halves and misses the threshold. That result depends partly on the
+control's later, worse runs and is treated as suggestive, not
+established, in results/storms/findings.md.
