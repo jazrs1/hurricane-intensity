@@ -58,10 +58,15 @@ def safe_unlink(path: Path, retries: int = 5, delay_s: float = 0.3) -> None:
     )
 
 
-def download_scan(s3_client, key: str, dest_path: Path = config.SCRATCH_NC_PATH) -> Path:
+def download_scan(
+    s3_client,
+    key: str,
+    dest_path: Path = config.SCRATCH_NC_PATH,
+    bucket: str = config.GOES_BUCKET,
+) -> Path:
     dest_path = Path(dest_path)
     dest_path.parent.mkdir(parents=True, exist_ok=True)
-    s3_client.download_file(config.GOES_BUCKET, key, str(dest_path))
+    s3_client.download_file(bucket, key, str(dest_path))
     return dest_path
 
 
