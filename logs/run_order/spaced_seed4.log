@@ -1,0 +1,43 @@
+RUN block=spaced seed=4 order=5
+START 2026-10-13T21:06:08-04:00 | 2026/10/13 21:06:09.057, 38, 547 MHz, 547 MHz, 7001 MHz, 22.87 W, 0 %, 3 %, P3, 0x0000000000000000, Not Active, Not Active, Not Active, Not Active
+COUNTERS_START  SW Power Capping : 2469215402 us; Sync Boost : 0 us; SW Thermal Slowdown : 0 us; HW Thermal Slowdown : 0 us
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024']
+val storms:   ['AL192020', 'AL162023', 'AL132020']
+seed: 4  checkpoint: models/run_order/spaced_seed4.pt
+after exclusion: 1307
+after exclusion: 386
+train samples: 1307  val samples: 386
+epoch 1: train 54.92 kt  val 68.00 kt
+  saved
+epoch 2: train 33.09 kt  val 34.64 kt
+  saved
+epoch 3: train 23.88 kt  val 23.54 kt
+  saved
+epoch 4: train 17.07 kt  val 17.16 kt
+  saved
+epoch 5: train 12.83 kt  val 15.13 kt
+  saved
+epoch 6: train 12.79 kt  val 11.53 kt
+  saved
+epoch 7: train 12.21 kt  val 10.92 kt
+  saved
+epoch 8: train 8.50 kt  val 13.59 kt
+epoch 9: train 10.10 kt  val 9.90 kt
+  saved
+epoch 10: train 8.18 kt  val 11.47 kt
+epoch 11: train 8.39 kt  val 12.27 kt
+epoch 12: train 7.67 kt  val 10.89 kt
+epoch 13: train 6.78 kt  val 10.71 kt
+epoch 14: train 7.75 kt  val 9.73 kt
+  saved
+epoch 15: train 6.71 kt  val 9.75 kt
+epoch 16: train 7.47 kt  val 8.91 kt
+  saved
+epoch 17: train 5.74 kt  val 9.85 kt
+epoch 18: train 6.23 kt  val 9.40 kt
+epoch 19: train 6.17 kt  val 8.56 kt
+  saved
+epoch 20: train 5.08 kt  val 10.25 kt
+END 2026-10-13T21:07:04-04:00 | 2026/10/13 21:07:04.706, 46, 2910 MHz, 2910 MHz, 14001 MHz, 80.55 W, 34 %, 2 %, P0, 0x0000000000000000, Not Active, Not Active, Not Active, Not Active
+COUNTERS_END  SW Power Capping : 2469479522 us; Sync Boost : 0 us; SW Thermal Slowdown : 0 us; HW Thermal Slowdown : 0 us

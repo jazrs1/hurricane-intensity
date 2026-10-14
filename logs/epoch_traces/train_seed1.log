@@ -1,0 +1,38 @@
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024']
+val storms:   ['AL192020', 'AL162023', 'AL132020']
+seed: 1  checkpoint: models/epoch_traces/seed1/best_val.pt
+after exclusion: 1307
+after exclusion: 386
+train samples: 1307  val samples: 386
+epoch 1: train 45.25 kt  val 31.69 kt
+  saved
+epoch 2: train 30.85 kt  val 21.78 kt
+  saved
+epoch 3: train 23.62 kt  val 21.33 kt
+  saved
+epoch 4: train 18.26 kt  val 16.67 kt
+  saved
+epoch 5: train 14.61 kt  val 14.94 kt
+  saved
+epoch 6: train 12.71 kt  val 13.75 kt
+  saved
+epoch 7: train 10.07 kt  val 10.99 kt
+  saved
+epoch 8: train 8.77 kt  val 13.77 kt
+epoch 9: train 8.30 kt  val 10.61 kt
+  saved
+epoch 10: train 6.81 kt  val 10.85 kt
+epoch 11: train 8.54 kt  val 10.27 kt
+  saved
+epoch 12: train 6.60 kt  val 13.43 kt
+epoch 13: train 6.37 kt  val 9.60 kt
+  saved
+epoch 14: train 6.70 kt  val 11.99 kt
+epoch 15: train 6.10 kt  val 10.48 kt
+epoch 16: train 6.30 kt  val 10.91 kt
+epoch 17: train 5.16 kt  val 12.26 kt
+epoch 18: train 5.54 kt  val 9.64 kt
+epoch 19: train 4.97 kt  val 8.97 kt
+  saved
+epoch 20: train 5.59 kt  val 12.88 kt

@@ -1,0 +1,84 @@
+RUN block=long60 seed=0 order=11
+START 2026-10-13T21:11:48-04:00 | 2026/10/13 21:11:48.357, 43, 2662 MHz, 2662 MHz, 13801 MHz, 50.27 W, 33 %, 0 %, P1, 0x0000000000000000, Not Active, Not Active, Not Active, Not Active
+COUNTERS_START  SW Power Capping : 2469479522 us; Sync Boost : 0 us; SW Thermal Slowdown : 0 us; HW Thermal Slowdown : 0 us
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024']
+val storms:   ['AL192020', 'AL162023', 'AL132020']
+seed: 0  checkpoint: models/epoch_traces_60/seed0/best_val.pt
+after exclusion: 1307
+after exclusion: 386
+train samples: 1307  val samples: 386
+epoch 1: train 40.67 kt  val 43.19 kt
+  saved
+epoch 2: train 29.43 kt  val 25.56 kt
+  saved
+epoch 3: train 19.98 kt  val 34.66 kt
+epoch 4: train 15.85 kt  val 14.95 kt
+  saved
+epoch 5: train 12.99 kt  val 23.19 kt
+epoch 6: train 10.08 kt  val 10.20 kt
+  saved
+epoch 7: train 10.04 kt  val 14.77 kt
+epoch 8: train 9.22 kt  val 9.34 kt
+  saved
+epoch 9: train 8.22 kt  val 12.12 kt
+epoch 10: train 8.00 kt  val 10.07 kt
+epoch 11: train 8.17 kt  val 10.17 kt
+epoch 12: train 7.72 kt  val 9.14 kt
+  saved
+epoch 13: train 6.89 kt  val 9.20 kt
+epoch 14: train 5.80 kt  val 8.60 kt
+  saved
+epoch 15: train 6.30 kt  val 8.59 kt
+  saved
+epoch 16: train 6.34 kt  val 9.37 kt
+epoch 17: train 5.55 kt  val 8.35 kt
+  saved
+epoch 18: train 5.61 kt  val 8.01 kt
+  saved
+epoch 19: train 4.28 kt  val 9.17 kt
+epoch 20: train 5.04 kt  val 8.30 kt
+epoch 21: train 5.38 kt  val 9.68 kt
+epoch 22: train 5.27 kt  val 8.44 kt
+epoch 23: train 4.58 kt  val 9.79 kt
+epoch 24: train 5.28 kt  val 8.59 kt
+epoch 25: train 4.95 kt  val 8.43 kt
+epoch 26: train 3.83 kt  val 8.42 kt
+epoch 27: train 3.67 kt  val 9.00 kt
+epoch 28: train 3.71 kt  val 8.45 kt
+epoch 29: train 4.47 kt  val 8.31 kt
+epoch 30: train 3.54 kt  val 8.01 kt
+epoch 31: train 3.86 kt  val 9.17 kt
+epoch 32: train 3.63 kt  val 8.19 kt
+epoch 33: train 4.94 kt  val 8.58 kt
+epoch 34: train 3.64 kt  val 8.09 kt
+epoch 35: train 3.84 kt  val 7.95 kt
+  saved
+epoch 36: train 3.53 kt  val 7.73 kt
+  saved
+epoch 37: train 4.03 kt  val 8.84 kt
+epoch 38: train 3.75 kt  val 7.96 kt
+epoch 39: train 3.72 kt  val 8.71 kt
+epoch 40: train 3.35 kt  val 8.48 kt
+epoch 41: train 3.10 kt  val 8.15 kt
+epoch 42: train 3.85 kt  val 9.38 kt
+epoch 43: train 4.28 kt  val 7.98 kt
+epoch 44: train 3.35 kt  val 7.86 kt
+epoch 45: train 2.86 kt  val 8.33 kt
+epoch 46: train 2.62 kt  val 8.29 kt
+epoch 47: train 3.12 kt  val 8.46 kt
+epoch 48: train 3.24 kt  val 8.82 kt
+epoch 49: train 3.14 kt  val 8.47 kt
+epoch 50: train 3.15 kt  val 8.05 kt
+epoch 51: train 3.23 kt  val 11.06 kt
+epoch 52: train 3.08 kt  val 8.46 kt
+epoch 53: train 2.80 kt  val 8.62 kt
+epoch 54: train 2.96 kt  val 7.81 kt
+epoch 55: train 2.78 kt  val 7.99 kt
+epoch 56: train 2.80 kt  val 8.94 kt
+epoch 57: train 3.07 kt  val 8.83 kt
+epoch 58: train 2.68 kt  val 10.16 kt
+epoch 59: train 2.70 kt  val 8.43 kt
+epoch 60: train 2.93 kt  val 8.13 kt
+END 2026-10-13T21:14:20-04:00 | 2026/10/13 21:14:20.835, 45, 2910 MHz, 2910 MHz, 13801 MHz, 89.89 W, 34 %, 0 %, P1, 0x0000000000000000, Not Active, Not Active, Not Active, Not Active
+COUNTERS_END  SW Power Capping : 2469479522 us; Sync Boost : 0 us; SW Thermal Slowdown : 0 us; HW Thermal Slowdown : 0 us

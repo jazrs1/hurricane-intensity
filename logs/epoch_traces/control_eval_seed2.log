@@ -1,0 +1,20 @@
+checkpoint: C:/Users/johnb/AppData/Local/Temp/claude/C--Users-johnb-Projects-hurricane-intensity/7a8d882c-df1c-49ca-a8c4-10eecca63549/scratchpad/noflag/seed2.pt
+held-out storms: ['AL092022', 'AL172022', 'AL032021']
+after exclusion: 393
+held-out samples: 393
+overall MAE:      9.82 kt
+true fixes only:  10.48 kt  (n=77)
+
+TD       88 samples   MAE   7.71 kt   bias  +4.39 kt
+TS      189 samples   MAE   8.93 kt   bias  -0.78 kt
+Cat 1    60 samples   MAE  11.50 kt   bias  -8.19 kt
+Cat 2     9 samples   MAE   8.46 kt   bias  +4.29 kt
+Cat 3    26 samples   MAE  12.80 kt   bias  +8.17 kt
+Cat 4    17 samples   MAE  19.04 kt   bias -19.04 kt
+Cat 5     4 samples   MAE  17.11 kt   bias -17.11 kt
+            count       mean
+storm_name                  
+IAN            48  10.082274
+NICOLE         12  17.157160
+
+wrote C:/Users/johnb/AppData/Local/Temp/claude/C--Users-johnb-Projects-hurricane-intensity/7a8d882c-df1c-49ca-a8c4-10eecca63549/scratchpad/noflag/eval_seed2.csv  (393 rows)

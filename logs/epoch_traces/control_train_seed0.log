@@ -1,0 +1,37 @@
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024']
+val storms:   ['AL192020', 'AL162023', 'AL132020']
+seed: 0  checkpoint: C:/Users/johnb/AppData/Local/Temp/claude/C--Users-johnb-Projects-hurricane-intensity/7a8d882c-df1c-49ca-a8c4-10eecca63549/scratchpad/noflag/seed0.pt
+after exclusion: 1307
+after exclusion: 386
+train samples: 1307  val samples: 386
+epoch 1: train 40.32 kt  val 43.84 kt
+  saved
+epoch 2: train 33.93 kt  val 28.73 kt
+  saved
+epoch 3: train 25.28 kt  val 45.40 kt
+epoch 4: train 19.75 kt  val 16.89 kt
+  saved
+epoch 5: train 15.03 kt  val 16.40 kt
+  saved
+epoch 6: train 11.61 kt  val 15.61 kt
+  saved
+epoch 7: train 10.78 kt  val 12.41 kt
+  saved
+epoch 8: train 9.51 kt  val 14.60 kt
+epoch 9: train 8.31 kt  val 10.83 kt
+  saved
+epoch 10: train 8.92 kt  val 14.15 kt
+epoch 11: train 7.99 kt  val 10.17 kt
+  saved
+epoch 12: train 6.88 kt  val 12.34 kt
+epoch 13: train 8.01 kt  val 10.59 kt
+epoch 14: train 7.19 kt  val 11.10 kt
+epoch 15: train 7.01 kt  val 10.05 kt
+  saved
+epoch 16: train 6.80 kt  val 10.30 kt
+epoch 17: train 6.33 kt  val 10.37 kt
+epoch 18: train 6.98 kt  val 10.22 kt
+epoch 19: train 5.66 kt  val 9.62 kt
+  saved
+epoch 20: train 5.60 kt  val 9.88 kt

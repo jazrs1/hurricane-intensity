@@ -1,0 +1,35 @@
+START 2026-10-13T21:25:51-04:00 | 2026/10/13 21:25:51.411, 43, 2550 MHz, 46.24 W, 0 %, Not Active, Not Active
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024']
+val storms:   ['AL192020', 'AL162023', 'AL132020']
+seed: 3  checkpoint: models/run_order/rep_seed3.pt
+after exclusion: 1307
+after exclusion: 386
+train samples: 1307  val samples: 386
+epoch 1: train 54.30 kt  val 26.99 kt
+  saved
+epoch 2: train 25.00 kt  val 24.08 kt
+  saved
+epoch 3: train 15.10 kt  val 26.94 kt
+epoch 4: train 11.37 kt  val 11.91 kt
+  saved
+epoch 5: train 9.35 kt  val 15.61 kt
+epoch 6: train 7.94 kt  val 12.84 kt
+epoch 7: train 8.42 kt  val 8.85 kt
+  saved
+epoch 8: train 8.72 kt  val 8.97 kt
+epoch 9: train 6.53 kt  val 9.39 kt
+epoch 10: train 7.71 kt  val 10.07 kt
+epoch 11: train 6.22 kt  val 8.97 kt
+epoch 12: train 5.39 kt  val 10.09 kt
+epoch 13: train 6.27 kt  val 8.59 kt
+  saved
+epoch 14: train 7.19 kt  val 10.08 kt
+epoch 15: train 6.72 kt  val 9.47 kt
+epoch 16: train 5.11 kt  val 9.41 kt
+epoch 17: train 5.97 kt  val 9.15 kt
+epoch 18: train 5.53 kt  val 8.11 kt
+  saved
+epoch 19: train 4.68 kt  val 8.45 kt
+epoch 20: train 4.53 kt  val 11.74 kt
+END 2026-10-13T21:26:44-04:00 | 2026/10/13 21:26:44.641, 47, 2910 MHz, 99.67 W, 8 %, Not Active, Not Active
