@@ -1,0 +1,2 @@
+after exclusion: 1752
+same-storm fraction (k=20, +-6 h excluded): 0.2622; +-24 h: 0.1419 -> results/variety/sparse_seed4_storm_fraction_h9.json

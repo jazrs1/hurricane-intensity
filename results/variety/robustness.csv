@@ -1,0 +1,7 @@
+metric,check,sparse - dense,exact p,passes 0.0167
+spearman >96,dense seeds 0-4 vs sparse all ten,0.032534682962926276,0.13386613386613386,False
+spearman >96,sparse seeds 0-4 vs dense all ten,0.024824942772314507,0.23343323343323344,False
+>96 bias,dense seeds 0-4 vs sparse all ten,3.8178223730474743,0.008658008658008658,True
+>96 bias,sparse seeds 0-4 vs dense all ten,5.113100097090353,0.002997002997002997,True
+overall MAE,dense seeds 0-4 vs sparse all ten,-0.9936323689497701,0.000333000333000333,True
+overall MAE,sparse seeds 0-4 vs dense all ten,-1.2744578562785396,0.00333000333000333,True

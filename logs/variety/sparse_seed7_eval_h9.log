@@ -1,0 +1,27 @@
+checkpoint: models/variety/sparse/seed7.pt
+held-out storms: ['AL092022', 'AL172022', 'AL032021', 'AL022024', 'AL132023', 'AL182021', 'AL072022', 'AL122024', 'AL312020']
+after exclusion: 1752
+circular mask: False
+held-out samples: 1752
+overall MAE:      9.75 kt
+true fixes only:  9.89 kt  (n=315)
+
+TD      180 samples   MAE   9.99 kt   bias  +9.55 kt
+TS      506 samples   MAE   6.91 kt   bias  +1.39 kt
+Cat 1   264 samples   MAE   7.75 kt   bias  -2.96 kt
+Cat 2   149 samples   MAE   9.37 kt   bias  -3.81 kt
+Cat 3   274 samples   MAE  11.68 kt   bias  -6.96 kt
+Cat 4   348 samples   MAE  13.08 kt   bias -11.56 kt
+Cat 5    31 samples   MAE  19.23 kt   bias -19.23 kt
+            count       mean
+storm_name                  
+BERYL          27   6.110998
+FIONA          31   7.859599
+IAN            48   9.935036
+IOTA           21   7.102560
+KIRK           38   5.518291
+LEE            58   8.947726
+NICOLE         12  11.398837
+SAM            29   5.043967
+
+wrote results/variety/sparse_seed7_h9.csv  (1752 rows)

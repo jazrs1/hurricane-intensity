@@ -1,0 +1,2 @@
+after exclusion: 1752
+same-storm fraction (k=20, +-6 h excluded): 0.3217; +-24 h: 0.1736 -> results/variety/dense_seed5_storm_fraction_h9.json

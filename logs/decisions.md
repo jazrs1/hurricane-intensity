@@ -1771,3 +1771,81 @@ Code, all written before launch:
   primary tests, threshold, secondary and robustness check are
   hard-coded. Smoke-tested on synthetic outputs (the planted effects were
   recovered); the synthetic files were deleted.
+
+2026-10-14, 19:59. Variety-against-volume experiment, results.
+
+All 20 runs completed, no failures.
+- Protected checkpoint hashes, the analysis SHA-256 (2ba4d247...) and all
+  20 frame lists are unchanged since launch.
+- Every run matched the recorded design: its own seed's frame list, 1013
+  frames from 9 (dense) or 19 (sparse) storms, 51 epochs, 940 validation
+  frames, L1, unmasked, unrotated, secondary on 1752 H9 frames.
+- Output from scripts/variety_analysis.py, unedited. Tables in
+  results/variety/. 20 checkpoints in models/variety/ (855 MB).
+
+Primary tests: H9 pooled, sparse - dense, two-sided exact permutation,
+threshold 0.0167.
+
+| test | dense (9 storms) | sparse (19 storms) | difference | exact p | survives |
+|---|---|---|---|---|---|
+| Spearman, frames > 96 kt | 0.532 (0.024) | 0.564 (0.040) | +0.031 | 0.047 | no |
+| >96 kt bias | -11.14 (2.64) | -6.88 (2.34) | +4.26 | 0.0017 | yes |
+| overall MAE | 10.75 (0.66) | 9.55 (0.39) | -1.21 | 0.00016 | yes |
+
+By the rule fixed in advance ("sparse beats dense on a primary: at fixed
+volume and intensity mix, variety helps"), variety helps: on >96 kt bias
+and overall MAE, at an identical frame count and identical counts in
+every 5 kt bin. Ranking above 96 kt is not established (p 0.047 against
+0.0167), as in the robustness check of the more-distinct-storms
+experiment.
+
+Secondary, pre-registered: same-storm neighbour fraction on H9, 0.336 ->
+0.314 (-0.022, p 0.30). Null, the third time this mechanism has not
+shown up.
+
+Robustness, fixed in advance (each arm's seeds 0-4 against the other
+arm's ten):
+- Bias passes both ways: +3.82 (p 0.009) and +5.11 (p 0.003).
+- Overall MAE passes both ways: -0.99 (p 0.0003) and -1.27 (p 0.003).
+- Spearman fails both ways: p 0.13 and 0.23.
+
+Flags fixed in advance:
+- Under-training: epoch 50 or 51 selected by 1 of 10 dense and 3 of 10
+  sparse runs. Not flagged.
+- Run order: within arm, dense +0.42 and sparse +0.02. Pooled +0.27
+  (p 0.25).
+- The first run of each round was 0.52 kt better than the second (exact
+  p 0.021). Arm order alternated, so each arm ran first five times, and
+  this cannot bias the arm comparison.
+
+Residual intensity mismatch: the sparse arm's training labels are 0.3-0.9
+kt lower within every band. That would push the sparse arm's predictions
+down, the opposite of the observed +4.3 kt bias gain, so it cannot explain
+the result.
+
+Exploratory (uncorrected):
+- Bias by band, sparse - dense: TD -0.4, TS -0.7, Cat 1 +1.5, Cat 2 +2.5,
+  Cat 3 +3.5 (p 0.004), Cat 4 +5.1 (p 0.001), Cat 5 +1.9 (p 0.32). The
+  gain is at Cat 3/4. At Cat 5, where both arms draw on the same three
+  storms, nothing is detectable.
+- Weak storms improved slightly: < 64 kt MAE 8.50 -> 7.91 (p 0.016).
+- > 96 kt per storm, dense -> sparse:
+  - Sam: MAE 15.8 -> 11.6 (p 0.0001), bias +5.4
+  - Kirk: MAE 9.8 -> 6.7 (p 0.0001), bias +5.6
+  - Iota: MAE 9.9 -> 5.7 (p 0.004), bias +8.4, Spearman +0.105 (p 0.0001)
+  - Fiona: Spearman +0.100 (p 0.0007), bias +3.7
+  - Lee: bias +3.7 (p 0.004)
+  - Beryl: MAE -1.3 (p 0.17), Spearman -0.026 (p 0.02)
+  - Ian: MAE 13.9 -> 14.3, Spearman 0.17 -> 0.07 (p 0.11)
+- Ian check: Cat 3 +1.0 and Cat 4/5 +0.6 (neither significant); gap -1.5
+  -> -1.8. No separation on Ian, again. Fiona's gap widens (+3.6,
+  p 0.001); the other storms move as a block.
+- H3 subset: overall MAE -0.43; nothing above 96 kt (Ian only).
+- Validation MAE at the selected epoch: dense 9.86, sparse 8.35.
+- Against the more-distinct-storms experiment (cross-experiment; the
+  frame counts and step budgets differ, so not a test):
+  - that experiment's 9 -> 19 storms with more frames gave bias +5.40 and
+    MAE -1.60;
+  - here, 9 -> 19 storms with equal frames gives +4.26 and -1.21, about
+    three-quarters of each.
+  Variety alone accounts for most of that gain.

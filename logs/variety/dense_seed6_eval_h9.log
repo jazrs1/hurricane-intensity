@@ -1,0 +1,27 @@
+checkpoint: models/variety/dense/seed6.pt
+held-out storms: ['AL092022', 'AL172022', 'AL032021', 'AL022024', 'AL132023', 'AL182021', 'AL072022', 'AL122024', 'AL312020']
+after exclusion: 1752
+circular mask: False
+held-out samples: 1752
+overall MAE:      10.79 kt
+true fixes only:  10.68 kt  (n=315)
+
+TD      180 samples   MAE  12.71 kt   bias +12.12 kt
+TS      506 samples   MAE   8.07 kt   bias  +4.11 kt
+Cat 1   264 samples   MAE   8.25 kt   bias  -3.95 kt
+Cat 2   149 samples   MAE   9.98 kt   bias  -5.90 kt
+Cat 3   274 samples   MAE  11.86 kt   bias  -7.59 kt
+Cat 4   348 samples   MAE  14.47 kt   bias -13.46 kt
+Cat 5    31 samples   MAE  18.97 kt   bias -18.97 kt
+            count       mean
+storm_name                  
+BERYL          27   6.311356
+FIONA          31   8.049278
+IAN            48   7.601080
+IOTA           21   6.446981
+KIRK           38   5.039489
+LEE            58  10.272699
+NICOLE         12  14.868192
+SAM            29  10.063325
+
+wrote results/variety/dense_seed6_h9.csv  (1752 rows)
