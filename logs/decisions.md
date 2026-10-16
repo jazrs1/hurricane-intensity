@@ -2073,3 +2073,35 @@ AL072025, AL082025, AL092025, AL132025:
 - The 21 existing exclusions must be unchanged.
 - Nothing is re-cropped or rebuilt after any prediction is seen.
 - The evaluation (step 5) waits for the user.
+
+2026-10-16, 00:27. Final test on the 2025 GOES-19 storms: build done,
+pre-evaluation note. Written before any prediction on 2025 data.
+
+Build:
+- 1047 sample times, 1045 crops, all GOES-19. The 2 missing are
+  Gabrielle 2025-09-22 17:00 and 18:00, with no scan within 10 min.
+- check_nan.py excluded no 2025 frame. The 21 existing exclusions are
+  unchanged (5839 frames).
+- The HURDAT2 cache SHA-256 is unchanged (ee35819c...).
+- 272 frames are > 96 kt. Frames per band, TD to Cat 5: 22 / 456 / 166 /
+  129 / 84 / 137 / 51.
+- Logs in logs/final_2025/.
+
+Domain-shift diagnostic (results/final_2025/domain_shift_2025_vs_h9.csv):
+- The cold tail is colder in 2025 in every band: the 5th percentile is
+  3-8 K lower in every band, and in every band but TD more pixels are
+  below 200 K.
+- The effect is strongest at Cat 5: 0.174 of pixels below 200 K against
+  0.042 in H9.
+- Mean brightness is within normal variation (the H3-vs-H9 reference
+  differs by up to about 8 K per band).
+- No pixel in either set lies outside the 180-320 K scaling range.
+
+Expected effects, stated now:
+- The model's attribution at high intensity concentrates on cold
+  convection. A colder tail may therefore raise predictions and partly
+  offset the known low bias. A smaller 2025 high-end bias is not to be
+  read as better skill without this caveat.
+- Melissa peaked above the maximum training intensity: 165 kt against
+  160 kt (Dorian). 8 Melissa frames are above 160 kt; validation's
+  maximum is 130 kt. Predictions there are expected to saturate.
