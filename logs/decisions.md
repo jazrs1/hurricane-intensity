@@ -1849,3 +1849,139 @@ Exploratory (uncorrected):
   - here, 9 -> 19 storms with equal frames gives +4.26 and -1.21, about
     three-quarters of each.
   Variety alone accounts for most of that gain.
+
+2026-10-15, 22:57. Final test on the 2025 GOES-19 storms, design. Not run.
+No 2025 test frame has been built, and no model has seen any 2025 data.
+
+Question: does the more-distinct-storms model carry over to storms it
+has never seen, imaged by a different satellite? H9 can no longer
+answer that. It has been used across several experiments and it
+favoured the expanded arm, so its numbers are optimistic. The 2025 set is
+used once, and then it is spent.
+
+Model, frozen by this entry:
+- An ensemble of the ten expanded-arm checkpoints of the
+  more-distinct-storms experiment (models/storms/expanded/seed0-9.pt). Their
+  SHA-256s are in results/ensemble/members_sha256.txt, committed with this
+  entry; models/ is not in git, so that file is the definition.
+- The prediction is the unweighted mean of the ten members' predictions
+  per frame. No recalibration, bias correction, weighting, member
+  selection or test-time augmentation. Preprocessing is dataset.py's,
+  unchanged: unmasked, unrotated, 180-320 K scaling, bilinear to 224.
+- Code: scripts/ensemble_eval.py (SHA-256 658770d7...0a84) runs it, with
+  --expect-sha results/ensemble/members_sha256.txt, which refuses to run on
+  any other checkpoints. scripts/ensemble_report.py (SHA-256
+  854c166f...4429) computes the metrics. Both hashes are recorded here and
+  checked before the run. On H9 (exploratory, results/ensemble/findings.md)
+  each member reproduces its committed single-model CSV exactly.
+- Reference, fixed now, evaluated in the same single pass: best_model.pt
+  (f95e6c7e...cc18e9cc), with scripts/evaluate.py. It is reported beside
+  the ensemble; it is not the test, and it does not change what the test
+  reads.
+
+Test set (storms_test_2025.txt, committed with this entry):
+
+| ATCF id | name | first fix | HURDAT2 entries |
+|---|---|---|---|
+| AL042025 | Dexter | 2025-08-02 | 43 |
+| AL052025 | Erin | 2025-08-11 | 68 |
+| AL072025 | Gabrielle | 2025-09-17 | 45 |
+| AL082025 | Humberto | 2025-09-24 | 29 |
+| AL092025 | Imelda | 2025-09-26 | 38 |
+| AL132025 | Melissa | 2025-10-21 | 49 |
+
+- HURDAT2 entry counts include statuses the build drops.
+- Only header lines and first-fix dates were read; no intensities.
+- Labels come from the cached HURDAT2 copy, data/interim/hurdat2_atlantic.txt
+  (SHA-256 ee35819c...0bcb5c), which contains the 2025 season. It must
+  not be refreshed before the build.
+- Humberto 2025 shares its name with Humberto 2019 (AL092019, a training
+  storm). Everything is keyed on ATCF id; ensemble_report.py's per-storm
+  rows already are.
+- load_splits confirms no overlap with storms_train.txt or
+  storms_train_expanded.txt.
+
+GOES-19 check (results/goes19_check/):
+- One GOES-19 scan (2025-06-15 12:00, outside every test storm's
+  lifetime, cropped at an arbitrary point) was read through
+  goes_index.find_nearest_scan(bucket="noaa-goes19") and crop.py, and
+  compared field by field with a GOES-16 scan. The files were deleted. No
+  model was run.
+- Same file naming (platform G19 matches the existing regex), same key
+  layout, same Mode 6 full disk.
+- Identical projection metadata (lon_0 -75.0), grid and CMI packing.
+  Same crop shape.
+- What differs: the instrument (FM4 against FM1) and its band-13 Planck
+  coefficients (fk1 10860.40 against 10803.30). Both are calibrated
+  brightness temperature, but the spectral response differs slightly, so
+  the same scene can read slightly differently. Not corrected; this is
+  part of what the test measures.
+- noaa-goes16 has no band-13 full-disk scans on 2025-09-01. These storms
+  exist only on GOES-19.
+- Gap: pipeline.run_pipeline does not pass a bucket to goes_index or crop,
+  and build_dataset.py has no flag for it.
+
+Order of operations, each step committed before the next:
+1. This entry: the members' hashes, both scripts' hashes, the storm list.
+2. Pipeline change only: a --bucket flag on build_dataset.py, passed
+   through run_pipeline to find_nearest_scan and process_one_scan /
+   download_scan. The default stays noaa-goes16. Check that the default
+   is unchanged: for a sample of existing G16 manifest rows, the index
+   returns the same source_key. No existing storm is rebuilt.
+3. Build the six storms, settings identical to H9 except the bucket:
+   - hourly grid plus every exact fix (H9 manifests are hourly);
+   - ABI-L2-CMIPF band 13, full disk;
+   - 600 km box, 10 min tolerance, statuses LO,TD,SD,TS,SS,HU;
+   - --bucket noaa-goes19.
+   Then check_nan.py regenerates excluded_crops.txt under the unchanged
+   rule (any NaN pixel excludes the frame). The 21 existing entries must
+   be unchanged; the new ones are reported per storm. Per storm, report
+   sample times, matched frames and missing scans. Missing scans stay
+   missing. Nothing is re-cropped or rebuilt after any prediction is
+   seen.
+4. Domain-shift diagnostic, fixed now and computed before any model
+   runs. Per band, 2025 against H9: crop BT mean, sd, 5th percentile and
+   fraction of pixels below 200 K. Descriptive only.
+5. Evaluate once:
+   - ensemble_eval.py --expect-sha results/ensemble/members_sha256.txt
+     --train-list storms_train_expanded.txt --holdout-list
+     storms_test_2025.txt;
+   - evaluate.py --checkpoint best_model.pt --holdout-list
+     storms_test_2025.txt;
+   - ensemble_report.py --reweight-to results/ensemble/expanded10_h9.csv.
+   Outputs go to results/final_2025/, all committed, every number
+   reported.
+
+Metrics, fixed now:
+- Overall MAE, fixes-only MAE, overall bias.
+- >96 kt MAE and bias; Spearman over frames > 96 kt, pooled; <64 kt MAE
+  and bias.
+- Per-band bias, MAE and frame count.
+- Overall MAE reweighted to H9's band shares (2025 per-band MAE, H9
+  weights), so a change in intensity mix is not read as a change in
+  skill.
+- Per storm, by ATCF id: MAE; and, where a storm has at least 10 frames
+  > 96 kt, >96 kt MAE, bias and Spearman.
+- The ten members' mean, sd and range on each metric (from the pred_seed
+  columns).
+
+Reading, fixed now:
+- There is no inferential test. Six storms of autocorrelated hourly
+  frames and one model give no sampling distribution to test against.
+  The results are compared descriptively with the ensemble's H9 values:
+  overall 8.57, fixes-only 8.45, >96 kt MAE 10.82, >96 kt bias -7.72,
+  Spearman 0.601, per-band bias TD +7.4 to Cat 5 -18.8.
+- Some degradation is expected: H9 picked the arm, and the satellite
+  changes. The test reports how much and where (by band, by storm),
+  rather than pass or fail.
+- Validation has no frames at or above 137 kt, so the models are blind
+  there. Cat 5 frames are reported separately and also shown within the
+  reweighted figure.
+
+If the result is poor, it is still the result:
+- No retraining or tuning on 2025 data.
+- No second evaluation.
+- No change of members, averaging or preprocessing.
+- If a bug in the evaluation code is found afterwards, it is fixed and
+  rerun, and both runs are reported with the reason.
+- The 2025 set is not used for model selection afterwards.

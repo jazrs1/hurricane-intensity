@@ -1,0 +1,343 @@
+{
+ "goes19": {
+  "bucket": "noaa-goes19",
+  "key": "ABI-L2-CMIPF/2025/166/12/OR_ABI-L2-CMIPF-M6C13_G19_s20251661200206_e20251661209525_c20251661209576.nc",
+  "scan_time": "2025-06-15T12:00:20+00:00",
+  "offset_min": 0.3333333333333333,
+  "file_mb": 23.4,
+  "global_attrs": {
+   "naming_authority": "gov.nesdis.noaa",
+   "Conventions": "CF-1.7",
+   "Metadata_Conventions": "Unidata Dataset Discovery v1.0",
+   "standard_name_vocabulary": "CF Standard Name Table (v35, 20 July 2016)",
+   "institution": "DOC/NOAA/NESDIS > U.S. Department of Commerce, National Oceanic and Atmospheric Administration, National Environmental Satellite, Data, and Information Services",
+   "project": "GOES",
+   "production_site": "RBU",
+   "production_environment": "OE",
+   "spatial_resolution": "2km at nadir",
+   "orbital_slot": "GOES-East",
+   "platform_ID": "G19",
+   "instrument_type": "GOES-R Series Advanced Baseline Imager (ABI)",
+   "scene_id": "Full Disk",
+   "instrument_ID": "FM4",
+   "dataset_name": "OR_ABI-L2-CMIPF-M6C13_G19_s20251661200206_e20251661209525_c20251661209576.nc",
+   "iso_series_metadata_id": "8c9e8150-3692-11e3-aa6e-0800200c9a66",
+   "title": "ABI L2 Cloud and Moisture Imagery",
+   "summary": "Single emissive band Cloud and Moisture Imagery Products are digital maps of clouds, moisture and atmospheric windows at IR bands.",
+   "keywords": "SPECTRAL/ENGINEERING > INFRARED WAVELENGTHS > BRIGHTNESS TEMPERATURE",
+   "keywords_vocabulary": "NASA Global Change Master Directory (GCMD) Earth Science Keywords, Version 7.0.0.0.0",
+   "license": "Unclassified data.  Access is restricted to approved users only.",
+   "processing_level": "National Aeronautics and Space Administration (NASA) L2",
+   "date_created": "2025-06-15T12:09:57.6Z",
+   "cdm_data_type": "Image",
+   "time_coverage_start": "2025-06-15T12:00:20.6Z",
+   "time_coverage_end": "2025-06-15T12:09:52.5Z",
+   "timeline_id": "ABI Mode 6",
+   "production_data_source": "Realtime",
+   "id": "5ef8e123-c4b7-405f-8a67-775fdee78e8c"
+  },
+  "goes_imager_projection": {
+   "long_name": "GOES-R ABI fixed grid projection",
+   "grid_mapping_name": "geostationary",
+   "perspective_point_height": 35786023.0,
+   "semi_major_axis": 6378137.0,
+   "semi_minor_axis": 6356752.31414,
+   "inverse_flattening": 298.2572221,
+   "latitude_of_projection_origin": 0.0,
+   "longitude_of_projection_origin": -75.0,
+   "sweep_angle_axis": "x"
+  },
+  "CMI_attrs_raw": {
+   "_FillValue": -1,
+   "long_name": "ABI L2+ Cloud and Moisture Imagery brightness temperature",
+   "standard_name": "toa_brightness_temperature",
+   "_Unsigned": "true",
+   "sensor_band_bit_depth": 12,
+   "valid_range": [
+    0,
+    4095
+   ],
+   "scale_factor": 0.06145332008600235,
+   "add_offset": 89.62000274658203,
+   "units": "K",
+   "resolution": "y: 0.000056 rad x: 0.000056 rad",
+   "grid_mapping": "goes_imager_projection",
+   "cell_methods": "t: point area: point",
+   "ancillary_variables": "DQF"
+  },
+  "CMI_stored_dtype": "int16",
+  "DQF_attrs": {
+   "long_name": "ABI L2+ Cloud and Moisture Imagery brightness temperature data quality flags",
+   "standard_name": "status_flag",
+   "valid_range": [
+    0,
+    4
+   ],
+   "units": "1",
+   "grid_mapping": "goes_imager_projection",
+   "flag_values": [
+    0,
+    1,
+    2,
+    3,
+    4
+   ],
+   "flag_meanings": "good_pixel_qf conditionally_usable_pixel_qf out_of_range_pixel_qf no_value_pixel_qf focal_plane_temperature_threshold_exceeded_qf",
+   "number_of_qf_values": 5,
+   "percent_good_pixel_qf": 0.9999924898147583,
+   "percent_conditionally_usable_pixel_qf": 4.0000000467443897e-07,
+   "percent_out_of_range_pixel_qf": 0.0,
+   "percent_no_value_pixel_qf": 7.199999799922807e-06,
+   "percent_focal_plane_temperature_threshold_exceeded_qf": 0.0
+  },
+  "x_len": 5424,
+  "y_len": 5424,
+  "x_step_rad": 5.5999997130129486e-05,
+  "y_step_rad": -5.5999997130129486e-05,
+  "x_first_last": [
+   -0.15184399485588074,
+   0.15184399485588074
+  ],
+  "y_first_last": [
+   0.15184399485588074,
+   -0.15184399485588074
+  ],
+  "proj4": "+proj=geos +sweep=x +lon_0=-75 +h=35786023 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
+  "variables": [
+   "CMI",
+   "DQF",
+   "algorithm_dynamic_input_data_container",
+   "algorithm_product_version_container",
+   "channel_gain_field",
+   "channel_integration_time",
+   "earth_sun_distance_anomaly_in_AU",
+   "esun",
+   "focal_plane_temperature_threshold_decreasing",
+   "focal_plane_temperature_threshold_exceeded_count",
+   "focal_plane_temperature_threshold_increasing",
+   "geospatial_lat_lon_extent",
+   "goes_imager_projection",
+   "kappa0",
+   "max_brightness_temperature",
+   "maximum_focal_plane_temperature",
+   "mean_brightness_temperature",
+   "min_brightness_temperature",
+   "nominal_satellite_height",
+   "nominal_satellite_subpoint_lat",
+   "nominal_satellite_subpoint_lon",
+   "outlier_pixel_count",
+   "percent_uncorrectable_GRB_errors",
+   "percent_uncorrectable_L0_errors",
+   "planck_bc1",
+   "planck_bc2",
+   "planck_fk1",
+   "planck_fk2",
+   "processing_parm_version_container",
+   "std_dev_brightness_temperature",
+   "time_bounds",
+   "total_number_of_points",
+   "valid_pixel_count",
+   "x_image_bounds",
+   "y_image_bounds"
+  ],
+  "band_vars": {
+   "planck_fk1": 10860.400390625,
+   "planck_fk2": 1395.18994140625,
+   "planck_bc1": 0.07480999827384949,
+   "planck_bc2": 0.999750018119812,
+   "esun": NaN,
+   "kappa0": NaN
+  },
+  "crop": {
+   "centre": [
+    20.0,
+    -60.0
+   ],
+   "box_km": 600.0,
+   "bt_shape": "273x311",
+   "bt_dtype": "float32",
+   "nan_pixels": 0,
+   "bt_min": 228.811767578125,
+   "bt_max": 296.16461181640625,
+   "bt_mean": 283.2570495605469,
+   "dqf_values": {
+    "0.0": 84903
+   }
+  }
+ },
+ "goes16": {
+  "bucket": "noaa-goes16",
+  "key": "ABI-L2-CMIPF/2024/167/12/OR_ABI-L2-CMIPF-M6C13_G16_s20241671200212_e20241671209532_c20241671210010.nc",
+  "scan_time": "2024-06-15T12:00:21+00:00",
+  "offset_min": 0.35,
+  "file_mb": 23.1,
+  "global_attrs": {
+   "naming_authority": "gov.nesdis.noaa",
+   "Conventions": "CF-1.7",
+   "Metadata_Conventions": "Unidata Dataset Discovery v1.0",
+   "standard_name_vocabulary": "CF Standard Name Table (v35, 20 July 2016)",
+   "institution": "DOC/NOAA/NESDIS > U.S. Department of Commerce, National Oceanic and Atmospheric Administration, National Environmental Satellite, Data, and Information Services",
+   "project": "GOES",
+   "production_site": "NSOF",
+   "production_environment": "OE",
+   "spatial_resolution": "2km at nadir",
+   "orbital_slot": "GOES-East",
+   "platform_ID": "G16",
+   "instrument_type": "GOES-R Series Advanced Baseline Imager (ABI)",
+   "scene_id": "Full Disk",
+   "instrument_ID": "FM1",
+   "dataset_name": "OR_ABI-L2-CMIPF-M6C13_G16_s20241671200212_e20241671209532_c20241671210010.nc",
+   "iso_series_metadata_id": "8c9e8150-3692-11e3-aa6e-0800200c9a66",
+   "title": "ABI L2 Cloud and Moisture Imagery",
+   "summary": "Single emissive band Cloud and Moisture Imagery Products are digital maps of clouds, moisture and atmospheric windows at IR bands.",
+   "keywords": "SPECTRAL/ENGINEERING > INFRARED WAVELENGTHS > BRIGHTNESS TEMPERATURE",
+   "keywords_vocabulary": "NASA Global Change Master Directory (GCMD) Earth Science Keywords, Version 7.0.0.0.0",
+   "license": "Unclassified data.  Access is restricted to approved users only.",
+   "processing_level": "National Aeronautics and Space Administration (NASA) L2",
+   "date_created": "2024-06-15T12:10:01.0Z",
+   "cdm_data_type": "Image",
+   "time_coverage_start": "2024-06-15T12:00:21.2Z",
+   "time_coverage_end": "2024-06-15T12:09:53.2Z",
+   "timeline_id": "ABI Mode 6",
+   "production_data_source": "Realtime",
+   "id": "812e2c15-53e2-4861-a1a4-44693b7126f0"
+  },
+  "goes_imager_projection": {
+   "long_name": "GOES-R ABI fixed grid projection",
+   "grid_mapping_name": "geostationary",
+   "perspective_point_height": 35786023.0,
+   "semi_major_axis": 6378137.0,
+   "semi_minor_axis": 6356752.31414,
+   "inverse_flattening": 298.2572221,
+   "latitude_of_projection_origin": 0.0,
+   "longitude_of_projection_origin": -75.0,
+   "sweep_angle_axis": "x"
+  },
+  "CMI_attrs_raw": {
+   "_FillValue": -1,
+   "long_name": "ABI L2+ Cloud and Moisture Imagery brightness temperature",
+   "standard_name": "toa_brightness_temperature",
+   "_Unsigned": "true",
+   "sensor_band_bit_depth": 12,
+   "valid_range": [
+    0,
+    4095
+   ],
+   "scale_factor": 0.06145332008600235,
+   "add_offset": 89.62000274658203,
+   "units": "K",
+   "resolution": "y: 0.000056 rad x: 0.000056 rad",
+   "grid_mapping": "goes_imager_projection",
+   "cell_methods": "t: point area: point",
+   "ancillary_variables": "DQF"
+  },
+  "CMI_stored_dtype": "int16",
+  "DQF_attrs": {
+   "long_name": "ABI L2+ Cloud and Moisture Imagery brightness temperature data quality flags",
+   "standard_name": "status_flag",
+   "valid_range": [
+    0,
+    4
+   ],
+   "units": "1",
+   "grid_mapping": "goes_imager_projection",
+   "flag_values": [
+    0,
+    1,
+    2,
+    3,
+    4
+   ],
+   "flag_meanings": "good_pixel_qf conditionally_usable_pixel_qf out_of_range_pixel_qf no_value_pixel_qf focal_plane_temperature_threshold_exceeded_qf",
+   "number_of_qf_values": 5,
+   "percent_good_pixel_qf": 0.9999995827674866,
+   "percent_conditionally_usable_pixel_qf": 1.0000000116860974e-07,
+   "percent_out_of_range_pixel_qf": 0.0,
+   "percent_no_value_pixel_qf": 3.000000106112566e-07,
+   "percent_focal_plane_temperature_threshold_exceeded_qf": 0.0
+  },
+  "x_len": 5424,
+  "y_len": 5424,
+  "x_step_rad": 5.5999997130129486e-05,
+  "y_step_rad": -5.5999997130129486e-05,
+  "x_first_last": [
+   -0.15184399485588074,
+   0.15184399485588074
+  ],
+  "y_first_last": [
+   0.15184399485588074,
+   -0.15184399485588074
+  ],
+  "proj4": "+proj=geos +sweep=x +lon_0=-75 +h=35786023 +x_0=0 +y_0=0 +ellps=GRS80 +units=m +no_defs +type=crs",
+  "variables": [
+   "CMI",
+   "DQF",
+   "algorithm_dynamic_input_data_container",
+   "algorithm_product_version_container",
+   "channel_gain_field",
+   "channel_integration_time",
+   "earth_sun_distance_anomaly_in_AU",
+   "esun",
+   "focal_plane_temperature_threshold_decreasing",
+   "focal_plane_temperature_threshold_exceeded_count",
+   "focal_plane_temperature_threshold_increasing",
+   "geospatial_lat_lon_extent",
+   "goes_imager_projection",
+   "kappa0",
+   "max_brightness_temperature",
+   "maximum_focal_plane_temperature",
+   "mean_brightness_temperature",
+   "min_brightness_temperature",
+   "nominal_satellite_height",
+   "nominal_satellite_subpoint_lat",
+   "nominal_satellite_subpoint_lon",
+   "outlier_pixel_count",
+   "percent_uncorrectable_GRB_errors",
+   "percent_uncorrectable_L0_errors",
+   "planck_bc1",
+   "planck_bc2",
+   "planck_fk1",
+   "planck_fk2",
+   "processing_parm_version_container",
+   "std_dev_brightness_temperature",
+   "time_bounds",
+   "total_number_of_points",
+   "valid_pixel_count",
+   "x_image_bounds",
+   "y_image_bounds"
+  ],
+  "band_vars": {
+   "planck_fk1": 10803.2998046875,
+   "planck_fk2": 1392.739990234375,
+   "planck_bc1": 0.0754999965429306,
+   "planck_bc2": 0.999750018119812,
+   "esun": NaN,
+   "kappa0": NaN
+  },
+  "crop": {
+   "centre": [
+    20.0,
+    -60.0
+   ],
+   "box_km": 600.0,
+   "bt_shape": "273x311",
+   "bt_dtype": "float32",
+   "nan_pixels": 0,
+   "bt_min": 221.56027221679688,
+   "bt_max": 297.02496337890625,
+   "bt_mean": 290.7514953613281,
+   "dqf_values": {
+    "0.0": 84903
+   }
+  }
+ },
+ "noaa-goes16_C13_full_disk_2025": {
+  "2025-04-01T12:00:00+00:00": [
+   "ABI-L2-CMIPF/2025/091/12/OR_ABI-L2-CMIPF-M6C13_G16_s20250911200205_e20250911209524_c20250911209587.nc",
+   "ABI-L2-CMIPF/2025/091/12/OR_ABI-L2-CMIPF-M6C13_G16_s20250911210205_e20250911219525_c20250911219592.nc",
+   "ABI-L2-CMIPF/2025/091/12/OR_ABI-L2-CMIPF-M6C13_G16_s20250911220205_e20250911229525_c20250911229583.nc",
+   "... 6 total"
+  ],
+  "2025-09-01T12:00:00+00:00": []
+ }
+}

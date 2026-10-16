@@ -1,0 +1,11 @@
+# Final test set: the six 2025 storms, GOES-19 only. Not built yet. Valid only
+# for the frozen ensemble (results/ensemble/members_sha256.txt, trained on
+# storms_train_expanded.txt) and the best_model.pt reference; see
+# logs/decisions.md, 2026-10-15. Humberto 2025 is not Humberto 2019 (a
+# training storm): key everything on ATCF id.
+AL042025
+AL052025
+AL072025
+AL082025
+AL092025
+AL132025
