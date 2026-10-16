@@ -80,6 +80,14 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     p.add_argument(
+        "--bucket",
+        default=config.GOES_BUCKET,
+        help=(
+            "S3 bucket to read ABI scans from, e.g. noaa-goes19. "
+            f"Default: {config.GOES_BUCKET}."
+        ),
+    )
+    p.add_argument(
         "--log-level",
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -107,6 +115,7 @@ def main() -> None:
         hurdat2_url=args.hurdat2_url,
         force_hurdat2_refresh=args.force_hurdat2_refresh,
         include_statuses=include_statuses,
+        bucket=args.bucket,
     )
 
 

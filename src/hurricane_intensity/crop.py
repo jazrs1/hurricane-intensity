@@ -108,11 +108,12 @@ def process_one_scan(
     center_lon: float,
     box_km: float,
     scratch_path: Path = config.SCRATCH_NC_PATH,
+    bucket: str = config.GOES_BUCKET,
 ) -> Crop:
     """Download -> crop -> delete, for one ABI scan. Guarantees the raw file
     is removed even if cropping raises.
     """
-    download_scan(s3_client, key, scratch_path)
+    download_scan(s3_client, key, scratch_path, bucket=bucket)
     try:
         return extract_crop(scratch_path, center_lat, center_lon, box_km)
     finally:

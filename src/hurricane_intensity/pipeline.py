@@ -96,8 +96,13 @@ def run_pipeline(
     hurdat2_url: str | None = None,
     force_hurdat2_refresh: bool = False,
     include_statuses: tuple[str, ...] = config.DEFAULT_INCLUDE_STATUSES,
+    bucket: str = config.GOES_BUCKET,
 ) -> Path:
-    """Run the full pipeline for one storm. Returns the manifest CSV path."""
+    """Run the full pipeline for one storm. Returns the manifest CSV path.
+
+    `bucket` selects the satellite (noaa-goes16, noaa-goes19, ...); it is
+    used both to find the nearest scan and to download it.
+    """
     atcf_id = atcf_id.strip().upper()
     out_dir = Path(out_root) / atcf_id
     crops_dir = out_dir / "crops"
@@ -143,7 +148,7 @@ def run_pipeline(
         }
 
         match = goes_index.find_nearest_scan(
-            s3_client, sample_time, tolerance_min=tolerance_min
+            s3_client, sample_time, tolerance_min=tolerance_min, bucket=bucket
         )
         if match is None:
             rows.append(record)
@@ -151,7 +156,7 @@ def run_pipeline(
 
         try:
             result = crop.process_one_scan(
-                s3_client, match.key, row.lat, row.lon, box_km
+                s3_client, match.key, row.lat, row.lon, box_km, bucket=bucket
             )
         except Exception:
             logger.exception(

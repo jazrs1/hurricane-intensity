@@ -2016,3 +2016,60 @@ Known limit of the frozen ensemble_report.py: the reweighted overall MAE
 sums over every band H9 has. If the 2025 set has no frames in one of
 those bands, it returns NaN. That is reported as NaN and not patched; the
 per-band MAEs stand on their own.
+
+2026-10-15, 23:05. Final test on the 2025 GOES-19 storms: user decisions,
+bucket plumbing, diagnostic script. Written and committed before any 2025
+crop is built. data/processed/ has no 2025 storm.
+
+User decisions on the design above:
+- best_model.pt stays as a reference. It is evaluated in the same single
+  pass and labelled as a reference, not part of the test.
+- All three extras stand:
+  - the domain-shift diagnostic, with its script written and hashed now;
+  - the overall MAE reweighted to H9's band shares;
+  - storms_test_2025.txt, already committed in 12e579e.
+
+Step 2, bucket plumbing (src/hurricane_intensity/pipeline.py, crop.py,
+scripts/build_dataset.py):
+- build_dataset.py gets --bucket. run_pipeline(bucket=...) passes it to
+  goes_index.find_nearest_scan and to crop.process_one_scan, which passes
+  it to download_scan.
+- Every default is config.GOES_BUCKET (noaa-goes16).
+- Check that the default path is unchanged: three existing GOES-16 crops
+  were rebuilt through the real run_pipeline, with no bucket given, into
+  a scratch out_root. Only the sample grid was narrowed to the one sample
+  time. All three matched the crops on disk byte for byte, from the same
+  source scans:
+  - Michael AL142018 2018-10-09 12:00 (scan mode 3), 649563 bytes
+  - Ian AL092022 2022-09-27 06:00, 663107 bytes
+  - Kirk AL122024 2024-10-05 12:00, 650255 bytes
+  No existing storm was rebuilt in place.
+
+Step 2b, domain-shift diagnostic: scripts/domain_shift.py, SHA-256
+d439e7361d6a66e02e3fc7e2cddc9fd36b4f5f9d1a97b847e62e360614c7c3b4.
+- It uses the same frame set TCDataset uses (manifest rows with a crop,
+  minus excluded_crops.txt) and the native crops, before resampling and
+  before the 180-320 K clip.
+- Per frame: mean BT, BT sd, 5th percentile, fraction below 200 K,
+  fraction outside 180-320 K. These are averaged per band and overall.
+- It never loads a model.
+- Scale reference, run now on existing data
+  (results/final_2025/domain_shift_reference_h3_vs_h9.csv): H3 against H9
+  differs by up to about 8 K in band-mean BT (all frames +10.5 K, mostly
+  composition). Two sets of GOES-16 storms already differ this much, so a
+  2025 difference is read against that, not against zero.
+- Run after the build and check_nan.py, before any evaluation:
+  domain_shift.py --set H9 storms_holdout_h9.txt --set 2025
+  storms_test_2025.txt --out results/final_2025/domain_shift_2025_vs_h9.csv
+
+Step 3, the build, exactly as fixed. For each of AL042025, AL052025,
+AL072025, AL082025, AL092025, AL132025:
+- build_dataset.py --atcf-id <id> --bucket noaa-goes19
+- All defaults: 1h grid plus exact fixes; ABI-L2-CMIPF band 13; 600 km;
+  10 min; statuses LO,TD,SD,TS,SS,HU; no --force-hurdat2-refresh.
+- Logs go to logs/final_2025/build_<id>.log.
+- Then check_nan.py; the HURDAT2 cache SHA-256 (ee35819c..., unchanged
+  now) is rechecked.
+- The 21 existing exclusions must be unchanged.
+- Nothing is re-cropped or rebuilt after any prediction is seen.
+- The evaluation (step 5) waits for the user.
