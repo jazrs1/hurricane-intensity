@@ -1,0 +1,46 @@
+﻿band weights from results/ensemble/expanded10_h9.csv: TD 0.103, TS 0.289, Cat 1 0.151, Cat 2 0.085, Cat 3 0.156, Cat 4 0.199, Cat 5 0.018
+results/final_2025/best_model_2025_report_input.csv: 1045 frames, 272 above 96 kt, 1 members
+
+band counts: TD 22, TS 456, Cat 1 166, Cat 2 129, Cat 3 84, Cat 4 137, Cat 5 51
+                           metric  ensemble  member mean  member sd  member min  member max  members ensemble beats
+                      overall MAE    12.131       12.131        NaN      12.131      12.131                   0.000
+                   fixes-only MAE    11.714       11.714        NaN      11.714      11.714                   0.000
+                     overall bias    -2.961       -2.961        NaN      -2.961      -2.961                     NaN
+                          >96 MAE    15.358       15.358        NaN      15.358      15.358                   0.000
+                         >96 bias   -11.828      -11.828        NaN     -11.828     -11.828                     NaN
+                     spearman >96     0.684        0.684        NaN       0.684       0.684                   0.000
+                          <64 MAE    10.722       10.722        NaN      10.722      10.722                   0.000
+                         <64 bias     6.028        6.028        NaN       6.028       6.028                     NaN
+                          bias TD     8.274        8.274        NaN       8.274       8.274                     NaN
+                           MAE TD     8.275        8.275        NaN       8.275       8.275                   0.000
+                          bias TS     5.920        5.920        NaN       5.920       5.920                     NaN
+                           MAE TS    10.841       10.841        NaN      10.841      10.841                   0.000
+                       bias Cat 1    -7.633       -7.633        NaN      -7.633      -7.633                     NaN
+                        MAE Cat 1    10.005       10.005        NaN      10.005      10.005                   0.000
+                       bias Cat 2   -11.561      -11.561        NaN     -11.561     -11.561                     NaN
+                        MAE Cat 2    13.281       13.281        NaN      13.281      13.281                   0.000
+                       bias Cat 3   -12.415      -12.415        NaN     -12.415     -12.415                     NaN
+                        MAE Cat 3    17.843       17.843        NaN      17.843      17.843                   0.000
+                       bias Cat 4    -9.025       -9.025        NaN      -9.025      -9.025                     NaN
+                        MAE Cat 4    12.690       12.690        NaN      12.690      12.690                   0.000
+                       bias Cat 5   -18.389      -18.389        NaN     -18.389     -18.389                     NaN
+                        MAE Cat 5    18.431       18.431        NaN      18.431      18.431                   0.000
+MAE reweighted to reference bands    12.255       12.255        NaN      12.255      12.255                   0.000
+              MAE AL042025 Dexter     8.286        8.286        NaN       8.286       8.286                   0.000
+                MAE AL052025 Erin    13.660       13.660        NaN      13.660      13.660                   0.000
+            >96 MAE AL052025 Erin    22.532       22.532        NaN      22.532      22.532                   0.000
+           >96 bias AL052025 Erin   -22.025      -22.025        NaN     -22.025     -22.025                     NaN
+       >96 spearman AL052025 Erin     0.492        0.492        NaN       0.492       0.492                   0.000
+           MAE AL072025 Gabrielle    10.371       10.371        NaN      10.371      10.371                   0.000
+       >96 MAE AL072025 Gabrielle     8.486        8.486        NaN       8.486       8.486                   0.000
+      >96 bias AL072025 Gabrielle    -4.452       -4.452        NaN      -4.452      -4.452                     NaN
+  >96 spearman AL072025 Gabrielle     0.832        0.832        NaN       0.832       0.832                   0.000
+            MAE AL082025 Humberto    13.434       13.434        NaN      13.434      13.434                   0.000
+        >96 MAE AL082025 Humberto    12.899       12.899        NaN      12.899      12.899                   0.000
+       >96 bias AL082025 Humberto   -11.615      -11.615        NaN     -11.615     -11.615                     NaN
+   >96 spearman AL082025 Humberto     0.647        0.647        NaN       0.647       0.647                   0.000
+              MAE AL092025 Imelda    10.705       10.705        NaN      10.705      10.705                   0.000
+             MAE AL132025 Melissa    12.610       12.610        NaN      12.610      12.610                   0.000
+         >96 MAE AL132025 Melissa    15.497       15.497        NaN      15.497      15.497                   0.000
+        >96 bias AL132025 Melissa    -7.429       -7.429        NaN      -7.429      -7.429                     NaN
+    >96 spearman AL132025 Melissa     0.711        0.711        NaN       0.711       0.711                   0.000

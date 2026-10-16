@@ -2105,3 +2105,49 @@ Expected effects, stated now:
 - Melissa peaked above the maximum training intensity: 165 kt against
   160 kt (Dorian). 8 Melissa frames are above 160 kt; validation's
   maximum is 130 kt. Predictions there are expected to saturate.
+
+2026-10-16, 00:29. Final test on the 2025 GOES-19 storms, results. Run
+once.
+- The members, both scripts and best_model.pt matched their frozen hashes
+  just before the run. The commands were exactly as pinned.
+- 1045 frames from six storms. The full write-up is in
+  results/final_2025/findings.md.
+- best_model.pt is a reference, not part of the test. Its metrics come
+  from the same frozen ensemble_report.py, run on a copy of its CSV with
+  the prediction as the one member column.
+
+| metric | ensemble 2025 | ensemble H9 | members 2025, mean (sd) | best_model.pt 2025 |
+|---|---|---|---|---|
+| overall MAE | 9.78 | 8.57 | 10.42 (0.26) | 12.13 |
+| fixes-only MAE | 9.79 | 8.45 | 10.42 (0.45) | 11.71 |
+| MAE reweighted to H9 bands | 10.05 | 8.57 | 10.64 (0.34) | 12.26 |
+| >96 kt MAE | 12.65 | 10.82 | 13.18 (0.87) | 15.36 |
+| >96 kt bias | -8.54 | -7.72 | same | -11.83 |
+| Spearman > 96 kt | 0.729 | 0.601 | 0.711 (0.028) | 0.684 |
+
+Per-band bias, TD to Cat 5:
+- 2025: +7.6, +3.6, -6.3, -6.4, -7.9, -6.2, -15.7.
+- H9: +7.4, -0.8, -2.3, -2.6, -4.2, -9.5, -18.8.
+
+Per storm, MAE (and >96 kt bias / Spearman where there are at least 10
+frames above 96 kt):
+- Dexter 6.13.
+- Erin 9.88 (-17.1 / 0.53).
+- Gabrielle 8.24 (-1.6 / 0.82).
+- Humberto 11.73 (-7.4 / 0.72).
+- Imelda 8.91.
+- Melissa 10.98 (-6.2 / 0.82).
+
+Reading, descriptive as fixed:
+- Error rose by 1.2 kt from H9 (1.5 kt at H9's intensity mix).
+- The ensemble beat all ten members again, and it beats best_model.pt on
+  every pooled metric.
+- The shift is not uniform: TS over-prediction grows, Cat 1-3
+  under-prediction grows by about 4 kt, and Cat 4/5 under-prediction
+  shrinks. Per the pre-evaluation note, the smaller high-end bias is not
+  read as better skill (colder 2025 cold tail).
+- Exploratory: Melissa's 8 frames above 160 kt are predicted at 133-143 kt
+  (bias -23). That is consistent with saturation, but it can't be
+  separated from the general Cat 5 underestimation.
+
+The 2025 set is now spent.

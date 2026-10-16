@@ -1,0 +1,24 @@
+﻿checkpoint: best_model.pt
+held-out storms: ['AL042025', 'AL052025', 'AL072025', 'AL082025', 'AL092025', 'AL132025']
+after exclusion: 1045
+circular mask: False
+held-out samples: 1045
+overall MAE:      12.13 kt
+true fixes only:  11.71 kt  (n=182)
+
+TD       22 samples   MAE   8.27 kt   bias  +8.27 kt
+TS      456 samples   MAE  10.84 kt   bias  +5.92 kt
+Cat 1   166 samples   MAE  10.01 kt   bias  -7.63 kt
+Cat 2   129 samples   MAE  13.28 kt   bias -11.56 kt
+Cat 3    84 samples   MAE  17.84 kt   bias -12.42 kt
+Cat 4   137 samples   MAE  12.69 kt   bias  -9.02 kt
+Cat 5    51 samples   MAE  18.43 kt   bias -18.39 kt
+            count       mean
+storm_name                  
+ERIN           26  13.068150
+GABRIELLE      31   5.723248
+HUMBERTO       33  13.151577
+IMELDA         43   9.125065
+MELISSA        33   9.614637
+
+wrote results/final_2025/best_model_2025.csv  (1045 rows)
