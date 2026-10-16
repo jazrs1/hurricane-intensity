@@ -52,8 +52,13 @@ from more high-end frames, and this experiment cannot tell those apart.
 Adding Beryl and Lee hourly in the class-imbalance experiment (+509 frames,
 +219 at >= 96 kt) did not help, which hints that variety matters more than
 volume -- but that experiment used different held-out storms and is not
-directly comparable. A variety-against-volume experiment, using only data
-already on disk, is drafted in `logs/decisions.md`.
+directly comparable. The variety-against-volume experiment that followed
+(`results/variety/findings.md`) held frame count and intensity mix fixed
+(1013 frames per arm, matched in every 5 kt bin) and compared 9 storms
+hourly with 19 storms 3-hourly. Variety helped: >96 kt bias +4.26 kt
+(p 0.0017) and overall MAE -1.20 kt (p 0.00016) survive correction, about
+four-fifths and three-quarters of the gains here. Ranking above 96 kt did
+not (+0.031, p 0.047).
 
 ## Pre-registered secondary: null
 
