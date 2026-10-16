@@ -1985,3 +1985,34 @@ If the result is poor, it is still the result:
 - If a bug in the evaluation code is found afterwards, it is fixed and
   rerun, and both runs are reported with the reason.
 - The 2025 set is not used for model selection afterwards.
+
+2026-10-15, 22:59. Final test on the 2025 GOES-19 storms, design: three
+corrections. These supersede the entry above where they differ. Still
+nothing built or run.
+
+1. Output paths are pinned. Without --out, evaluate.py writes
+   results/heldout_predictions.csv, which must never be overwritten. Step 5
+   runs exactly:
+   - ensemble_eval.py --expect-sha results/ensemble/members_sha256.txt
+     --train-list storms_train_expanded.txt --holdout-list
+     storms_test_2025.txt --out results/final_2025/ensemble_2025.csv
+     --sha-out results/final_2025/members_sha256_at_run.txt
+   - evaluate.py --checkpoint best_model.pt --train-list storms_train.txt
+     --holdout-list storms_test_2025.txt --out
+     results/final_2025/best_model_2025.csv
+   - ensemble_report.py --csv results/final_2025/ensemble_2025.csv
+     --reweight-to results/ensemble/expanded10_h9.csv --out
+     results/final_2025/ensemble_2025_metrics.csv
+2. The domain-shift diagnostic gets its own script, written and hashed
+   before the build: a new step between the pipeline change (2) and the
+   build (3). Its SHA-256 goes in decisions.md before any 2025 crop exists.
+3. HURDAT2: hurdat2.download_hurdat2 returns the cached file without
+   touching the network when it exists and force is False, so the build
+   uses data/interim/hurdat2_atlantic.txt as long as --force-hurdat2-refresh
+   is not passed. Its SHA-256 (ee35819c...0bcb5c) is rechecked after the
+   build and reported.
+
+Known limit of the frozen ensemble_report.py: the reweighted overall MAE
+sums over every band H9 has. If the 2025 set has no frames in one of
+those bands, it returns NaN. That is reported as NaN and not patched; the
+per-band MAEs stand on their own.
