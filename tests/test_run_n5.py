@@ -975,12 +975,12 @@ def test_rule_a_completes_when_a_record_breaks_mid_phase2(tmp_path):
     with pytest.raises(R.LaunchError, match="evaluation failed: logs/n5_atlantic/atlantic_seed3_eval_h9.log"):
         ev(root, runner=runner)
     assert (root / "logs/n5_atlantic/runs/control_seed0.json").exists()
-    touch_kept(root / "models/n5_atlantic/control/seed0_epochs/epoch_13.pt", b"bit rot")
+    touch_kept(root / "models/n5_atlantic/control/seed0.pt", b"bit rot")  # also one check_training hashes
     runner.eval_fail = set()
     with pytest.raises(R.LaunchError, match=r"do not verify: \[\('control', 0\)\]; H9 has been looked at"):
         ev(root, runner=runner)
     R.abort_eval("atlantic", 3, "evaluation crashed", root)
-    dev = write_deviations(root, [{"seed": 0, "reason": "control seed 0 epoch_13.pt changed after H9; bytes lost"}])
+    dev = write_deviations(root, [{"seed": 0, "reason": "control seed 0's seed0.pt changed after H9; bytes lost"}])
     n = len(runner.calls)
     mans, runner = ev(root, runner=runner, deviations=dev)
     assert sorted((m["arm"], m["seed"]) for m in mans) == sorted((a, s) for _, a, s in R.schedule(range(10)) if s)
