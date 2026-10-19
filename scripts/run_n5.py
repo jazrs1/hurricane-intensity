@@ -70,8 +70,8 @@ ABORTED = "logs/n5_atlantic/aborted"
 LOCK = "logs/n5_atlantic/run_n5.lock"
 PHASE2_MARKER = "logs/n5_atlantic/phase2_started.json"  # written once, before the first H9 step; never moved
 RESTORE_AFTER_LOOK = ("H9 has been looked at, so it can't be retrained: restore the exact bytes of the changed files "
-                      "(their SHA-256s are in the record); if that is impossible, §14's post-look rule applies "
-                      "(pending John)")
+                      "(their SHA-256s are in the record); if that is impossible, §14's rule (A) applies: the seed "
+                      "pair is dropped as a named deviation (analyze_n5.py --deviations)")
 DOC_PATHS = ("logs/decisions.md",)  # 5e: docs a merge may add between L and HEAD; never executed (coordinator)
 OUTPUT_ROOTS = ("models/n5_atlantic/", "results/n5_atlantic/", "logs/n5_atlantic/")
 NEVER_WRITTEN = ("best_model.pt", "models/baseline_9kt.pt", "results/heldout_predictions.csv", "models/storms/",

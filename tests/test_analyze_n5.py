@@ -185,9 +185,9 @@ def build(name, arm_scale=1.0, arm_hi=-7.0, ctl_hi=-7.0, seed_sd=0.03, bias_sd=0
     return root
 
 
-def analyse(root, out="out", git=None, frozen_dir=None):
+def analyse(root, out="out", git=None, frozen_dir=None, deviations=None):
     return A.run(root / "logs/n5_atlantic/runs", root / out, frozen_dir=frozen_dir, root=root, design=DESIGN,
-                 git=git or fake_git())
+                 git=git or fake_git(), deviations=deviations)
 
 
 @pytest.fixture(autouse=True)
@@ -501,6 +501,63 @@ def test_revalidation_pick_check_alone(request):
         return m
     with pytest.raises(A.DesignError, match="does not reproduce training"):
         analyse(build(request.node.name, man_mutate=man))
+
+
+# ---- rule (A), John 2026-10-19 17:03: a dropped seed pair as a named deviation -----------------------------------
+def deviations(root, rows):
+    p = root / "deviations.json"
+    p.write_text(json.dumps({"dropped_pairs": rows}), encoding="utf-8")
+    return p
+
+
+def test_rule_a_drops_a_named_pair_and_says_so(request):
+    """A pair is dropped only when the deviations file names it; the report labels the verdict NON-CONFIRMATORY and
+    states the reduced n and both primaries' power at it."""
+    root = build(request.node.name, arm_scale=0.9)
+    plain = analyse(root, "plain")
+    assert plain["n_pairs"] == 10 and plain["primary"].confirmatory.all() and not plain["joint"].startswith("NON")
+    assert not any(l.startswith("DEVIATION") for l in plain["report"])
+    for arm in A.ARMS:  # seed 4's runs are unusable (say, a post-look bad record)
+        (root / f"logs/n5_atlantic/runs/{arm}_seed4.json").unlink()
+    with pytest.raises(A.DesignError, match="missing run manifest"):  # never dropped automatically
+        analyse(root, "auto")
+    res = analyse(root, "dev", deviations=deviations(root, [{"seed": 4, "reason": "kept file changed after H9"}]))
+    assert res["n_pairs"] == 9 and sorted(res["per_run"].seed.unique()) == [0, 1, 2, 3, 5, 6, 7, 8, 9]
+    assert res["joint"].startswith("NON-CONFIRMATORY (rule (A)")
+    prim_rows = res["primary"]
+    assert (~prim_rows.confirmatory).all() and (prim_rows.n_pairs == 9).all() and (prim_rows.dropped_seeds == "4").all()
+    report = (root / "dev" / "report.txt").read_text(encoding="utf-8")
+    assert "DEVIATION (rule (A), John 2026-10-19 17:03): seed pairs dropped, both arms: seed 4: kept file changed" in report
+    assert "The verdict is NON-CONFIRMATORY. n = 9 paired seeds instead of 10." in report
+    assert "Power at the SESOI, n = 10 -> 9" in report
+    for k, sds in A.POWER_SD.items():
+        assert f"    {k} ({A.SESOI[k]} kt): sd_diff {sds[0]:.2f}: " in report
+    assert prim(res, "overall MAE").verdict == "BETTER"  # the test itself still runs, on 9 pairs
+
+
+@pytest.mark.parametrize("rows, msg", [
+    ([], "non-empty"),
+    ([{"seed": 10, "reason": "x"}], "distinct seed"),
+    ([{"seed": 3, "reason": " "}], "distinct seed"),
+    ([{"seed": 3, "reason": "x"}, {"seed": 3, "reason": "y"}], "distinct seed"),
+    ([{"seed": "3", "reason": "x"}], "distinct seed"),
+    ([{"seed": s, "reason": "x"} for s in range(9)], "fewer than 2 would remain"),
+], ids=["empty", "unknown_seed", "no_reason", "duplicate", "string_seed", "too_many"])
+def test_rule_a_refuses_a_malformed_deviations_file(request, rows, msg):
+    root = build(request.node.name)
+    with pytest.raises(A.DesignError, match=msg):
+        analyse(root, deviations=deviations(root, rows))
+
+
+def test_rule_a_power_uses_the_design_method():
+    """n = 10 reproduces the design's planning figures (§5: 71% at the conservative rows, about 1.00 at the best MAE
+    row); dropping a pair costs power."""
+    assert A.power_at(10, 0.9, 0.85) == pytest.approx(0.71, abs=0.03)
+    assert A.power_at(10, 3.0, 2.84) == pytest.approx(0.71, abs=0.03)
+    assert A.power_at(10, 0.9, 0.40) >= 0.99
+    assert A.power_at(9, 0.9, 0.85) < A.power_at(10, 0.9, 0.85)
+    assert A.power_at(9, 3.0, 2.84) == A.power_at(9, 3.0, 2.84)  # fixed seed: deterministic
+    assert A.signflip_p(np.full(9, -1.0), 9) == pytest.approx(2 / 512)
 
 
 # ---- 2026-10-19 amendment (a): the tie rule ---------------------------------------------------------------------

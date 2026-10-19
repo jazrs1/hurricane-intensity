@@ -1,6 +1,7 @@
 """N5 Atlantic-only arm: pre-registered analysis. DRAFT r2 (reports/v2_survey/n5/design.md); not yet approved.
 
-Read-only, CPU only, deterministic (no torch, no random numbers). At launch this file is committed as
+Read-only, CPU only, deterministic (no torch; the only random numbers are rule (A)'s fixed-seed power Monte
+Carlo, run only when --deviations drops a pair). At launch this file is committed as
 scripts/analyze_n5.py. Its hash is the SHA-256 of the committed blob, computed in Python from the bytes of
 `git show <commit>:scripts/analyze_n5.py`. It is not the hash of the Windows working-tree file, whose bytes differ
 under core.autocrlf. At run time the script refuses to run unless the working file is clean and identical to the
@@ -16,13 +17,19 @@ Every link is verified (see load_run). Optional input: --frozen-dir results/stor
 expanded_seed<s>_h9.csv), for a descriptive, unpaired reproducibility check only.
 
     python scripts/analyze_n5.py --manifest-dir logs/n5_atlantic/runs --out-dir results/n5_atlantic/analysis
-        [--frozen-dir results/storms]
+        [--frozen-dir results/storms] [--deviations logs/n5_atlantic/deviations.json]
+
+--deviations (rule (A), John 2026-10-19 17:03; design.md §14) is an explicit, recorded input, never inferred:
+{"dropped_pairs": [{"seed": <s>, "reason": "<why>"}, ...]}. The named seed pairs (both arms) are left out; the
+report names the deviation, labels the verdict NON-CONFIRMATORY, and states the reduced n and its effect on the
+power of both primaries, recomputed as in power.py (design §5).
 
 Writes into --out-dir (refuses to overwrite): primary_tests.csv, sensitivity.csv, per_run.csv, per_arm.csv,
 paired_differences.csv, per_storm.csv, ensemble.csv, val_trace.csv, frozen_vs_control.csv (with --frozen-dir),
 report.txt.
 """
 import argparse
+import functools
 import hashlib
 import itertools
 import json
@@ -72,6 +79,8 @@ ALPHA = 0.025  # each: Bonferroni 0.05 / 2; two-sided exact sign-flip; 97.5% CIs
 SESOI = {"overall MAE": 0.9, ">96 bias": 3.0}  # kt, power-derived (not a meaningfulness claim)
 SECONDARY = (">96 MAE",)  # alpha 0.05, uncorrected, labelled secondary
 SECONDARY_ALPHA = 0.05
+POWER_SD = {"overall MAE": (0.40, 0.69, 0.85), ">96 bias": (2.03, 2.44, 2.84)}  # design §5 sd_diff rows
+POWER_REPS, POWER_SEED = 2000, 20261018  # power.py's reps per cell and seed
 UNDERTRAIN_FRACTION = 0.85  # flag: selected checkpoint in the last 15% of steps
 UNDERTRAIN_RUNS = 5  # >= 5/10 runs flagged in either arm -> the result is "budget-limited"
 HIGH = 96  # ">96" means truth > 96 kt, as in scripts/storms_analysis.py
@@ -98,7 +107,6 @@ PROTECTED = {  # FEATURES.md / COORDINATOR.md protected block; must be identical
 
 REQUIRED = ["atcf_id", "storm_name", "sample_time", "wind_kt", "is_interpolated", "crop_path",
             "pred", "truth", "signed_error", "abs_error"]
-SIGNS = np.array(list(itertools.product((1.0, -1.0), repeat=len(SEEDS))))
 OUTPUTS = ["primary_tests.csv", "sensitivity.csv", "per_run.csv", "per_arm.csv", "paired_differences.csv",
            "per_storm.csv", "ensemble.csv", "val_trace.csv", "frozen_vs_control.csv", "report.txt"]
 SELF_PATH = "scripts/analyze_n5.py"
@@ -130,20 +138,51 @@ def design_constants(**override):
 
 
 # ---- statistics --------------------------------------------------------------------------------------------
-def signflip_p(d):
-    """Two-sided exact paired sign-flip p over all 2^10 sign assignments."""
+@functools.lru_cache(maxsize=None)
+def sign_matrix(n):
+    return np.array(list(itertools.product((1.0, -1.0), repeat=n)))
+
+
+def signflip_p(d, n=len(SEEDS)):
+    """Two-sided exact paired sign-flip p over all 2^n sign assignments (n = 10, or fewer under rule (A))."""
     d = np.asarray(d, float)
-    if d.shape != (len(SEEDS),):
-        raise DesignError(f"expected {len(SEEDS)} paired differences, got {d.shape}")
-    return float((np.abs(SIGNS @ d) / len(d) >= abs(d.mean()) - 1e-12).mean())
+    if d.shape != (n,):
+        raise DesignError(f"expected {n} paired differences, got {d.shape}")
+    return float((np.abs(sign_matrix(n) @ d) / len(d) >= abs(d.mean()) - 1e-12).mean())
 
 
-def signflip_ci(d, alpha, n_grid=4001):
+def signflip_ci(d, alpha, n_grid=4001, n=len(SEEDS)):
     """(1 - alpha) CI for the mean paired difference: the shifts g in [min d, max d] (where it must lie) that the
     exact sign-flip test on d - g does not reject at alpha, on a fixed grid."""
     d = np.asarray(d, float)
-    keep = [g for g in np.linspace(d.min(), d.max(), n_grid) if signflip_p(d - g) >= alpha]
+    keep = [g for g in np.linspace(d.min(), d.max(), n_grid) if signflip_p(d - g, n) >= alpha]
     return (float(min(keep)), float(max(keep))) if keep else (np.nan, np.nan)
+
+
+def power_at(n, delta, sd):
+    """Power of one primary's test (two-sided exact sign-flip, alpha ALPHA) with n paired seeds, under the design's
+    normal model of the per-seed differences (power.py): POWER_REPS draws from a fixed-seed generator."""
+    rng = np.random.default_rng(POWER_SEED)
+    return float(np.mean([signflip_p(rng.normal(delta, sd, n), n) < ALPHA for _ in range(POWER_REPS)]))
+
+
+def load_deviations(path):
+    """Rule (A): {seed: reason} of the seed pairs to leave out, from an explicit, recorded file; {} without one."""
+    if path is None:
+        return {}
+    d = json.loads(read_text_strict(path))
+    rows = d.get("dropped_pairs") if isinstance(d, dict) else None
+    if not isinstance(rows, list) or not rows:
+        raise DesignError(f"{path}: needs a non-empty \"dropped_pairs\" list of {{seed, reason}}")
+    out = {}
+    for r in rows:
+        s, why = r.get("seed") if isinstance(r, dict) else None, str((r or {}).get("reason", "")).strip()
+        if type(s) is not int or s not in SEEDS or s in out or not why:
+            raise DesignError(f"{path}: each dropped pair needs a distinct seed in {list(SEEDS)} and a reason: {r}")
+        out[s] = why
+    if len(out) > len(SEEDS) - 2:
+        raise DesignError(f"{path}: drops {len(out)} of {len(SEEDS)} pairs; fewer than 2 would remain")
+    return out
 
 
 def unpaired_p(a, b):
@@ -473,7 +512,7 @@ def per_storm(d):
     return out
 
 
-def test_primary(name, a_vals, c_vals):
+def test_primary(name, a_vals, c_vals, n=len(SEEDS)):
     """Returns the row for one primary. The bias branch is fixed in advance:
     both arm means < 0 -> d = bias_atl - bias_ctl, better is d > 0 (less under-prediction);
     otherwise (a sign crossing) -> d = |bias_atl| - |bias_ctl| per seed, better is d < 0."""
@@ -486,8 +525,8 @@ def test_primary(name, a_vals, c_vals):
             better_sign, branch = -1, "sign crossing: d = |bias_atl| - |bias_ctl|, d < 0 better"
     else:
         d, better_sign, branch = a - c, -1, "d = MAE_atl - MAE_ctl, d < 0 better"
-    p = signflip_p(d)
-    lo, hi = signflip_ci(d, ALPHA)
+    p = signflip_p(d, n)
+    lo, hi = signflip_ci(d, ALPHA, n=n)
     s = SESOI[name]
     inside = -s < lo and hi < s
     direction = "better" if np.sign(d.mean()) == better_sign else "worse"
@@ -527,16 +566,19 @@ def joint_verdict(rows, budget_limited):
 
 
 # ---- main analysis -----------------------------------------------------------------------------------------
-def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None):
+def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None, deviations=None):
     root = Path(root) if root else Path(__file__).resolve().parents[1]
     design = design or design_constants()
     out_dir = Path(out_dir)
     clash = [f for f in OUTPUTS if (out_dir / f).exists()]
     if clash:
         raise DesignError(f"refusing to overwrite {clash} in {out_dir}")
+    dropped = load_deviations(deviations)
+    seeds = [s for s in SEEDS if s not in dropped]
+    n = len(seeds)
     runs = {}
     for arm in ARMS:
-        for s in SEEDS:
+        for s in seeds:
             p = Path(manifest_dir) / f"{arm}_seed{s}.json"
             if not p.exists():
                 raise DesignError(f"missing run manifest {p}")
@@ -544,7 +586,7 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
     commit = single_commit([r["man"] for r in runs.values()])
     blob_sha, blob_id = verify_self(commit, root, git or real_git(root), check_path=git is None)
 
-    ref = runs[("control", 0)]["d"]
+    ref = runs[("control", seeds[0])]["d"]
     vecs = {}
     for k, r in runs.items():
         for which in ("d", "native"):
@@ -584,14 +626,17 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
     under = {arm: int(by[arm].undertrain_flag.sum()) for arm in ARMS}
     budget_limited = any(v >= UNDERTRAIN_RUNS for v in under.values())
 
-    prim = {k: test_primary(k, by["atlantic"], by["control"]) for k in PRIMARIES}
-    joint = joint_verdict(prim, budget_limited)
-    primary = pd.DataFrame(list(prim.values())).assign(joint_verdict=joint)
+    tag = "NON-CONFIRMATORY (rule (A): seed pairs dropped as a named deviation): " if dropped else ""
+    prim = {k: test_primary(k, by["atlantic"], by["control"], n) for k in PRIMARIES}
+    joint = tag + joint_verdict(prim, budget_limited)
+    primary = pd.DataFrame(list(prim.values())).assign(joint_verdict=joint, n_pairs=n, confirmatory=not dropped,
+                                                       dropped_seeds=" ".join(map(str, sorted(dropped))))
 
-    native_ctl = pd.DataFrame([{"seed": s, **metrics(runs[("control", s)]["native"])} for s in SEEDS]).set_index("seed")
-    sens = {k: test_primary(k, by["atlantic"], native_ctl) for k in PRIMARIES}
+    native_ctl = pd.DataFrame([{"seed": s, **metrics(runs[("control", s)]["native"])} for s in seeds]).set_index("seed")
+    sens = {k: test_primary(k, by["atlantic"], native_ctl, n) for k in PRIMARIES}
     sensitivity = pd.DataFrame(list(sens.values())).assign(
-        analysis="sensitivity: control at its native selection (all 25 epochs)", joint_verdict=joint_verdict(sens, budget_limited))
+        analysis="sensitivity: control at its native selection (all 25 epochs)",
+        joint_verdict=tag + joint_verdict(sens, budget_limited), n_pairs=n)
 
     paired = []
     skip = {"seed", "arm", "order", "undertrain_flag", ">96 n", "epochs", "steps_total"}
@@ -601,10 +646,10 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
             continue
         role = "primary" if k in PRIMARIES else ("secondary" if k in SECONDARY else "descriptive")
         alpha = ALPHA if role == "primary" else SECONDARY_ALPHA
-        lo, hi = signflip_ci(dd, alpha)
+        lo, hi = signflip_ci(dd, alpha, n=n)
         paired.append({"metric": k, "role": role, "alpha_ci": alpha, "control_mean": by["control"][k].mean(),
                        "atlantic_mean": by["atlantic"][k].mean(), "mean_diff": dd.mean(), "sd_diff": dd.std(ddof=1),
-                       "ci_lo": lo, "ci_hi": hi, "p_signflip": signflip_p(dd)})
+                       "ci_lo": lo, "ci_hi": hi, "p_signflip": signflip_p(dd, n)})
     paired = pd.DataFrame(paired)
 
     per_arm = per_run.drop(columns=["seed", "order"]).groupby("arm").agg(["mean", "std", "min", "max"])
@@ -614,7 +659,7 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
     truth = ref["truth"].to_numpy()
     ens = []
     for arm in ARMS:
-        mp = np.mean([vecs[(arm, s)] for s in SEEDS], axis=0)
+        mp = np.mean([vecs[(arm, s)] for s in seeds], axis=0)
         ens.append({"arm": arm, **metrics(ref.assign(pred=mp, signed_error=mp - truth, abs_error=np.abs(mp - truth)))})
     ens = pd.DataFrame(ens)
     trace = pd.DataFrame(traces).groupby(["arm", "epoch"])[["train_mae", "val_mae"]].agg(["mean", "std"]).reset_index()
@@ -650,19 +695,33 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
     attempts = {k: {f"{arm} seed {s}": r["man"][k] for (arm, s), r in runs.items() if r["man"].get(k)}
                 for k in ("aborted_attempts", "eval_attempts")}
 
+    deviation = []
+    if dropped:
+        cells = {k: [(sd, power_at(len(SEEDS), SESOI[k], sd), power_at(n, SESOI[k], sd)) for sd in POWER_SD[k]]
+                 for k in PRIMARIES}
+        deviation = [
+            f"DEVIATION (rule (A), John 2026-10-19 17:03): seed pairs dropped, both arms: "
+            + "; ".join(f"seed {s}: {why}" for s, why in sorted(dropped.items())),
+            f"  The verdict is NON-CONFIRMATORY. n = {n} paired seeds instead of {len(SEEDS)}.",
+            f"  Power at the SESOI, n = {len(SEEDS)} -> {n} (two-sided exact sign-flip, alpha {ALPHA}; normal model, "
+            f"{POWER_REPS} reps, as power.py and design §5):",
+            *[f"    {k} ({SESOI[k]} kt): " + ", ".join(f"sd_diff {sd:.2f}: {a:.2f} -> {b:.2f}" for sd, a, b in cells[k])
+              for k in PRIMARIES]]
+
     def prow(r):
         return (f"  {r['metric']}: control {r['control_mean']:.3f}, atlantic {r['atlantic_mean']:.3f}, "
                 f"d {r['mean_diff']:+.3f} (sd {r['sd_diff']:.3f}), 97.5% CI [{r['ci97.5_lo']:+.3f}, "
                 f"{r['ci97.5_hi']:+.3f}], p {r['p_signflip']:.5f}, SESOI {r['sesoi']} -> {r['verdict']}"
                 f"   [{r['branch']}]")
     lines = [
-        "N5 Atlantic-only arm vs retrained control, H9, seeds 0-9 paired. Pre-registered analysis output, unedited.",
+        f"N5 Atlantic-only arm vs retrained control, H9, seeds {seeds} paired. Pre-registered analysis output, unedited.",
         f"analysis blob sha256 {blob_sha} (blob id {blob_id}) at commit {commit}",
+        *deviation,
         f"PRIMARIES (Bonferroni, alpha {ALPHA} each, two-sided exact sign-flip; control re-selected on odd epochs):",
         *[prow(r) for r in prim.values()],
         f"JOINT VERDICT: {joint}",
-        f"Under-training flag (selected step in the last 15%): control {under['control']}/10, "
-        f"atlantic {under['atlantic']}/10",
+        f"Under-training flag (selected step in the last 15%): control {under['control']}/{n}, "
+        f"atlantic {under['atlantic']}/{n}",
         f"Tie rule (2026-10-19 amendment, |d| < {TIE_KT} kt; train.py's own checkpoint evaluated): control seeds "
         f"{ties or 'none'}; off-grid primary (even epoch, the same checkpoint as the sensitivity): {offgrid or 'none'}",
         f"Odd-grid near ties (within {TIE_KT} kt of the odd-grid minimum; the first minimum is kept): "
@@ -687,7 +746,7 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
     (out_dir / "report.txt").write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     print("\n".join(lines))
     return dict(primary=primary, sensitivity=sensitivity, paired=paired, per_run=per_run, frozen=frozen,
-                joint=joint, blob_sha=blob_sha)
+                joint=joint, blob_sha=blob_sha, n_pairs=n, report=lines)
 
 
 def main(argv=None):
@@ -695,12 +754,13 @@ def main(argv=None):
     ap.add_argument("--manifest-dir", required=True)
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--frozen-dir", default=None)
+    ap.add_argument("--deviations", default=None, help="rule (A): JSON naming the seed pairs to drop, with reasons")
     args = ap.parse_args(argv)
     out = Path(args.out_dir).resolve().as_posix().lower()
     if any(x in out for x in ("/models/", "/results/storms", "/results/ensemble", "/results/final_2025")) \
             or out.endswith("/results") or "/n5_atlantic/" not in out + "/":
         ap.error(f"--out-dir {args.out_dir}: must be a new directory under results/n5_atlantic/")
-    run(args.manifest_dir, args.out_dir, frozen_dir=args.frozen_dir)
+    run(args.manifest_dir, args.out_dir, frozen_dir=args.frozen_dir, deviations=args.deviations)
 
 
 if __name__ == "__main__":

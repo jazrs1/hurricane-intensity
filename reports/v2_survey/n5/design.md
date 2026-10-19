@@ -511,8 +511,18 @@ An interrupted abort is resumed by running the same command again, and `launch` 
 1. **`abort-run ARM SEED --reason`:** for a run that failed (`TRAIN_FAILED`, a refused re-validation or weights check, a protected-hash change, a crash) or whose record no longer verifies. Its record is moved too. `launch` then trains it again with the **same seed, in the same order position**, at the pinned paths, which are empty again. Its record and manifest list `aborted_attempts`.
 2. **`abort-all --reason`, decided by John (his 2: option (i) of hc-adversary item 16).** The procedure for a relaunch from a fix commit. Only while no H9 output exists, it moves every run aside, finished ones included, and `launch` from the fix commit restarts all 20 in the §4 order with their seeds. Records already committed show up as deletions; commit the deletions through a PR before relaunch.
 3. **`abort-eval ARM SEED --reason`:** for a crashed H9 evaluation, or a manifest that `load_run` refuses (for example, a CSV changed after its manifest). It applies only to a run whose record verifies and which has H9 outputs without a manifest, or a manifest that `load_run` refuses. The outputs (and that manifest) are moved, never deleted. `evaluate` then evaluates the same recorded checkpoint again. The manifest lists `eval_attempts`. An eval abort is itself a look (above).
-4. **Post-look bad record, pending John.** After any look, a kept file that no longer verifies cannot be fixed by retraining, because (b) forbids it. The driver's message asks for the exact bytes to be restored, and their SHA-256s are in the record. If that is impossible, John decides between: (i) N5 is void; or (ii) N5 is reported with that seed's pair dropped, as a named deviation.
-5. **What is refused:**
+4. **Post-look bad record: rule (A), decided by John 2026-10-19 17:03.** After any look, a kept file that no longer verifies cannot be fixed by retraining, because (b) forbids it. The driver's message asks for the exact bytes to be restored, and their SHA-256s are in the record. If that is impossible, John's rule applies, verbatim: "Dead-end rule: (A). Drop that seed pair as a named deviation, label the verdict non-confirmatory, and state the reduced n and its effect on power in the report."
+   - **Mechanism:** an explicit, recorded input, never inferred: `analyze_n5.py --deviations <file>` with `{"dropped_pairs": [{"seed": s, "reason": "..."}]}`. The file is committed before the analysis runs.
+   - **What the analysis does with it:**
+     - leaves out both arms of each named seed and runs every test on the remaining n;
+     - names the deviation and the reason at the top of `report.txt`;
+     - prefixes the joint verdict with "NON-CONFIRMATORY";
+     - adds `n_pairs`, `confirmatory` and `dropped_seeds` to `primary_tests.csv`;
+     - states the power of both primaries at the SESOI for each of §5's sd_diff rows, at n = 10 and at the reduced n.
+   - **Power method:** the same as §5 / `power.py`: the two-sided exact sign-flip at alpha 0.025, under the normal model, 2000 reps, seed 20261018.
+   - **Refusals:** without the file, a missing pair is refused as before. A malformed file is refused: an unknown or repeated seed, an empty reason, or fewer than 2 pairs left.
+5. **Closed (John, 2026-10-19 17:03, verbatim):** "Phase-2 marker PR: no. The launch-safety design is now closed. From here, only a concrete defect reopens it, not new hypothetical cases. Log further edge-case ideas as follow-ups."
+6. **What is refused:**
    - `abort-run` and `abort-all` once H9 has been looked at (above), so an abort can never follow a look at held-out results;
    - `abort-run` on a run whose record verifies (finished runs are not aborted one by one);
    - any abort with nothing to move.

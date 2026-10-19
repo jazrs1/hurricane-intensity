@@ -2364,16 +2364,14 @@ or evaluation.
     84e5f730edb42129bc96186b4705241759c696f5a15383c466215fc8b662cc87.
   - Tracked. .gitattributes marks it -text, so checkout keeps its LF
     bytes and run_n5.py guard 2 sees this SHA in the main checkout.
-- scripts/analyze_n5.py: ARM_TRAIN_FRAMES = 4044 and FRAME_LIST_SHA256
-  = "84e5f730...cc87". These are the only two changed lines against
-  the amendment blob 2a70bf18... The launch blob is
-  f214379f0c482fc4a83d7b8ee4bbcfc6051a752e5fb2654eca82e73b63791854
-  [6da929ef].
+- scripts/analyze_n5.py, the two constants: ARM_TRAIN_FRAMES = 4044 and
+  FRAME_LIST_SHA256 = "84e5f730...cc87". At commit 438cb23 these were
+  the only two changed lines against the amendment blob 2a70bf18...
+  (blob f214379f...).
 - tests/test_analyze_n5.py: test_refuses_unfinished_design now passes
   the unfilled constants as overrides, since the real ones are filled.
-  Blob: 8ff9c3f557d0a04c4d22d8fc277a963a7b04e362476de186344a8e3787ccea75
-  [55249f82]. tests/test_n5_frame_list.py reproduces the committed
-  frame list byte for byte from the main checkout's data.
+  tests/test_n5_frame_list.py reproduces the committed frame list byte
+  for byte from the main checkout's data.
 - hc-adversary item 16c follow-ups (the coordinator folded them into
   part 2), in design.md section 14:
   - phase2_started.json alone is a look, even with no H9 output;
@@ -2381,7 +2379,39 @@ or evaluation.
     and the abort moves still work;
   - after a look, a record that no longer verifies asks for the exact
     bytes back, never abort-run;
-  - a post-look bad record that can't be restored: N5 void, or the
-    seed's pair dropped as a named deviation, pending John.
-  design.md blob: 4335cc212c4e5497bd0746039f73b72790bca2bf9a462312dee9afd46edb330c
-  [f1b2839b].
+  - a post-look bad record that can't be restored: decided below.
+- Decided by John, 2026-10-19 17:03 (relayed by the coordinator),
+  verbatim: "3. Dead-end rule: (A). Drop that seed pair as a named
+  deviation, label the verdict non-confirmatory, and state the reduced
+  n and its effect on power in the report. 4. Phase-2 marker PR: no.
+  The launch-safety design is now closed. From here, only a concrete
+  defect reopens it, not new hypothetical cases. Log further edge-case
+  ideas as follow-ups."
+  - Rule (A) in analyze_n5.py. A pair is dropped only through
+    --deviations <file>, an explicit, committed
+    {"dropped_pairs": [{seed, reason}]}, never inferred.
+  - Both arms of each named seed are left out and the tests run on the
+    remaining n. report.txt names the deviation and labels the verdict
+    NON-CONFIRMATORY. primary_tests.csv gets n_pairs, confirmatory and
+    dropped_seeds.
+  - Power at the SESOI is stated for each design section-5 sd_diff
+    row, at n = 10 and at the reduced n, with power.py's method
+    (two-sided exact sign-flip, alpha 0.025, normal model, 2000 reps,
+    seed 20261018).
+    - One dropped pair (n = 9): overall MAE 0.9 kt goes 1.00 / 0.89 /
+      0.72 -> 1.00 / 0.83 / 0.65; >96 bias 3.0 kt goes 0.95 / 0.86 /
+      0.72 -> 0.91 / 0.78 / 0.64.
+    - At n = 10 these match the design's figures within Monte Carlo
+      error, except the bias row at sd 2.44: 0.86 here vs 0.83 there,
+      because the generator is re-seeded per cell.
+- Launch blobs, SHA-256 of the committed bytes [blob id]:
+  - scripts/analyze_n5.py:
+    fd440c5b23a8c29e2c4f3b0f0558ebde0f4495ac3c465fddc509156189e9aa40
+    [12faf5f9]. That is the two constants plus rule (A).
+  - reports/v2_survey/n5/design.md:
+    6d3d45a4be88969683334a11d37026803562c1522523ad25ff68d64266a05d44
+    [39cd7781]. Section 14 has the 16c wording, rule (A) and John's
+    closing note; it is still a pure append against e8e4fc1.
+  - tests/test_analyze_n5.py:
+    0c9801d7e77025a558736c1284adcb2028dd54ae39dd43f3c44534c894680b10
+    [9c225956].
