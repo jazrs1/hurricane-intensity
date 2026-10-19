@@ -2209,3 +2209,65 @@ fix. No training, no evaluation.
   - The rule is procedural for now: epoch_trace_tag.py and
     imbalance_epoch_trace.py still default to held-out lists.
 Recorded at the user's request, 2026-10-18.
+
+2026-10-19, 14:20. N5 Atlantic-only arm: design amendment (John, ASK A).
+No build step, training or evaluation run by this entry.
+- John's decision, verbatim: "ASK A: approved with two conditions.
+  (a) Tie rule: when it fires, the checkpoint train.py actually saved is
+  the one evaluated on H9, never a post-hoc choice; this applies to both
+  arms, including the control's matched-grid re-selection. (b) Abort: no
+  H9 evaluation runs until all 20 training runs have finished, so an
+  abort can never follow a look at held-out results; restarted runs keep
+  their original seed and run-order position. Record both as a dated
+  amendment in decisions.md with the new design.md and analyze_n5.py
+  hashes, in PR B, before launch."
+- Implemented in PR B, commit 3d1a0e6, as reports/v2_survey/n5/design.md
+  section 14. The original sections 0-13 are unchanged.
+  - (a) analyze_n5.control_selection, TIE_KT = 1e-4 kt. The driver and
+    the analysis share this one function. When the re-validated argmin
+    misses train.py's pick by less than TIE_KT, train.py's
+    models/n5_atlantic/control/seed<s>.pt is evaluated, and the manifest
+    records tie_rule. The atlantic arm always evaluates train.py's own
+    checkpoint.
+  - (b) run_n5.py launch runs in two phases:
+    - phase 1: the 20 trainings, with training records and no H9;
+    - phase 2: the H9 evaluations, only after all 20 records verify.
+    An unfinished run is moved aside with abort-run, which refuses once
+    any H9 output exists. The run then restarts with the same seed in
+    the same order position.
+  - Guards: HEAD must be an ancestor of origin/phase2-experiments after
+    a fetch; the checkout must be the main checkout, with CUDA available.
+- Open for John: two odd epochs within TIE_KT of each other while
+  train.py's pick is reproduced. train.py never chose between odd
+  epochs, so the pre-registered first minimum over the odd grid stands.
+  The manifest records the near tie as odd_grid_near_ties.
+- Hashes, as SHA-256 of `git show <commit>:<path>` bytes (blob id in
+  brackets), before (e8e4fc1) -> after (3d1a0e6):
+  - reports/v2_survey/n5/design.md:
+    c08312358429067522691b761a512538c9e9e9e98ed783d280058e77778ff525
+    [4638f3d8] ->
+    a0abbcb76be711489046dff854ffa9c7ad23a4b228249dff4b765ac46562621e
+    [4a29e5e2]
+  - scripts/analyze_n5.py:
+    cc9083cabcc48ec442d3ca8c24bdb1347d33edc859117a5a6aa51f14d98ee6dc
+    [5692d6d3] ->
+    f5eee5e4b61db6324734487fcb949921956d1d4364db296e3e0a303b8db150fb
+    [466c70bb]
+  - tests/test_analyze_n5.py:
+    343059b8008ed7365fd92dbea07e61ab214660ab5a992d0a3f4aa02d3ad89f38
+    [d2d15bde] ->
+    7243e1efc06bc1c5e1437f158a8d7f9a17641a6a8ac9c3856b106c9fcb74943f
+    [9a9888cd]
+- Notes:
+  - The approved draft test file
+    (reports/v2_survey/n5/test_analyze_n5.py, d4d1d56b...3cbe) differs
+    from the moved tests/test_analyze_n5.py at e8e4fc1 (343059b8...) in
+    imports and paths only (PR #11).
+  - scripts/analyze_n5.py still carries the draft's "DRAFT r2 ... not yet
+    approved" docstring. It was left byte-identical apart from this
+    amendment (hc-adversary item 15).
+  - TIE_KT was added between the "fixed before launch" markers. The
+    launch blob will differ from f5eee5e4... in exactly the
+    ARM_TRAIN_FRAMES and FRAME_LIST_SHA256 lines. Those are filled from
+    the build in PR B and recorded with the frame-list SHA-256 before
+    launch.
