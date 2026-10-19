@@ -14,11 +14,14 @@ EXCLUDED = Path("excluded_crops.txt")
 # Other 2025 storms (East Pacific, the future H-EP set) are scanned like any other storm.
 SPENT_2025 = frozenset({"AL042025", "AL052025", "AL072025", "AL082025", "AL092025", "AL132025"})
 STORM_ID = re.compile(r"[A-Z]{2}[0-9]{6}")
+# Every root whose crops have entries in ./excluded_crops.txt (entries are relative to their own root).
+KNOWN_ROOTS = (Path("data/processed"), Path("data/hep_sealed"))
 
-# Every refusal exits 1 before excluded_crops.txt is written. Entries of storms that are not scanned (the
-# spent six, and storms with no directory under this root, e.g. those under the other root) are carried
-# forward unchanged. An entry of a scanned storm is never dropped: if its crop or manifest row is gone,
-# every run is refused until the entry is removed by a reviewed, committed manual edit of excluded_crops.txt.
+# Every refusal exits 1 before excluded_crops.txt is written. Only two kinds of entry are carried forward
+# unchanged: those of the spent six (never loaded), and those of storms with no directory under any known
+# root (reported as a warning). Every other entry is re-derived by scanning its storm under its own root, and
+# is never dropped: if its crop or manifest row is gone, every run is refused until the entry is removed by a
+# reviewed, committed manual edit of excluded_crops.txt.
 
 
 def refuse(reason, lines=()):
@@ -30,6 +33,10 @@ def refuse(reason, lines=()):
 
 def storm_of(crop_path):
     return crop_path.replace("\\", "/").split("/")[0].strip().upper()
+
+
+def manifest_dirs(root):
+    return sorted(p.parent.name for p in root.glob("*/manifest.csv"))
 
 
 def check_dirs(processed, storms):
@@ -83,10 +90,17 @@ def scan(processed, storms):
 
 def read_old():
     if not EXCLUDED.exists():
-        tracked = subprocess.run(["git", "ls-files", "--error-unmatch", "--", EXCLUDED.name],
-                                 cwd=EXCLUDED.resolve().parent, capture_output=True).returncode == 0
-        if tracked:
+        # Start from an empty list only when git says the file is untracked inside a repo (rc 1). Tracked (rc 0),
+        # not a repo (128), any other rc, or no git at all: refuse, since entries could be silently lost.
+        try:
+            rc = subprocess.run(["git", "ls-files", "--error-unmatch", "--", EXCLUDED.name],
+                                cwd=EXCLUDED.resolve().parent, capture_output=True).returncode
+        except OSError as e:
+            refuse(f"{EXCLUDED} is missing and git could not be run to check it is untracked ({e!r})")
+        if rc == 0:
             refuse(f"{EXCLUDED} is missing but tracked by git; restore it first (git checkout -- {EXCLUDED})")
+        if rc != 1:
+            refuse(f"{EXCLUDED} is missing and git ls-files exited {rc}, not 1 (untracked in a repo)")
         return []
     old = [line for line in EXCLUDED.read_text().splitlines() if line.strip()]
     seen, dups = set(), []
@@ -108,17 +122,37 @@ def main(argv=None):
                              "(default data/processed). The output is always ./excluded_crops.txt")
     processed = Path(parser.parse_args(argv).processed_root)
 
-    # Every storm with crops on disk, whichever list it is in, so regenerating
-    # the exclusion file can't drop a storm that was added after this was written.
-    all_storms = sorted(p.parent.name for p in processed.glob("*/manifest.csv"))
     old = read_old()
-    check_dirs(processed, all_storms)
-    scanned = [s for s in all_storms if s not in SPENT_2025]
-    check_manifests(processed, scanned)
+    roots = [processed] + [r for r in KNOWN_ROOTS if r.is_dir() and r.resolve() != processed.resolve()]
+    where = {}
+    for root in roots:
+        check_dirs(root, manifest_dirs(root))
+        for d in (p for p in (root.iterdir() if root.is_dir() else []) if p.is_dir()):
+            where.setdefault(d.name.upper(), []).append(root)
+    twice = [f"{s}: {', '.join(map(str, rs))}" for s, rs in sorted(where.items()) if len(rs) > 1]
+    if twice:
+        refuse("storms with a directory under more than one root", twice)
 
-    found, n = scan(processed, scanned)
+    # Every storm with crops on disk under the scanned root, whichever list it is in, so regenerating
+    # the exclusion file can't drop a storm that was added after this was written. An entry of a storm under
+    # another known root is re-derived by scanning that storm there, never carried forward unchecked.
+    plan = {processed: [s for s in manifest_dirs(processed) if s not in SPENT_2025]}
+    listed = sorted({storm_of(line) for line in old} - SPENT_2025 - set(plan[processed]))
+    for s in listed:
+        if s in where:
+            plan.setdefault(where[s][0], []).append(s)
+    found, n = [], 0
+    for root, storms in plan.items():
+        check_manifests(root, storms)
+        f, k = scan(root, storms)
+        found, n = found + f, n + k
+    scanned = {s for storms in plan.values() for s in storms}
     kept = [line for line in old if storm_of(line) not in scanned]
     absent = [line for line in kept if storm_of(line) not in SPENT_2025]
+    if absent:
+        print(f"warning: {len(absent)} entries carried forward for storms with no directory under "
+              f"{', '.join(map(str, roots))} (mistyped or removed?):" + "".join(f"\n  {p}" for p in absent),
+              file=sys.stderr)
     # Same order as before: storm by storm (sorted), frames in manifest order.
     storms = sorted({storm_of(p) for p in found + kept})
     bad = [p for s in storms for p in kept + found if storm_of(p) == s]
@@ -143,8 +177,6 @@ def main(argv=None):
     print(f"{len(bad)} of {n} excluded")
     added = [p for p in bad if p.rstrip() not in {line.rstrip() for line in old}]
     print(f"{len(added)} added" + "".join(f"\n  {p}" for p in added))
-    if absent:
-        print(f"{len(absent)} carried forward for storms not under {processed}" + "".join(f"\n  {p}" for p in absent))
 
 
 if __name__ == "__main__":

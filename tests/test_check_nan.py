@@ -50,8 +50,11 @@ def entry(storm_id, hour):
 
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
-    """A fixture checkout: NaN frames in an old storm and in EP052025, none in the clean storm."""
+    """A fixture checkout (its own git repo, so a missing excluded_crops.txt is untracked): NaN frames in an old
+    storm and in EP052025, none in the clean storm."""
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))  # git never looks above the fixture
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     processed = tmp_path / "data" / "processed"
     write_storm(processed, "AL142018", nan_hours=(0, 2))
     write_storm(processed, "AL012020")
@@ -196,7 +199,7 @@ def test_exception_mid_scan_leaves_file_identical(repo, check_nan, monkeypatch):
     with pytest.raises(RuntimeError, match="mid-scan"):
         check_nan.main([])
     assert existing.read_bytes() == before
-    assert sorted(p.name for p in repo.iterdir()) == ["data", "excluded_crops.txt"]
+    assert sorted(p.name for p in repo.iterdir() if p.name != ".git") == ["data", "excluded_crops.txt"]
 
 
 def test_exception_on_write_leaves_file_identical(repo, check_nan, monkeypatch):
@@ -211,7 +214,7 @@ def test_exception_on_write_leaves_file_identical(repo, check_nan, monkeypatch):
     with pytest.raises(OSError, match="os.replace"):
         check_nan.main([])
     assert existing.read_bytes() == before
-    assert sorted(p.name for p in repo.iterdir()) == ["data", "excluded_crops.txt"]
+    assert sorted(p.name for p in repo.iterdir() if p.name != ".git") == ["data", "excluded_crops.txt"]
 
 
 def test_failed_cleanup_does_not_mask_the_error(repo, check_nan, monkeypatch, capsys):
@@ -239,14 +242,49 @@ def test_failed_cleanup_does_not_mask_the_error(repo, check_nan, monkeypatch, ca
     assert existing.read_bytes() == before
 
 
+# --- a missing excluded_crops.txt (F-16): only "untracked inside a repo" (rc 1) may start from empty -------
+
+def git_rc(repo):
+    return subprocess.run(["git", "ls-files", "--error-unmatch", "--", "excluded_crops.txt"],
+                          cwd=repo, capture_output=True).returncode
+
+
+def test_missing_untracked_file_starts_empty(repo, check_nan):
+    assert git_rc(repo) == 1
+    check_nan.main([])
+    assert (repo / "excluded_crops.txt").read_text().splitlines() == [
+        entry("AL142018", 0), entry("AL142018", 2), entry("EP052025", 1)]
+
+
 def test_missing_but_tracked_file_refused(repo, check_nan, capsys):
     existing = repo / "excluded_crops.txt"
     existing.write_text(entry("AL142018", 0))
-    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
     subprocess.run(["git", "add", "excluded_crops.txt"], cwd=repo, check=True, capture_output=True)
     existing.unlink()
+    assert git_rc(repo) == 0
     assert_refused(check_nan, repo, capsys, "missing but tracked")
     assert not existing.exists()
+
+
+def test_missing_file_outside_a_repo_refused(repo, check_nan, capsys):
+    shutil.rmtree(repo / ".git")
+    assert git_rc(repo) == 128
+    assert_refused(check_nan, repo, capsys, "exited 128")
+    assert not (repo / "excluded_crops.txt").exists()
+
+
+@pytest.mark.parametrize("rc", [2, 129, -1])
+def test_missing_file_with_other_git_rc_refused(repo, check_nan, capsys, monkeypatch, rc):
+    monkeypatch.setattr(check_nan.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, rc, b"", b""))
+    assert_refused(check_nan, repo, capsys, f"exited {rc}")
+
+
+def test_missing_file_without_git_refused(repo, check_nan, capsys, monkeypatch):
+    def no_git(*a, **k):
+        raise FileNotFoundError(2, "The system cannot find the file specified", "git")
+
+    monkeypatch.setattr(check_nan.subprocess, "run", no_git)
+    assert_refused(check_nan, repo, capsys, "git could not be run")
 
 
 # --- existing entries -------------------------------------------------------------------------------------
@@ -280,14 +318,39 @@ def test_added_entries_are_summarised(repo, check_nan, capsys):
     assert "2 added" in out and entry("AL142018", 2) in out and entry("EP052025", 1) in out
 
 
-def test_entries_of_absent_storm_carried_forward(repo, check_nan, capsys):
-    """Close-out 8b: a storm with no directory under the scanned root keeps its entries, and they are reported."""
+def test_entries_of_storm_under_no_root_carried_with_warning(repo, check_nan, capsys):
+    """F-17: a storm with no directory under any known root (mistyped or removed) keeps its entries, with a warning."""
     absent = [entry("EP112025", 0), entry("AL992019", 2)]
     (repo / "excluded_crops.txt").write_text("\n".join(absent))
     check_nan.main([])
     lines = (repo / "excluded_crops.txt").read_text().splitlines()
     assert set(absent) <= set(lines)
-    assert "2 carried forward for storms not under data" in capsys.readouterr().out
+    err = capsys.readouterr().err
+    assert "warning: 2 entries carried forward for storms with no directory under" in err
+    assert all(a in err for a in absent)
+
+
+def test_bogus_entry_under_other_root_refused(repo, check_nan, capsys):
+    """F-17 (hc-adversary 9b): an entry for a clean crop under the other root is re-derived there, so it is refused
+    as a removal instead of being carried forward unchecked."""
+    write_storm(repo / "data" / "hep_sealed", "EP112025", nan_hours=(2,))
+    bogus = entry("EP112025", 0)  # a clean frame
+    (repo / "excluded_crops.txt").write_text("\n".join([entry("AL142018", 0), bogus]))
+    err = assert_refused(check_nan, repo, capsys, "would drop 1 existing entries")
+    assert bogus in err
+
+
+def test_entries_under_other_root_are_rederived(repo, check_nan, loads):
+    write_storm(repo / "data" / "hep_sealed", "EP112025", nan_hours=(2,))
+    (repo / "excluded_crops.txt").write_text(entry("EP112025", 2))
+    check_nan.main([])  # scans data/processed, and EP112025 under data/hep_sealed
+    assert any("hep_sealed" in p and "EP112025" in p for p in loads)
+    assert entry("EP112025", 2) in (repo / "excluded_crops.txt").read_text().splitlines()
+
+
+def test_storm_under_both_roots_refused(repo, check_nan, capsys):
+    write_storm(repo / "data" / "hep_sealed", "AL012020")
+    assert_refused(check_nan, repo, capsys, "more than one root")
 
 
 @pytest.mark.parametrize("order", [("processed", "hep_sealed"), ("hep_sealed", "processed")])
