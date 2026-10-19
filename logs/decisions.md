@@ -2413,5 +2413,5 @@ or evaluation.
     [39cd7781]. Section 14 has the 16c wording, rule (A) and John's
     closing note; it is still a pure append against e8e4fc1.
   - tests/test_analyze_n5.py:
-    0c9801d7e77025a558736c1284adcb2028dd54ae39dd43f3c44534c894680b10
-    [9c225956].
+    7429b6b9854a4c45e5acbfdd49a1c534b3972706c74c042c38f5bdee80994c59
+    [6732d317].

@@ -531,7 +531,9 @@ def test_rule_a_drops_a_named_pair_and_says_so(request):
     assert "The verdict is NON-CONFIRMATORY. n = 9 paired seeds instead of 10." in report
     assert "Power at the SESOI, n = 10 -> 9" in report
     for k, sds in A.POWER_SD.items():
-        assert f"    {k} ({A.SESOI[k]} kt): sd_diff {sds[0]:.2f}: " in report
+        cells = ", ".join(f"sd_diff {sd:.2f}: {A.power_at(10, A.SESOI[k], sd):.2f} -> {A.power_at(9, A.SESOI[k], sd):.2f}"
+                          for sd in sds)
+        assert f"    {k} ({A.SESOI[k]} kt): {cells}" in report  # n = 10 and the reduced n, every design row
     assert prim(res, "overall MAE").verdict == "BETTER"  # the test itself still runs, on 9 pairs
 
 
@@ -558,6 +560,8 @@ def test_rule_a_power_uses_the_design_method():
     assert A.power_at(9, 0.9, 0.85) < A.power_at(10, 0.9, 0.85)
     assert A.power_at(9, 3.0, 2.84) == A.power_at(9, 3.0, 2.84)  # fixed seed: deterministic
     assert A.signflip_p(np.full(9, -1.0), 9) == pytest.approx(2 / 512)
+    assert (A.POWER_REPS, A.POWER_SEED) == (2000, 20261018)  # power.py's reps and seed
+    assert A.POWER_SD == {"overall MAE": (0.40, 0.69, 0.85), ">96 bias": (2.03, 2.44, 2.84)}  # design §5 rows
 
 
 # ---- 2026-10-19 amendment (a): the tie rule ---------------------------------------------------------------------
