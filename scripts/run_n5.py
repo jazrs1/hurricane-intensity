@@ -328,7 +328,7 @@ def common_guards(root, git, main_root, check, cuda_ok, child_import):
     try:
         design = A.design_constants()
     except A.DesignError as e:
-        raise LaunchError(f"guard 2: {e} (PR B fills ARM_TRAIN_FRAMES and FRAME_LIST_SHA256)") from None
+        raise LaunchError(f"guard 2: {e} (ARM_TRAIN_FRAMES and FRAME_LIST_SHA256 come from the build)") from None
     frame_list = root / FRAME_LIST
     if not frame_list.is_file() or sha256_file(frame_list) != A.FRAME_LIST_SHA256:
         raise LaunchError(f"guard 2: {FRAME_LIST} is missing or its SHA-256 is not FRAME_LIST_SHA256")
@@ -791,17 +791,17 @@ def plan(root=ROOT):
 
 
 def build_spec():
-    """Specification only (PR A). Nothing here downloads, builds or scans."""
-    print("BUILD (design §12.3; specification only, not run by this script):")
+    """The build and exclusion steps as run (2026-10-19). Nothing here downloads, builds or scans."""
+    print("BUILD (design §12.3; done 2026-10-19 in the main checkout; not run by this script):")
     print("  hash data/interim/hurdat2_atlantic.txt before; it must be ee35819c...0bcb5c")
     print("  ", ["PY", "scripts/build_batch.py", "--ids-file", BUILD_IDS, "--sample-interval", "3h"])
     print("   GOES-16 default; never --force-hurdat2-refresh or --hurdat2-url")
     print("  hash data/interim/hurdat2_atlantic.txt after; it must be unchanged")
-    print("EXCLUSIONS (design §12.4; specification only): ['PY', 'check_nan.py'] (the merged safe version)")
-    print("  rescans all non-spent storms; the diff of excluded_crops.txt must be additions under the 31 new IDs only")
-    print("FRAME LIST (design §12.5; PR B): drop the Marco AL142020 frames concurrent with a protected storm")
-    print("  (scripts/concurrency.py, 650 km box) from the built manifests; write", FRAME_LIST)
-    print("  then fill ARM_TRAIN_FRAMES and FRAME_LIST_SHA256 in", SELF_ANALYSIS)
+    print("EXCLUSIONS (design §12.4; done): ['PY', 'check_nan.py', '--processed-root', <main>/data/processed]")
+    print("  rescans all non-spent storms; the diff of excluded_crops.txt is additions under the 31 new IDs only")
+    print("FRAME LIST (design §12.5; done): ['PY', 'scripts/n5_frame_list.py'] drops the 4 Marco AL142020 frames")
+    print("  concurrent with a protected storm (scripts/concurrency.py, 650 km box) and writes", FRAME_LIST)
+    print("  (tracked, -text); its count and SHA-256 are ARM_TRAIN_FRAMES and FRAME_LIST_SHA256 in", SELF_ANALYSIS)
 
 
 def main(argv=None):

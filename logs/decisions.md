@@ -2325,3 +2325,52 @@ No build step, training or evaluation run by this entry.
     ARM_TRAIN_FRAMES and FRAME_LIST_SHA256 lines. Those are filled from
     the build in PR B and recorded with the frame-list SHA-256 before
     launch.
+
+2026-10-19, 16:51. N5 Atlantic-only arm: build results, exclusions,
+frame list and the two post-build constants (PR B part 2). No training
+or evaluation.
+- Build (coordinator, main checkout, 14:04-16:40). 31/31 storms built,
+  0 failed. 2002 sample times: 1990 matched, 12 missing_scan. The new
+  folders under data/processed are exactly the 31 IDs in
+  storms_n5_new.txt; all 6143 pre-existing files are byte-unchanged.
+  The HURDAT2 cache (ee35819c...), its source.json and
+  excluded_crops.txt are unchanged. Scans are G16 only, 2018-2024.
+- Exclusions: the merged check_nan.py, run from the PR worktree with
+  --processed-root <main>/data/processed. It read the main checkout's
+  data and wrote only the worktree's excluded_crops.txt. The main
+  checkout's data/ (8203 files, size and mtime), its git status and
+  its excluded_crops.txt were identical before and after.
+  - 44 of 6784 frames excluded. The 21 existing entries are kept, in
+    order.
+  - 23 entries added, all under the 31 new IDs: Don AL052023 (1),
+    Leslie AL132018 (4), Paulette AL172020 (18). The design estimated
+    about 1.
+  - excluded_crops.txt blob:
+    102009773f843410149f8f8cadeb1b3c981252fcb8d7c53cc8d43e018df00cea.
+- Unchanged by the new exclusions: control 2081 frames, validation
+  940, H9 1752 with the per-storm counts and the H9 pin 267f154b...
+- Frame list: scripts/n5_frame_list.py writes
+  results/n5_atlantic/frame_list_atlantic.txt.
+  - It contains every training frame of storms_train_n5_atlantic.txt
+    after exclusions (50 storms), minus the Marco AL142020 frames whose
+    650 km box overlaps a validation, H9, 2025-test or H-EP storm.
+    Marco's positions come from its built manifest.
+  - Dropped: exactly the design's 4 frames, 2020-08-25 09Z, 12Z, 15Z
+    and 18Z, all against Laura AL132020. H-EP storms are East Pacific
+    (2023, 2025) and can't share a time with Marco.
+  - 4044 frames, so epochs_for gives 13 epochs of 127 batches (1651
+    steps).
+  - SHA-256 (also the blob):
+    84e5f730edb42129bc96186b4705241759c696f5a15383c466215fc8b662cc87.
+  - Tracked. .gitattributes marks it -text, so checkout keeps its LF
+    bytes and run_n5.py guard 2 sees this SHA in the main checkout.
+- scripts/analyze_n5.py: ARM_TRAIN_FRAMES = 4044 and FRAME_LIST_SHA256
+  = "84e5f730...cc87". These are the only two changed lines against
+  the amendment blob 2a70bf18... The launch blob is
+  f214379f0c482fc4a83d7b8ee4bbcfc6051a752e5fb2654eca82e73b63791854
+  [6da929ef].
+- tests/test_analyze_n5.py: test_refuses_unfinished_design now passes
+  the unfilled constants as overrides, since the real ones are filled.
+  Blob: 8ff9c3f557d0a04c4d22d8fc277a963a7b04e362476de186344a8e3787ccea75
+  [55249f82]. tests/test_n5_frame_list.py reproduces the committed
+  frame list byte for byte from the main checkout's data.

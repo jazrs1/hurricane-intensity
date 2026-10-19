@@ -86,10 +86,12 @@ def fake_repo(tmp_path, filled=True, frame_list_ok=True, protected_drift=False):
     fl.parent.mkdir(parents=True)
     fl.write_text("frame list\n", encoding="utf-8")
     src = (CHECKOUT / "scripts" / "analyze_n5.py").read_text(encoding="utf-8")
-    if filled:
-        sha = hashlib.sha256(fl.read_bytes()).hexdigest() if frame_list_ok else "0" * 64
-        src = src.replace("ARM_TRAIN_FRAMES = None", f"ARM_TRAIN_FRAMES = {ARM_FRAMES}", 1)
-        src = src.replace("FRAME_LIST_SHA256 = None", f'FRAME_LIST_SHA256 = "{sha}"', 1)
+    sha = hashlib.sha256(fl.read_bytes()).hexdigest() if frame_list_ok else "0" * 64
+    src, k1 = re.subn(r"^ARM_TRAIN_FRAMES = \S+", f"ARM_TRAIN_FRAMES = {ARM_FRAMES if filled else None}", src,
+                      count=1, flags=re.M)
+    src, k2 = re.subn(r"^FRAME_LIST_SHA256 = \S+", f"FRAME_LIST_SHA256 = {repr(sha) if filled else None}", src,
+                      count=1, flags=re.M)
+    assert k1 == k2 == 1
     src = src.replace(A_REAL.H9_PIN, PIN, 1)
     for rel, h in A_REAL.PROTECTED.items():
         new = "e" * 64 if protected_drift and rel == "best_model.pt" else prot[rel]
@@ -298,16 +300,19 @@ def test_output_paths_are_confined():
 
 
 # ---- guards -------------------------------------------------------------------------------------------------
-def test_the_committed_analysis_refuses_today(tmp_path):
-    """PR A's own state: the constants are None, so launch can't start before PR B."""
+def test_an_unfilled_analysis_refuses(tmp_path):
+    """With the two post-build constants None (PR A's state), launch can't start."""
     with pytest.raises(R.LaunchError, match="guard 2: .*not filled in"):
         train(fake_repo(tmp_path, filled=False))
 
 
-def test_real_checkout_constants_are_not_filled():
-    assert A_REAL.ARM_TRAIN_FRAMES is None and A_REAL.FRAME_LIST_SHA256 is None
-    with pytest.raises(A_REAL.DesignError, match="not final"):
-        A_REAL.design_constants()
+def test_real_checkout_constants_match_the_committed_frame_list():
+    """PR B: ARM_TRAIN_FRAMES and FRAME_LIST_SHA256 are the committed frame list's line count and SHA-256, and the
+    budget rule gives the design's 13 epochs."""
+    data = (CHECKOUT / R.FRAME_LIST).read_bytes()
+    assert hashlib.sha256(data).hexdigest() == A_REAL.FRAME_LIST_SHA256 and b"\r" not in data
+    assert len(data.decode("utf-8").splitlines()) == A_REAL.ARM_TRAIN_FRAMES == 4044
+    assert A_REAL.design_constants()["epochs"] == {"control": 25, "atlantic": 13}
 
 
 @pytest.mark.parametrize("kw, match", [(dict(dirty=True), "guard 1: the tracked tree"),
@@ -965,7 +970,7 @@ def test_build_spec_and_plan_run_nothing(capsys, monkeypatch):
     assert "never --force-hurdat2-refresh or --hurdat2-url" in out
     R.main(["plan"])
     out = capsys.readouterr().out
-    assert out.count("order ") == 40 and "<epochs_for(ARM_TRAIN_FRAMES)>" in out
+    assert out.count("order ") == 40 and "'--epochs', '13'" in out and "<epochs_for" not in out
     assert out.index("PHASE 1") < out.index("BETWEEN THE PHASES") < out.index("PHASE 2")
     assert "eval:" not in out[:out.index("PHASE 2")]
     for bad in (["abort-run"], ["abort-run", "atlantic", "1"], ["plan", "control", "0"], ["abort-all"],

@@ -63,8 +63,8 @@ CONTROL_TRAIN_FRAMES = 2081
 CONTROL_EPOCHS = 25
 CONTROL_GRID = tuple(range(1, CONTROL_EPOCHS + 1, 2))  # primary: control re-selected on odd epochs (13 candidates)
 TIE_KT = 1e-4  # 2026-10-19 amendment (a): re-validation argmin != train.py's pick is a tie only when |d| < TIE_KT kt
-ARM_TRAIN_FRAMES = None  # filled from the build (post-exclusion, post-Marco frame list), before hashing
-FRAME_LIST_SHA256 = None  # SHA-256 of results/n5_atlantic/frame_list_atlantic.txt, filled with ARM_TRAIN_FRAMES
+ARM_TRAIN_FRAMES = 4044  # filled from the build (post-exclusion, post-Marco frame list), before hashing
+FRAME_LIST_SHA256 = "84e5f730edb42129bc96186b4705241759c696f5a15383c466215fc8b662cc87"  # SHA-256 of results/n5_atlantic/frame_list_atlantic.txt, filled with ARM_TRAIN_FRAMES
 BATCH = 32
 TARGET_STEPS = 1640
 PRIMARIES = ("overall MAE", ">96 bias")  # H9 pooled, per member, paired atlantic - control over seeds 0-9

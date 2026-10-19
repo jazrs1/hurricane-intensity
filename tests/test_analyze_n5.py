@@ -686,7 +686,9 @@ def test_refuses_log_encoding(request, enc, msg):
 
 def test_refuses_unfinished_design():
     with pytest.raises(A.DesignError, match="not final"):
-        A.design_constants()
+        A.design_constants(frames={"control": A.CONTROL_TRAIN_FRAMES, "atlantic": None})
+    with pytest.raises(A.DesignError, match="not final"):
+        A.design_constants(frame_list_sha={"control": None, "atlantic": None})
 
 
 def test_cli_refuses_protected_or_foreign_out_dir():
