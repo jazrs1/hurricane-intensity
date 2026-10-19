@@ -221,6 +221,21 @@ def test_planted_storm_in_the_n5_list_is_caught(checkout_root, tmp_path, planted
     assert caught, f"{planted} added to the N5 list passed every guard"
 
 
+def test_alias_of_a_forbidden_storm_is_caught(checkout_root, tmp_path):
+    """Only the alias closure catches this: Julia held out under her Atlantic ID (in a copy of the forbidden lists)
+    and her East Pacific ID in training, or in a validation list."""
+    root = tmp_path / "repo"
+    root.mkdir()
+    for name in FORBIDDEN_LISTS:
+        (root / name).write_text((checkout_root / name).read_text())
+    with open(root / "storms_holdout_hep.txt", "a") as f:
+        f.write("AL132022\n")
+    assert forbidden_overlaps(root, {"EP182022"}) == {"storms_holdout_hep.txt": ["AL132022", "EP182022"]}
+    val = tmp_path / "storms_val_planted.txt"
+    val.write_text("EP182022\n")
+    assert held_out_in_val(root, val)["storms_holdout_hep.txt"] == ["AL132022", "EP182022"]
+
+
 # ---- N5 lists tied to the pinned analysis constants ---------------------------------------------------------
 def analyze_n5(root):
     spec = importlib.util.spec_from_file_location("analyze_n5", root / "scripts" / "analyze_n5.py")
