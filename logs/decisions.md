@@ -2325,3 +2325,103 @@ No build step, training or evaluation run by this entry.
     ARM_TRAIN_FRAMES and FRAME_LIST_SHA256 lines. Those are filled from
     the build in PR B and recorded with the frame-list SHA-256 before
     launch.
+
+2026-10-19, 16:51. N5 Atlantic-only arm: build results, exclusions,
+frame list and the two post-build constants (PR B part 2). No training
+or evaluation.
+- Build (coordinator, main checkout, 14:04-16:40). 31/31 storms built,
+  0 failed. 2002 sample times: 1990 matched, 12 missing_scan. The new
+  folders under data/processed are exactly the 31 IDs in
+  storms_n5_new.txt; all 6143 pre-existing files are byte-unchanged.
+  The HURDAT2 cache (ee35819c...), its source.json and
+  excluded_crops.txt are unchanged. Scans are G16 only, 2018-2024.
+- Exclusions: the merged check_nan.py, run from the PR worktree with
+  --processed-root <main>/data/processed. It read the main checkout's
+  data and wrote only the worktree's excluded_crops.txt. The main
+  checkout's data/ (8203 files, size and mtime), its git status and
+  its excluded_crops.txt were identical before and after.
+  - 44 of 6784 frames excluded. The 21 existing entries are kept, in
+    order.
+  - 23 entries added, all under the 31 new IDs: Don AL052023 (1),
+    Leslie AL132018 (4), Paulette AL172020 (18). The design estimated
+    about 1.
+  - excluded_crops.txt blob:
+    102009773f843410149f8f8cadeb1b3c981252fcb8d7c53cc8d43e018df00cea.
+- Unchanged by the new exclusions: control 2081 frames, validation
+  940, H9 1752 with the per-storm counts and the H9 pin 267f154b...
+- Frame list: scripts/n5_frame_list.py writes
+  results/n5_atlantic/frame_list_atlantic.txt.
+  - It contains every training frame of storms_train_n5_atlantic.txt
+    after exclusions (50 storms), minus the Marco AL142020 frames whose
+    650 km box overlaps a validation, H9, 2025-test or H-EP storm.
+    Marco's positions come from its built manifest.
+  - Dropped: exactly the design's 4 frames, 2020-08-25 09Z, 12Z, 15Z
+    and 18Z, all against Laura AL132020. H-EP storms are East Pacific
+    (2023, 2025) and can't share a time with Marco.
+  - 4044 frames, so epochs_for gives 13 epochs of 127 batches (1651
+    steps).
+  - SHA-256 (also the blob):
+    84e5f730edb42129bc96186b4705241759c696f5a15383c466215fc8b662cc87.
+  - Tracked. .gitattributes marks it -text, so checkout keeps its LF
+    bytes and run_n5.py guard 2 sees this SHA in the main checkout.
+- scripts/analyze_n5.py, the two constants: ARM_TRAIN_FRAMES = 4044 and
+  FRAME_LIST_SHA256 = "84e5f730...cc87". At commit 438cb23 these were
+  the only two changed lines against the amendment blob 2a70bf18...
+  (blob f214379f...).
+- tests/test_analyze_n5.py: test_refuses_unfinished_design now passes
+  the unfilled constants as overrides, since the real ones are filled.
+  tests/test_n5_frame_list.py reproduces the committed frame list byte
+  for byte from the main checkout's data.
+- hc-adversary item 16c follow-ups (the coordinator folded them into
+  part 2), in design.md section 14:
+  - phase2_started.json alone is a look, even with no H9 output;
+  - kept training files are read-only once their record is written,
+    and the abort moves still work;
+  - after a look, a record that no longer verifies asks for the exact
+    bytes back, never abort-run;
+  - a post-look bad record that can't be restored: decided below.
+- Decided by John, 2026-10-19 17:03 (relayed by the coordinator),
+  verbatim: "3. Dead-end rule: (A). Drop that seed pair as a named
+  deviation, label the verdict non-confirmatory, and state the reduced
+  n and its effect on power in the report. 4. Phase-2 marker PR: no.
+  The launch-safety design is now closed. From here, only a concrete
+  defect reopens it, not new hypothetical cases. Log further edge-case
+  ideas as follow-ups."
+  - Rule (A) in analyze_n5.py and run_n5.py. A pair is dropped only
+    through the one committed file logs/n5_atlantic/deviations.json,
+    {"dropped_pairs": [{seed, reason}]}, never inferred.
+    - Both `run_n5.py evaluate --deviations` and `analyze_n5.py
+      --deviations` read it. It must be committed (evaluate: identical
+      to HEAD's blob; analysis: clean), and its path is in guard 5e's
+      allowed set.
+    - It may name only a seed with a run whose training record no
+      longer verifies.
+    - evaluate leaves both runs of a named seed out of its checks and
+      its H9 steps and evaluates the rest. So rule (A) completes even
+      when the bad record appears part-way through phase 2
+      (hc-adversary item 17).
+  - Both arms of each named seed are left out and the tests run on the
+    remaining n. report.txt names the deviation and labels the verdict
+    NON-CONFIRMATORY and gives the deviations file's blob SHA-256.
+    primary_tests.csv gets n_pairs, confirmatory and dropped_seeds.
+  - Power at the SESOI is stated for each design section-5 sd_diff
+    row. The n = 10 column is section 5's own table, quoted as
+    constants. The reduced n is simulated with power.py's method
+    (two-sided exact sign-flip, alpha 0.025, normal model, seed
+    20261018) at 20000 reps, SE at most 0.0036.
+    - One dropped pair (n = 9): overall MAE 0.9 kt goes 1.00 / 0.89 /
+      0.71 -> 1.00 / 0.83 / 0.64; >96 bias 3.0 kt goes 0.95 / 0.83 /
+      0.71 -> 0.91 / 0.78 / 0.64.
+- Launch blobs, SHA-256 of the committed bytes [blob id]:
+  - scripts/analyze_n5.py:
+    0130641583cf09c8abb5791b9ea9467fd6410b953bc8a57c3a2ae68fb3bb1288
+    [679e2169]. That is the two constants plus rule (A) with item 17's
+    fixes.
+  - reports/v2_survey/n5/design.md:
+    334e51f01c841d47b12beed90ede0a966151dddc5ec9e9f29cc66daa34f4a271
+    [49a5d80e]. Section 14 has the 16c wording, rule (A) (with item
+    17's fixes) and John's closing note; it is still a pure append
+    against e8e4fc1.
+  - tests/test_analyze_n5.py:
+    fa1c079ff7b97ce26f1d0c9c206cc16030acf9e2234348a787fdaffdbf16e8fb
+    [4d531f39].

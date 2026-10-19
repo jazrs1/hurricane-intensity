@@ -1,0 +1,3 @@
+# N5 frame list: its SHA-256 is pinned in scripts/analyze_n5.py (FRAME_LIST_SHA256) and run_n5.py guard 2 hashes
+# the working file, so checkout must not change its bytes (core.autocrlf=true would add CRs).
+results/n5_atlantic/frame_list_atlantic.txt -text

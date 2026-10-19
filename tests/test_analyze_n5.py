@@ -54,8 +54,10 @@ DESIGN = A.design_constants(h9_pin=PIN, frames={"control": A.CONTROL_TRAIN_FRAME
                             frame_list_sha={"control": None, "atlantic": FRAME_SHA}, protected=FAKE_PROT)
 
 
-def fake_git(dirty=False, differs=False):
+def fake_git(dirty=False, differs=False, untracked=()):
     def git(args, check=True):
+        if args[0] == "ls-files":
+            return SimpleNamespace(stdout=b"", returncode=1 if args[-1] in untracked else 0)
         if args[0] == "status":
             return SimpleNamespace(stdout=b" M scripts/analyze_n5.py\n" if dirty else b"", returncode=0)
         if args[0] == "diff":
@@ -185,9 +187,9 @@ def build(name, arm_scale=1.0, arm_hi=-7.0, ctl_hi=-7.0, seed_sd=0.03, bias_sd=0
     return root
 
 
-def analyse(root, out="out", git=None, frozen_dir=None):
+def analyse(root, out="out", git=None, frozen_dir=None, deviations=None):
     return A.run(root / "logs/n5_atlantic/runs", root / out, frozen_dir=frozen_dir, root=root, design=DESIGN,
-                 git=git or fake_git())
+                 git=git or fake_git(), deviations=deviations)
 
 
 @pytest.fixture(autouse=True)
@@ -503,6 +505,101 @@ def test_revalidation_pick_check_alone(request):
         analyse(build(request.node.name, man_mutate=man))
 
 
+# ---- rule (A), John 2026-10-19 17:03: a dropped seed pair as a named deviation -----------------------------------
+def deviations(root, rows):
+    p = root / A.DEVIATIONS_PATH
+    p.write_text(json.dumps({"dropped_pairs": rows}), encoding="utf-8")
+    return p
+
+
+def failing_record(root, arm, seed):
+    """A training record whose hashed file no longer matches: what rule (A) is for."""
+    write(root, f"logs/n5_atlantic/runs/{arm}_seed{seed}.train.json",
+          json.dumps({"files_sha256": {f"models/n5_atlantic/{arm}/seed{seed}.pt": "0" * 64}}))
+
+
+def test_rule_a_drops_a_named_pair_and_says_so(request):
+    """A pair is dropped only when the deviations file names it; the report labels the verdict NON-CONFIRMATORY and
+    states the reduced n and both primaries' power at it."""
+    root = build(request.node.name, arm_scale=0.9)
+    plain = analyse(root, "plain")
+    assert plain["n_pairs"] == 10 and plain["primary"].confirmatory.all() and not plain["joint"].startswith("NON")
+    assert not any(l.startswith("DEVIATION") for l in plain["report"])
+    for arm in A.ARMS:  # seed 4's runs are unusable: a post-look bad record, and no manifests
+        (root / f"logs/n5_atlantic/runs/{arm}_seed4.json").unlink()
+    failing_record(root, "control", 4)
+    with pytest.raises(A.DesignError, match="missing run manifest"):  # never dropped automatically
+        analyse(root, "auto")
+    res = analyse(root, "dev", deviations=deviations(root, [{"seed": 4, "reason": "kept file changed after H9"}]))
+    assert res["n_pairs"] == 9 and sorted(res["per_run"].seed.unique()) == [0, 1, 2, 3, 5, 6, 7, 8, 9]
+    assert res["joint"].startswith("NON-CONFIRMATORY (rule (A)")
+    prim_rows = res["primary"]
+    assert (~prim_rows.confirmatory).all() and (prim_rows.n_pairs == 9).all() and (prim_rows.dropped_seeds == "4").all()
+    report = (root / "dev" / "report.txt").read_text(encoding="utf-8")
+    assert "DEVIATION (rule (A), John 2026-10-19 17:03): seed pairs dropped, both arms: seed 4: kept file changed" in report
+    assert "The verdict is NON-CONFIRMATORY. n = 9 paired seeds instead of 10." in report
+    assert f"{A.DEVIATIONS_PATH} blob sha256 {hashlib.sha256(b'blob bytes' + bytes([10])).hexdigest()}." in report
+    assert "Power at the SESOI, n = 10 -> 9 (n = 10: design §5's table; n = 9:" in report
+    for k, sds in A.POWER_SD.items():
+        cells = ", ".join(f"sd_diff {sd:.2f}: {A.POWER_N10[k][sd]:.2f} -> {A.power_at(9, A.SESOI[k], sd):.2f}"
+                          for sd in sds)
+        assert f"    {k} ({A.SESOI[k]} kt): {cells}" in report  # design §5 at n = 10, simulated at n = 9
+    assert prim(res, "overall MAE").verdict == "BETTER"  # the test itself still runs, on 9 pairs
+
+
+@pytest.mark.parametrize("rows, msg", [
+    ([], "non-empty"),
+    ([{"seed": 10, "reason": "x"}], "distinct seed"),
+    ([{"seed": 3, "reason": " "}], "distinct seed"),
+    ([{"seed": 3, "reason": "x"}, {"seed": 3, "reason": "y"}], "distinct seed"),
+    ([{"seed": "3", "reason": "x"}], "distinct seed"),
+    ([{"seed": s, "reason": "x"} for s in range(9)], "fewer than 2 would remain"),
+], ids=["empty", "unknown_seed", "no_reason", "duplicate", "string_seed", "too_many"])
+def test_rule_a_refuses_a_malformed_deviations_file(request, rows, msg):
+    root = build(request.node.name)
+    with pytest.raises(A.DesignError, match=msg):
+        analyse(root, deviations=deviations(root, rows))
+
+
+def test_rule_a_drops_only_a_failing_pair_from_the_committed_file(request):
+    """hc-adversary item 17, finding 2: a healthy pair can't be dropped; the file must be the committed, clean one at
+    its fixed path."""
+    root = build(request.node.name)
+    dev = deviations(root, [{"seed": 3, "reason": "I prefer not"}])
+    with pytest.raises(A.DesignError, match=r"seeds \[3\] have no run whose training record fails"):
+        analyse(root, "a", deviations=dev)
+    write(root, "logs/n5_atlantic/runs/control_seed3.train.json", json.dumps(
+        {"files_sha256": {"models/n5_atlantic/control/seed3.pt": sha(root / "models/n5_atlantic/control/seed3.pt")}}))
+    with pytest.raises(A.DesignError, match="have no run whose training record fails"):  # a record that verifies
+        analyse(root, "b", deviations=dev)
+    failing_record(root, "atlantic", 3)
+    with pytest.raises(A.DesignError, match="must be committed and unchanged"):
+        analyse(root, "c", deviations=dev, git=fake_git(untracked=(A.DEVIATIONS_PATH,)))
+    with pytest.raises(A.DesignError, match="must be committed and unchanged"):
+        analyse(root, "d", deviations=dev, git=fake_git(dirty=True))
+    other = write(root, "deviations.json", dev.read_text(encoding="utf-8"))
+    with pytest.raises(A.DesignError, match="--deviations must be logs/n5_atlantic/deviations.json"):
+        analyse(root, "e", deviations=root / other)
+    assert analyse(root, "f", deviations=dev)["n_pairs"] == 9
+
+
+def test_rule_a_power_uses_the_design_method():
+    """The n = 10 column is design §5's table, quoted. The simulation (power.py's method) reproduces it within the
+    table's own Monte Carlo error (§5 used 2000 reps, SE ~0.01; the 2.44 bias cell, 0.83, is ~2 SE low), and a
+    dropped pair costs power."""
+    assert A.POWER_N10 == {"overall MAE": {0.40: 1.00, 0.69: 0.89, 0.85: 0.71},
+                           ">96 bias": {2.03: 0.95, 2.44: 0.83, 2.84: 0.71}}  # design.md §5, both tables
+    for k, row in A.POWER_N10.items():
+        for sd, design in row.items():
+            assert A.power_at(10, A.SESOI[k], sd) == pytest.approx(design, abs=0.02 if sd != 2.44 else 0.025)
+            assert A.power_at(9, A.SESOI[k], sd) <= A.power_at(10, A.SESOI[k], sd)
+    assert A.power_at(9, 3.0, 2.84) == A.power_at(9, 3.0, 2.84)  # fixed seed: deterministic
+    assert A.power_at(9, 0.9, 0.85, reps=2000) != A.power_at(9, 0.9, 0.85)  # reps is honoured
+    assert A.signflip_p(np.full(9, -1.0), 9) == pytest.approx(2 / 512)
+    assert (A.POWER_REPS, A.POWER_SEED) == (20000, 20261018)
+    assert A.POWER_SD == {"overall MAE": (0.40, 0.69, 0.85), ">96 bias": (2.03, 2.44, 2.84)}  # design §5 rows
+
+
 # ---- 2026-10-19 amendment (a): the tie rule ---------------------------------------------------------------------
 def plant_tie(delta, record=True, select_native=True):
     """Control seed 0: an epoch e2 re-validates `delta` kt below train.py's pick (its log line rewritten so the
@@ -686,7 +783,9 @@ def test_refuses_log_encoding(request, enc, msg):
 
 def test_refuses_unfinished_design():
     with pytest.raises(A.DesignError, match="not final"):
-        A.design_constants()
+        A.design_constants(frames={"control": A.CONTROL_TRAIN_FRAMES, "atlantic": None})
+    with pytest.raises(A.DesignError, match="not final"):
+        A.design_constants(frame_list_sha={"control": None, "atlantic": None})
 
 
 def test_cli_refuses_protected_or_foreign_out_dir():
