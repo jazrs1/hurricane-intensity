@@ -1,10 +1,12 @@
-"""check_nan.py regenerates excluded_crops.txt without ever losing it (hc-adversary item 5, finding 15).
+"""check_nan.py regenerates excluded_crops.txt without ever losing it (hc-adversary items 5 and 9, close-out 8b).
 
 Every test runs in a temporary directory with fixture storms. None touches the real data/ or the real
 excluded_crops.txt.
 """
 import importlib.util
 import os
+import pathlib
+import shutil
 import subprocess
 import sys
 
@@ -26,7 +28,7 @@ def check_nan(checkout_root):
     return module
 
 
-def write_storm(root, storm_id, nan_hours=(), hours=3):
+def write_storm(root, storm_id, nan_hours=(), hours=3, atcf_id=None):
     crops = root / storm_id / "crops"
     crops.mkdir(parents=True)
     rows = []
@@ -36,7 +38,8 @@ def write_storm(root, storm_id, nan_hours=(), hours=3):
         if hour in nan_hours:
             bt[3, 4] = np.nan
         np.savez(crops / name, bt=bt)
-        rows.append({"atcf_id": storm_id, "wind_kt": 50.0, "crop_path": os.path.join(storm_id, "crops", name)})
+        rows.append({"atcf_id": atcf_id or storm_id, "wind_kt": 50.0,
+                     "crop_path": os.path.join(storm_id, "crops", name)})
     pd.DataFrame(rows).to_csv(root / storm_id / "manifest.csv", index=False)
     return [r["crop_path"] for r in rows]
 
@@ -56,45 +59,125 @@ def repo(tmp_path, monkeypatch):
     return tmp_path
 
 
+@pytest.fixture
+def loads(monkeypatch):
+    """Every crop np.load'ed through hurricane_intensity.dataset."""
+    loaded = []
+    real = dataset.np.load
+    monkeypatch.setattr(dataset.np, "load", lambda p, *a, **k: loaded.append(str(p)) or real(p, *a, **k))
+    return loaded
+
+
+def spent_in(paths):
+    return [p for p in paths if any(s in p.upper() for s in SPENT_2025)]
+
+
+def assert_refused(check_nan, repo, capsys, reason, argv=()):
+    existing = repo / "excluded_crops.txt"
+    before = existing.read_bytes() if existing.exists() else None
+    with pytest.raises(SystemExit) as exc:
+        check_nan.main(list(argv))
+    assert exc.value.code not in (0, None)
+    assert (existing.read_bytes() if existing.exists() else None) == before
+    assert not list(repo.glob("excluded_crops.txt.*.tmp"))
+    err = capsys.readouterr().err
+    assert reason in err, err
+    return err
+
+
 def test_importing_runs_nothing(repo, check_nan):
     assert not (repo / "excluded_crops.txt").exists()
 
 
 def test_normal_run(repo, check_nan, capsys):
-    check_nan.main()
+    check_nan.main([])
     assert (repo / "excluded_crops.txt").read_text().splitlines() == [
         entry("AL142018", 0), entry("AL142018", 2), entry("EP052025", 1)]
     assert "3 of 9 excluded" in capsys.readouterr().out
 
 
 def test_ep_2025_storm_is_scanned(repo, check_nan):
-    check_nan.main()
+    check_nan.main([])
     assert entry("EP052025", 1) in (repo / "excluded_crops.txt").read_text().splitlines()
 
 
-def test_spent_2025_storms_never_loaded(repo, check_nan, monkeypatch):
+def test_spent_2025_storms_never_loaded(repo, check_nan, monkeypatch, loads):
     processed = repo / "data" / "processed"
-    # One spent storm on disk in lower case: NTFS would serve it as the real storm.
-    for storm_id in SPENT_2025[:-1] + [SPENT_2025[-1].lower()]:
+    for storm_id in SPENT_2025:
         write_storm(processed, storm_id, nan_hours=(0,))
     # Existing entry for a spent storm: carried forward unchanged, never re-derived.
     spent_entry = entry("AL052025", 1)
     (repo / "excluded_crops.txt").write_text(spent_entry)
 
-    built, loaded = [], []
-    real_init, real_load = dataset.TCDataset.__init__, dataset.np.load
+    built = []
+    real_init = dataset.TCDataset.__init__
     monkeypatch.setattr(dataset.TCDataset, "__init__",
                         lambda self, root, ids, *a, **k: built.extend(ids) or real_init(self, root, ids, *a, **k))
-    monkeypatch.setattr(dataset.np, "load", lambda p, *a, **k: loaded.append(str(p)) or real_load(p, *a, **k))
-    check_nan.main()
+    check_nan.main([])
 
-    spent = {s.upper() for s in SPENT_2025}
-    assert built and not [s for s in built if s.strip().upper() in spent]
-    assert loaded and not [p for p in loaded if any(s in p.upper() for s in spent)]
+    assert built and not spent_in(built)
+    assert loads and not spent_in(loads)
     lines = (repo / "excluded_crops.txt").read_text().splitlines()
     assert spent_entry in lines
-    assert not [p for p in lines if p != spent_entry and any(s in p.upper() for s in spent)]
+    assert spent_in(lines) == [spent_entry]
 
+
+# --- aliases of a storm directory (item 9, finding 1) -----------------------------------------------------
+
+@pytest.mark.parametrize("name", ["al132025", "BOGUS99", "AL14201", "AL1420188"])
+def test_malformed_dir_refused(repo, check_nan, capsys, loads, name):
+    # A lowercase spent dir would load the real storm on NTFS; any non-ATCF name is refused outright.
+    write_storm(repo / "data" / "processed", name, nan_hours=(0,))
+    assert_refused(check_nan, repo, capsys, "not named like an ATCF ID")
+    assert loads == []
+
+
+@pytest.mark.parametrize("source", ["AL042025", "AL142018"], ids=["spent", "legal"])
+def test_copied_manifest_refused(repo, check_nan, capsys, loads, source):
+    processed = repo / "data" / "processed"
+    if source == "AL042025":
+        write_storm(processed, source, nan_hours=(1,))
+    (processed / "ZZ042025").mkdir()
+    shutil.copy(processed / source / "manifest.csv", processed / "ZZ042025" / "manifest.csv")
+    assert_refused(check_nan, repo, capsys, "belong to another storm")
+    assert loads == []
+
+
+def test_manifest_with_other_atcf_id_refused(repo, check_nan, capsys, loads):
+    write_storm(repo / "data" / "processed", "ZZ012020", nan_hours=(0,), atcf_id="AL042025")
+    assert_refused(check_nan, repo, capsys, "belong to another storm")
+    assert loads == []
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="directory junctions are Windows-only")
+def test_junction_refused(repo, check_nan, capsys, loads):
+    import _winapi
+    processed = repo / "data" / "processed"
+    write_storm(processed, "AL042025", nan_hours=(1,))
+    _winapi.CreateJunction(str(processed / "AL042025"), str(processed / "XX042025"))
+    assert (processed / "XX042025" / "manifest.csv").exists()
+    assert_refused(check_nan, repo, capsys, "links or junctions")
+    assert loads == []
+
+
+def test_stray_dataset_row_refused_before_any_load(repo, check_nan, capsys, monkeypatch):
+    """Belt and braces: a row in ds.df outside the scanned storms is refused before __getitem__ runs."""
+    write_storm(repo / "data" / "processed", "AL042025", nan_hours=(1,))
+    real_init = dataset.TCDataset.__init__
+
+    def init(self, root, ids, *a, **k):
+        real_init(self, root, ids, *a, **k)
+        extra = {"atcf_id": "AL042025", "wind_kt": 50.0, "crop_path": entry("AL042025", 1)}
+        self.df = pd.concat([self.df, pd.DataFrame([extra])], ignore_index=True)
+
+    got = []
+    monkeypatch.setattr(dataset.TCDataset, "__init__", init)
+    monkeypatch.setattr(dataset.TCDataset, "__getitem__", lambda self, i: got.append(i))
+    assert_refused(check_nan, repo, capsys, "dataset rows outside the scanned storms")
+    assert got == []
+
+
+# --- failures leave the file as it was --------------------------------------------------------------------
 
 def test_exception_mid_scan_leaves_file_identical(repo, check_nan, monkeypatch):
     existing = repo / "excluded_crops.txt"
@@ -111,7 +194,7 @@ def test_exception_mid_scan_leaves_file_identical(repo, check_nan, monkeypatch):
     real_getitem = dataset.TCDataset.__getitem__
     monkeypatch.setattr(dataset.TCDataset, "__getitem__", boom)
     with pytest.raises(RuntimeError, match="mid-scan"):
-        check_nan.main()
+        check_nan.main([])
     assert existing.read_bytes() == before
     assert sorted(p.name for p in repo.iterdir()) == ["data", "excluded_crops.txt"]
 
@@ -126,28 +209,102 @@ def test_exception_on_write_leaves_file_identical(repo, check_nan, monkeypatch):
 
     monkeypatch.setattr(check_nan.os, "replace", fail)
     with pytest.raises(OSError, match="os.replace"):
-        check_nan.main()
+        check_nan.main([])
     assert existing.read_bytes() == before
     assert sorted(p.name for p in repo.iterdir()) == ["data", "excluded_crops.txt"]
 
 
-def test_removal_is_refused(repo, check_nan, capsys):
+def test_failed_cleanup_does_not_mask_the_error(repo, check_nan, monkeypatch, capsys):
+    """Item 9, finding 7: the temp file can't be removed either; the original error is still the one raised."""
     existing = repo / "excluded_crops.txt"
-    stale = os.path.join("AL012020", "crops", "AL012020_20200101T0100Z.npz")  # clean frame: a scan drops it
-    existing.write_text("\n".join([entry("AL142018", 0), stale]))
+    existing.write_text(entry("AL142018", 0))
     before = existing.read_bytes()
-    with pytest.raises(SystemExit) as exc:
-        check_nan.main()
-    assert exc.value.code not in (0, None)
+
+    def fail(*a, **k):
+        raise OSError("simulated failure in os.replace")
+
+    real_unlink = pathlib.Path.unlink
+
+    def locked(self, *a, **k):
+        if self.name.endswith(".tmp"):
+            raise PermissionError("simulated lock on the temp file")
+        return real_unlink(self, *a, **k)
+
+    monkeypatch.setattr(check_nan.os, "replace", fail)
+    monkeypatch.setattr(pathlib.Path, "unlink", locked)
+    with pytest.raises(OSError, match="os.replace") as exc:
+        check_nan.main([])
+    assert any("simulated lock" in note for note in getattr(exc.value, "__notes__", []))
+    assert "simulated lock" in capsys.readouterr().err
     assert existing.read_bytes() == before
-    assert stale in capsys.readouterr().err
+
+
+def test_missing_but_tracked_file_refused(repo, check_nan, capsys):
+    existing = repo / "excluded_crops.txt"
+    existing.write_text(entry("AL142018", 0))
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "excluded_crops.txt"], cwd=repo, check=True, capture_output=True)
+    existing.unlink()
+    assert_refused(check_nan, repo, capsys, "missing but tracked")
+    assert not existing.exists()
+
+
+# --- existing entries -------------------------------------------------------------------------------------
+
+def test_removal_is_refused(repo, check_nan, capsys):
+    stale = os.path.join("AL012020", "crops", "AL012020_20200101T0100Z.npz")  # clean frame: a scan drops it
+    (repo / "excluded_crops.txt").write_text("\n".join([entry("AL142018", 0), stale]))
+    err = assert_refused(check_nan, repo, capsys, "would drop 1 existing entries")
+    assert stale in err
+
+
+def test_trailing_whitespace_is_not_a_removal(repo, check_nan):
+    (repo / "excluded_crops.txt").write_text(entry("AL142018", 0) + "  \n" + entry("EP052025", 1) + "\t")
+    check_nan.main([])
+    assert (repo / "excluded_crops.txt").read_text().splitlines() == [
+        entry("AL142018", 0), entry("AL142018", 2), entry("EP052025", 1)]
+
+
+def test_duplicate_entries_are_reported(repo, check_nan, capsys):
+    (repo / "excluded_crops.txt").write_text("\n".join([entry("AL142018", 0)] * 2))
+    check_nan.main([])
+    out = capsys.readouterr().out
+    assert "notice: 1 duplicate entries" in out and entry("AL142018", 0) in out
+    assert (repo / "excluded_crops.txt").read_text().splitlines().count(entry("AL142018", 0)) == 1
 
 
 def test_added_entries_are_summarised(repo, check_nan, capsys):
     (repo / "excluded_crops.txt").write_text(entry("AL142018", 0))
-    check_nan.main()
+    check_nan.main([])
     out = capsys.readouterr().out
     assert "2 added" in out and entry("AL142018", 2) in out and entry("EP052025", 1) in out
+
+
+def test_entries_of_absent_storm_carried_forward(repo, check_nan, capsys):
+    """Close-out 8b: a storm with no directory under the scanned root keeps its entries, and they are reported."""
+    absent = [entry("EP112025", 0), entry("AL992019", 2)]
+    (repo / "excluded_crops.txt").write_text("\n".join(absent))
+    check_nan.main([])
+    lines = (repo / "excluded_crops.txt").read_text().splitlines()
+    assert set(absent) <= set(lines)
+    assert "2 carried forward for storms not under data" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("order", [("processed", "hep_sealed"), ("hep_sealed", "processed")])
+def test_two_roots_carry_each_other_forward(repo, check_nan, order):
+    write_storm(repo / "data" / "hep_sealed", "EP112025", nan_hours=(2,))
+    for root in order + order:
+        check_nan.main(["--processed-root", f"data/{root}"])
+    assert (repo / "excluded_crops.txt").read_text().splitlines() == [
+        entry("AL142018", 0), entry("AL142018", 2), entry("EP052025", 1), entry("EP112025", 2)]
+
+
+def test_removal_refused_under_second_root(repo, check_nan, capsys):
+    write_storm(repo / "data" / "hep_sealed", "EP112025", nan_hours=(2,))
+    stale = entry("EP112025", 0)  # clean frame of a scanned storm
+    (repo / "excluded_crops.txt").write_text("\n".join([entry("AL142018", 0), stale]))
+    err = assert_refused(check_nan, repo, capsys, "would drop 1 existing entries", ["--processed-root", "data/hep_sealed"])
+    assert stale in err
 
 
 @pytest.mark.parametrize("existing", [None, "same"], ids=["no-file", "rerun"])
