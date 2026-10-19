@@ -103,3 +103,5 @@ Erick EP052025, Flossie EP062025, Kiko EP112025, Priscilla EP162025, Jova EP1120
 ## Timestamp correction (2026-10-19 00:47 EDT, from `date`)
 
 The approved files cite "John, 23:57" for the change that a worker writes the TCDataset block: protocol.md line 164 and design.md §12.4. That time was a coordinator estimate, not read from a clock. John made that change before the PR #2 merge, which git records at 23:38 EDT. The approved files are not edited, so their hashes stay valid. The decisions.md entries written at commit will use git-anchored times.
+
+**Hash definition:** the approved hashes above are blob hashes: SHA-256 of `git show <commit>:<path>` bytes, computed in Python. After reports/ is committed, Windows working copies are CRLF and hash differently, by design.
