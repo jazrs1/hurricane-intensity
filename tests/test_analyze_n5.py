@@ -3,11 +3,13 @@
     .venv\\Scripts\\python.exe -I -B -m pytest -q tests/test_analyze_n5.py -p no:cacheprovider
 
 Each test builds a synthetic run tree (manifests, train/eval logs, fake checkpoint bytes, H9 CSVs) under
-<tempdir>/hc_n5_synthetic/<test>/ in the layout run_n5.py will write, and deletes it afterwards.
+<tempdir>/hc_n5_synthetic/<pid>_<random>/<test>/ in the layout run_n5.py will write, and deletes it afterwards. The
+per-process folder keeps concurrent runs (two checkouts' check.py, say) out of each other's trees.
 """
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -23,7 +25,9 @@ _spec = importlib.util.spec_from_file_location(
 A = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(A)  # main() is behind the __main__ guard
 
-SYN = Path(tempfile.gettempdir()) / "hc_n5_synthetic"
+SYN_ROOT = Path(tempfile.gettempdir()) / "hc_n5_synthetic"
+SYN_ROOT.mkdir(exist_ok=True)
+SYN = Path(tempfile.mkdtemp(prefix=f"{os.getpid()}_", dir=SYN_ROOT))  # this process's own folder
 ARM_FRAMES = 4072
 FAKE_PROT = {"best_model.pt": "a" * 64, "data/interim/hurdat2_atlantic.txt": "b" * 64}
 FRAME_SHA = "f" * 64
@@ -146,6 +150,9 @@ def build(name, arm_scale=1.0, arm_hi=-7.0, ctl_hi=-7.0, seed_sd=0.03, bias_sd=0
                     write(root, f"models/n5_atlantic/control/seed{s}_epochs/epoch_{e:02d}.pt", f"ep {s} {e}".encode())
                 sel = min(A.CONTROL_GRID, key=lambda e: (val[e], e))
                 man["val_mae_revalidated"] = {str(e): val[e] for e in range(1, epochs + 1)}
+                man["tie_rule"] = None
+                man["off_grid_primary"] = False
+                man["odd_grid_near_ties"] = A.odd_grid_near_ties(val)
                 man["selected_epoch"] = sel
                 man["selected_checkpoint"] = f"models/n5_atlantic/control/seed{s}_epochs/epoch_{sel:02d}.pt"
                 native_epoch = min(val, key=lambda e: (val[e], e))
@@ -187,8 +194,16 @@ def analyse(root, out="out", git=None, frozen_dir=None):
 def cleanup(request):
     yield
     shutil.rmtree(SYN / safe(request.node.name), ignore_errors=True)
-    if SYN.exists() and not any(SYN.iterdir()):
-        SYN.rmdir()
+
+
+@pytest.fixture(autouse=True, scope="module")
+def remove_process_folder():
+    yield
+    shutil.rmtree(SYN, ignore_errors=True)
+    try:
+        SYN_ROOT.rmdir()  # only when no other process still has a folder there
+    except OSError:
+        pass
 
 
 def prim(res, name):
@@ -462,7 +477,7 @@ def test_revalidation_must_reproduce_native_pick(request):
             r = m["val_mae_revalidated"]
             nat = min(r, key=lambda e: (r[e], int(e)))
             other = next(e for e in r if e != nat)
-            r[other] = r[nat] - 1e-4  # moves the minimum; rounding check is separate and reported first if it trips
+            r[other] = r[nat] - 1e-3  # moves the minimum, outside the tie window; the rounding check may trip first
         return m
     with pytest.raises(A.DesignError, match="does not reproduce training|inconsistent with the train log"):
         analyse(build(request.node.name, man_mutate=man))
@@ -486,6 +501,118 @@ def test_revalidation_pick_check_alone(request):
         return m
     with pytest.raises(A.DesignError, match="does not reproduce training"):
         analyse(build(request.node.name, man_mutate=man))
+
+
+# ---- 2026-10-19 amendment (a): the tie rule ---------------------------------------------------------------------
+def plant_tie(delta, record=True, select_native=True):
+    """Control seed 0: an epoch e2 re-validates `delta` kt below train.py's pick (its log line rewritten so the
+    rounding still holds). With select_native, the manifest selects and evaluates train.py's own checkpoint."""
+    def man(arm, s, m, root):
+        if (arm, s) != ("control", 0):
+            return m
+        r = m["val_mae_revalidated"]
+        nat = min(r, key=lambda e: (r[e], int(e)))
+        e2 = "1" if nat != "1" else "2"
+        r[e2] = r[nat] - delta
+        p = root / m["train_log"]
+        t = re.sub(rf"^epoch {e2}: (train \S+ kt)\s+val \S+ kt", rf"epoch {e2}: \1  val {r[e2]:.2f} kt",
+                   p.read_text(encoding="utf-8"), flags=re.M)
+        p.write_text(t, encoding="utf-8", newline="\n")
+        m["train_log_sha256"] = sha(p)
+        m["odd_grid_near_ties"] = A.odd_grid_near_ties({int(k): v for k, v in r.items()})
+        if record:
+            m["tie_rule"] = {"revalidated_argmin": int(e2), "native_epoch": int(nat), "delta_kt": delta}
+            m["off_grid_primary"] = int(nat) % 2 == 0
+        if select_native == "epoch_only":  # train.py's epoch, but the grid pick's checkpoint file stays
+            m["selected_epoch"] = int(nat)
+        elif select_native:
+            m["selected_epoch"], m["selected_checkpoint"] = int(nat), m["native_checkpoint"]
+            shutil.copy(root / m["native_h9_csv"], root / m["h9_csv"])  # same checkpoint, same predictions
+            write(root, m["eval_log"], eval_log(m["native_checkpoint"], m["h9_csv"], pd.read_csv(root / m["h9_csv"])))
+            for k in ("selected_checkpoint", "h9_csv", "eval_log"):
+                m[f"{k}_sha256"] = sha(root / m[k])
+        return m
+    return man
+
+
+def test_tie_rule_accepts_train_py_checkpoint_inside_the_window(request):
+    res = analyse(build(request.node.name, man_mutate=plant_tie(5e-5)))
+    row = res["per_run"].set_index(["arm", "seed"]).loc[("control", 0)]
+    assert row.selected_epoch == row.native_selected_epoch
+    assert "control seeds [0]" in (SYN / safe(request.node.name) / "out" / "report.txt").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("kw, msg", [
+    (dict(delta=2e-4), "does not reproduce training"),  # outside the window: refused as before
+    (dict(delta=5e-5, record=False), "tie_rule None does not match"),  # fired but not recorded
+    (dict(delta=5e-5, select_native=False), "train.py's own saved checkpoint"),  # fired, but the grid pick evaluated
+    (dict(delta=5e-5, select_native="epoch_only"), "train.py's own saved checkpoint"),  # right epoch, other file
+], ids=["outside_window", "not_recorded", "grid_pick_evaluated", "other_checkpoint_file"])
+def test_tie_rule_refusals(request, kw, msg):
+    with pytest.raises(A.DesignError, match=msg):
+        analyse(build(request.node.name, man_mutate=plant_tie(**kw)))
+
+
+def test_tie_rule_recorded_when_it_did_not_fire_or_field_missing(request):
+    def recorded(arm, s, m, root):
+        if (arm, s) == ("control", 4):
+            m["tie_rule"] = {"revalidated_argmin": 3, "native_epoch": 5, "delta_kt": 0.0}
+        return m
+
+    def missing(arm, s, m, root):
+        if (arm, s) == ("control", 4):
+            del m["tie_rule"]
+        return m
+    with pytest.raises(A.DesignError, match="does not match the re-validated values"):
+        analyse(build(request.node.name, man_mutate=recorded))
+    with pytest.raises(A.DesignError, match="no tie_rule field"):
+        analyse(build(request.node.name, man_mutate=missing))
+
+
+@pytest.mark.parametrize("plant", ["no_tie_marked", "tie_unmarked"])
+def test_off_grid_primary_verified(request, plant):
+    """John, 2026-10-19, decision 1: an even-native tie's primary is marked off-grid; the mark must be exact."""
+    if plant == "no_tie_marked":
+        def man(arm, s, m, root):
+            if (arm, s) == ("control", 1):
+                m["off_grid_primary"] = True
+            return m
+    else:
+        tie = plant_tie(5e-5)
+
+        def man(arm, s, m, root):
+            m = tie(arm, s, m, root)
+            if (arm, s) == ("control", 0):
+                m["off_grid_primary"] = not m["off_grid_primary"]
+            return m
+    with pytest.raises(A.DesignError, match="off_grid_primary .* is wrong"):
+        analyse(build(request.node.name, man_mutate=man))
+
+
+def test_odd_grid_near_ties_verified_and_reported(request):
+    def wrong(arm, s, m, root):
+        if (arm, s) == ("control", 3):
+            m["odd_grid_near_ties"] = [25]
+        return m
+
+    with pytest.raises(A.DesignError, match="odd_grid_near_ties .* does not match"):
+        analyse(build(request.node.name, man_mutate=wrong))
+    reval = {e: 8.2 + 0.01 * e for e in range(1, 26)}
+    assert A.odd_grid_near_ties({**reval, 13: 8.00105, 15: 8.0010}) == [13]  # against the odd-grid minimum (15)
+    assert A.odd_grid_near_ties({**reval, 14: 8.00105, 13: 8.0010, 15: 8.00109}) == [15]  # never the even epoch
+    assert A.odd_grid_near_ties(reval) == []
+
+
+def test_control_selection_values():
+    reval = {e: 8.2 + 0.01 * e for e in range(1, 26)}
+    assert A.control_selection({**reval, 14: 7.99}, 14) == (1, None)  # no tie: odd-grid first minimum
+    assert A.control_selection({**reval, 13: 8.00105, 15: 8.0010}, 15) == (15, None)
+    sel, tie = A.control_selection({**reval, 13: 8.00105, 15: 8.0010}, 13)  # train.py saved 13: it is evaluated
+    assert (sel, tie["revalidated_argmin"], tie["native_epoch"]) == (13, 15, 13)
+    assert tie["delta_kt"] == pytest.approx(5e-5)
+    with pytest.raises(A.DesignError, match="does not reproduce training"):
+        A.control_selection({**reval, 13: 8.0012, 15: 8.0010}, 13)  # |d| = 2e-4
+    assert A.TIE_KT == 1e-4
 
 
 def test_self_check_dirty_or_different(request):

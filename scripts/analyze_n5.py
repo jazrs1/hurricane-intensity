@@ -62,6 +62,7 @@ TRAIN_LISTS = {"control": "storms_train_expanded.txt", "atlantic": "storms_train
 CONTROL_TRAIN_FRAMES = 2081
 CONTROL_EPOCHS = 25
 CONTROL_GRID = tuple(range(1, CONTROL_EPOCHS + 1, 2))  # primary: control re-selected on odd epochs (13 candidates)
+TIE_KT = 1e-4  # 2026-10-19 amendment (a): re-validation argmin != train.py's pick is a tie only when |d| < TIE_KT kt
 ARM_TRAIN_FRAMES = None  # filled from the build (post-exclusion, post-Marco frame list), before hashing
 FRAME_LIST_SHA256 = None  # SHA-256 of results/n5_atlantic/frame_list_atlantic.txt, filled with ARM_TRAIN_FRAMES
 BATCH = 32
@@ -280,6 +281,21 @@ def check_eval_log(path, checkpoint, csv_rel, d):
                           f"{csv_rel} ({d['abs_error'].mean():.3f}): CSV and log are not from the same evaluation")
 
 
+def control_selection(reval, native_epoch):
+    """(selected epoch, tie record or None) for the control (2026-10-19 amendment, condition (a)). The unrounded
+    re-validation argmin must be train.py's pick (its last 'saved'). When it is not, but the two differ by less than
+    TIE_KT, the tie rule fires: the checkpoint train.py saved (seed<s>.pt) is the one evaluated, never a re-ranked
+    one. Otherwise the selection is the first minimum over the odd epochs (the matched grid)."""
+    argmin = min(reval, key=lambda e: (reval[e], e))
+    if argmin == native_epoch:
+        return min(CONTROL_GRID, key=lambda e: (reval[e], e)), None
+    delta = reval[native_epoch] - reval[argmin]
+    if not abs(delta) < TIE_KT:
+        raise DesignError(f"re-validation minimum is not train.py's native selection (epoch {native_epoch}): the "
+                          "re-validation path does not reproduce training")
+    return native_epoch, {"revalidated_argmin": argmin, "native_epoch": native_epoch, "delta_kt": delta}
+
+
 def pinned_paths(arm, seed):
     """Every manifest path is fixed by arm and seed (design §8); nothing may point elsewhere."""
     p = {"train_log": f"logs/n5_atlantic/{arm}_seed{seed}.log",
@@ -294,29 +310,54 @@ def pinned_paths(arm, seed):
     return p
 
 
-def load_run(manifest_path, arm, seed, design, root):
-    man = json.loads(read_text_strict(manifest_path))
+def odd_grid_near_ties(reval):
+    """Odd epochs within TIE_KT of the odd-grid minimum (that minimum excluded). Recorded and reported; the
+    pre-registered first minimum stands (2026-10-19 amendment, open for John)."""
+    g = min(CONTROL_GRID, key=lambda e: (reval[e], e))
+    return sorted(e for e in CONTROL_GRID if e != g and abs(reval[e] - reval[g]) < TIE_KT)
+
+
+def single_commit(mans):
+    """All runs must come from one commit (design §4)."""
+    commits = {m.get("commit") for m in mans}
+    if len(commits) != 1:
+        raise DesignError(f"runs come from more than one commit: {sorted(map(str, commits))}")
+    return commits.pop()
+
+
+def check_attempts(man, root, where):
+    """Every recorded abort (training attempt or H9 evaluation attempt) must exist and be complete."""
+    for key in ("aborted_attempts", "eval_attempts"):
+        for rel in man.get(key, []):
+            p = Path(root) / rel
+            if not p.is_file() or json.loads(read_text_strict(p)).get("status") != "complete":
+                raise DesignError(f"{where}: {key} {rel} is missing or not complete")
+
+
+def check_training(man, arm, seed, design, root, where):
+    """Every training-side check, on a manifest or on run_n5's training record (the same keys). load_run applies it,
+    and run_n5 applies it to all 20 records before the first H9 evaluation, so no training-side refusal can first
+    appear after a look at H9 (hc-adversary item 16). Returns (epoch rows, native epoch, selected epoch)."""
     if (man.get("arm"), man.get("seed")) != (arm, seed):
-        raise DesignError(f"{manifest_path}: manifest is for {man.get('arm')} seed {man.get('seed')}")
-    keys = ["train_log", "native_checkpoint", "selected_checkpoint", "h9_csv", "eval_log"]
-    if arm == "control":
-        keys += ["native_h9_csv", "native_eval_log"]
-    for k, want in pinned_paths(arm, seed).items():
-        if Path(str(man.get(k))).as_posix() != want:
-            raise DesignError(f"{manifest_path}: {k} is {man.get(k)}, not the design's {want}")
-    for k in keys:
+        raise DesignError(f"{where}: manifest is for {man.get('arm')} seed {man.get('seed')}")
+    pins = pinned_paths(arm, seed)
+    for k in ("train_log", "native_checkpoint", "selected_checkpoint"):
+        if k in pins and Path(str(man.get(k))).as_posix() != pins[k]:
+            raise DesignError(f"{where}: {k} is {man.get(k)}, not the design's {pins[k]}")
+    for k in ("train_log", "native_checkpoint", "selected_checkpoint"):
         p = root / man[k]
-        if not p.exists() or sha256_file(p) != man[f"{k}_sha256"]:
-            raise DesignError(f"{manifest_path}: {k} {man[k]} is missing or its SHA-256 differs from the manifest")
+        if not p.exists() or sha256_file(p) != man.get(f"{k}_sha256"):
+            raise DesignError(f"{where}: {k} {man[k]} is missing or its SHA-256 differs from the manifest")
     if man.get("train_list") != design["train_lists"][arm]:
-        raise DesignError(f"{manifest_path}: train list {man.get('train_list')} is not {design['train_lists'][arm]}")
+        raise DesignError(f"{where}: train list {man.get('train_list')} is not {design['train_lists'][arm]}")
     if man.get("frame_list_sha256") != design["frame_list_sha"][arm]:
-        raise DesignError(f"{manifest_path}: frame list SHA-256 differs from the recorded one")
+        raise DesignError(f"{where}: frame list SHA-256 differs from the recorded one")
     for when in ("protected_before", "protected_after"):
         got = man.get(when, {})
         bad = sorted(k for k, v in design["protected"].items() if got.get(k) != v)
         if bad:
-            raise DesignError(f"{manifest_path}: {when} protected hashes differ: {bad}")
+            raise DesignError(f"{where}: {when} protected hashes differ: {bad}")
+    check_attempts(man, root, where)
     ep, native_epoch = parse_train_log(root / man["train_log"], arm, seed, design)
     if arm == "control":
         # Primary: re-selected on validation only, over the odd epochs. The driver re-validates ALL 25 epochs'
@@ -326,18 +367,47 @@ def load_run(manifest_path, arm, seed, design, root):
         reval = {int(k): float(v) for k, v in man["val_mae_revalidated"].items()}
         logged = {e: va for e, _, va in ep}
         if sorted(reval) != list(range(1, CONTROL_EPOCHS + 1)) or                 any(abs(round(v, 2) - logged[e]) > 0.0051 for e, v in reval.items()):
-            raise DesignError(f"{manifest_path}: re-validated values missing or inconsistent with the train log")
-        if min(reval, key=lambda e: (reval[e], e)) != native_epoch:
-            raise DesignError(f"{manifest_path}: re-validation minimum is not train.py's native selection "
-                              f"(epoch {native_epoch}): the re-validation path does not reproduce training")
-        sel = min(CONTROL_GRID, key=lambda e: (reval[e], e))
-        want = f"models/n5_atlantic/control/seed{seed}_epochs/epoch_{sel:02d}.pt"
+            raise DesignError(f"{where}: re-validated values missing or inconsistent with the train log")
+        try:
+            sel, tie = control_selection(reval, native_epoch)
+        except DesignError as e:
+            raise DesignError(f"{where}: {e}") from None
+        if "tie_rule" not in man:
+            raise DesignError(f"{where}: no tie_rule field (2026-10-19 amendment); null when it did not fire")
+        core = ("revalidated_argmin", "native_epoch")
+        got = None if man["tie_rule"] is None else {k: man["tie_rule"].get(k) for k in core}
+        if got != (None if tie is None else {k: tie[k] for k in core}):
+            raise DesignError(f"{where}: tie_rule {man['tie_rule']} does not match the re-validated values ({tie})")
+        if man.get("off_grid_primary") is not (tie is not None and sel % 2 == 0):
+            raise DesignError(f"{where}: off_grid_primary {man.get('off_grid_primary')} is wrong: the primary is off the "
+                              "odd grid exactly when the tie rule fired on an even native epoch (John, 2026-10-19)")
+        if man.get("odd_grid_near_ties") != odd_grid_near_ties(reval):
+            raise DesignError(f"{where}: odd_grid_near_ties {man.get('odd_grid_near_ties')} does not match the "
+                              f"re-validated values ({odd_grid_near_ties(reval)})")
+        want = man["native_checkpoint"] if tie else f"models/n5_atlantic/control/seed{seed}_epochs/epoch_{sel:02d}.pt"
         if man.get("selected_epoch") != sel or Path(man["selected_checkpoint"]).as_posix() != want:
-            raise DesignError(f"{manifest_path}: selected checkpoint is not the validation minimum on the odd-epoch grid")
+            raise DesignError(f"{where}: selected checkpoint is not the validation minimum on the odd-epoch grid"
+                              " (or, when the tie rule fired, train.py's own saved checkpoint)")
     else:
         sel = native_epoch
         if man.get("selected_epoch") != sel or man["selected_checkpoint"] != man["native_checkpoint"]:
-            raise DesignError(f"{manifest_path}: atlantic selected checkpoint must be the native one (last 'saved')")
+            raise DesignError(f"{where}: atlantic selected checkpoint must be the native one (last 'saved')")
+    return ep, native_epoch, sel
+
+
+def load_run(manifest_path, arm, seed, design, root):
+    man = json.loads(read_text_strict(manifest_path))
+    if (man.get("arm"), man.get("seed")) != (arm, seed):
+        raise DesignError(f"{manifest_path}: manifest is for {man.get('arm')} seed {man.get('seed')}")
+    for k, want in pinned_paths(arm, seed).items():  # every pinned path first, the H9 ones included
+        if Path(str(man.get(k))).as_posix() != want:
+            raise DesignError(f"{manifest_path}: {k} is {man.get(k)}, not the design's {want}")
+    ep, native_epoch, sel = check_training(man, arm, seed, design, root, manifest_path)
+    keys = ["h9_csv", "eval_log"] + (["native_h9_csv", "native_eval_log"] if arm == "control" else [])
+    for k in keys:
+        p = root / man[k]
+        if not p.exists() or sha256_file(p) != man.get(f"{k}_sha256"):
+            raise DesignError(f"{manifest_path}: {k} {man[k]} is missing or its SHA-256 differs from the manifest")
     d = load_csv(root / man["h9_csv"], design)
     check_eval_log(root / man["eval_log"], man["selected_checkpoint"], man["h9_csv"], d)
     native = d
@@ -471,10 +541,7 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
             if not p.exists():
                 raise DesignError(f"missing run manifest {p}")
             runs[(arm, s)] = load_run(p, arm, s, design, root)
-    commits = {r["man"]["commit"] for r in runs.values()}
-    if len(commits) != 1:
-        raise DesignError(f"runs come from more than one commit: {sorted(commits)}")
-    commit = commits.pop()
+    commit = single_commit([r["man"] for r in runs.values()])
     blob_sha, blob_id = verify_self(commit, root, git or real_git(root), check_path=git is None)
 
     ref = runs[("control", 0)]["d"]
@@ -576,6 +643,13 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
     if frozen is not None:
         frozen.to_csv(out_dir / "frozen_vs_control.csv", **kw)
 
+    ties = [s for (arm, s), r in runs.items() if arm == "control" and r["man"]["tie_rule"]]
+    offgrid = [s for (arm, s), r in runs.items() if arm == "control" and r["man"]["off_grid_primary"]]
+    near = {s: r["man"]["odd_grid_near_ties"] for (arm, s), r in runs.items()
+            if arm == "control" and r["man"]["odd_grid_near_ties"]}
+    attempts = {k: {f"{arm} seed {s}": r["man"][k] for (arm, s), r in runs.items() if r["man"].get(k)}
+                for k in ("aborted_attempts", "eval_attempts")}
+
     def prow(r):
         return (f"  {r['metric']}: control {r['control_mean']:.3f}, atlantic {r['atlantic_mean']:.3f}, "
                 f"d {r['mean_diff']:+.3f} (sd {r['sd_diff']:.3f}), 97.5% CI [{r['ci97.5_lo']:+.3f}, "
@@ -589,6 +663,12 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
         f"JOINT VERDICT: {joint}",
         f"Under-training flag (selected step in the last 15%): control {under['control']}/10, "
         f"atlantic {under['atlantic']}/10",
+        f"Tie rule (2026-10-19 amendment, |d| < {TIE_KT} kt; train.py's own checkpoint evaluated): control seeds "
+        f"{ties or 'none'}; off-grid primary (even epoch, the same checkpoint as the sensitivity): {offgrid or 'none'}",
+        f"Odd-grid near ties (within {TIE_KT} kt of the odd-grid minimum; the first minimum is kept): "
+        f"{near or 'none'}",
+        f"Aborted training attempts (restarted with the same seed and order): {attempts['aborted_attempts'] or 'none'};"
+        f" aborted H9 evaluation attempts (same checkpoint re-evaluated): {attempts['eval_attempts'] or 'none'}",
         "SENSITIVITY (pre-registered; control at its native 25-epoch selection; does not change the verdict):",
         *[prow(r) for r in sens.values()],
         "SECONDARY (alpha 0.05, uncorrected):",
