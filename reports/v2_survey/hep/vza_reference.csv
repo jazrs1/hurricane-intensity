@@ -1,0 +1,9 @@
+set,frames,n,min,p5,p25,median,p75,p95,max,share_gt_35deg,share_gt_45deg
+training (storms_train_expanded minus val),all,2081,17.490,23.286,29.229,34.688,39.619,49.638,66.985,0.487,0.084
+training (storms_train_expanded minus val),>96 kt,394,18.548,29.263,30.929,33.043,36.748,42.660,45.353,0.406,0.003
+validation (storms_val_expanded),all,940,17.242,19.352,27.344,34.403,38.692,46.889,51.493,0.464,0.101
+validation (storms_val_expanded),>96 kt,124,31.454,32.312,33.561,34.649,36.479,39.621,41.001,0.427,0.000
+H9,all,1752,14.790,17.284,25.477,32.023,39.544,48.099,63.198,0.370,0.083
+H9,>96 kt,653,16.686,19.153,27.514,31.035,34.243,42.167,46.197,0.230,0.015
+E2a training (expanded + 31 N5 storms; new storms estimated from HURDAT2 3h grid),all,4083,15.016,22.565,30.240,37.554,44.219,58.446,75.635,0.601,0.237
+E2a training (expanded + 31 N5 storms; new storms estimated from HURDAT2 3h grid),>96 kt,402,18.548,29.289,30.955,33.108,36.800,42.600,45.353,0.408,0.002
