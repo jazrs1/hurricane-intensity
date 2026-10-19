@@ -1,0 +1,2 @@
+candidate,other,other_role,min_km,hours_le700km,hours_box_overlap,frames3h_le700km,frames3h_box_overlap,hours_box650,frames3h_box650,box650_frames3h,box_overlap_times
+AL142020,AL132020,storms_val_expanded.txt,732.5,0,8,0,3,12,4,2020-08-25T09;2020-08-25T12;2020-08-25T15;2020-08-25T18,2020-08-25T11;2020-08-25T12;2020-08-25T13;2020-08-25T14;2020-08-25T15;2020-08-25T16;2020-08-25T17;2020-08-25T18

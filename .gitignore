@@ -7,3 +7,4 @@ __pycache__/
 *.pt
 COORDINATOR.md
 FEATURES.md
+/reports/v2_survey/_scratch/
