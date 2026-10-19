@@ -1,3 +1,4 @@
+import re
 import pandas as pd
 import numpy as np
 import torch
@@ -8,6 +9,23 @@ import torch.nn.functional as F
 BT_MIN = 180.0
 BT_MAX = 320.0
 SIZE = 224
+
+# The six 2025 Atlantic test storms, spent by the final test (logs/decisions.md, 2026-10-16): TCDataset never
+# loads them. Kept in code, never read from a file, the environment or the cwd (check_nan.py builds TCDataset
+# from an empty temporary cwd). Other 2025 storms (AL012025, the East Pacific H-EP set) load as usual.
+SPENT_2025 = frozenset({"AL042025", "AL052025", "AL072025", "AL082025", "AL092025", "AL132025"})
+# A storm ID is exactly two capital letters and six ASCII digits, with no normalisation.
+STORM_ID = re.compile(r"[A-Z]{2}[0-9]{6}")
+
+
+def crop_storm(processed_root, crop_path):
+    """The storm directory crop_path resolves to under processed_root, upper-cased; None if it is outside it."""
+    root = Path(processed_root).resolve()
+    try:
+        parts = (root / crop_path).resolve().relative_to(root).parts
+    except ValueError:
+        return None
+    return parts[0].rstrip(". ").upper() if len(parts) > 1 else None
 
 # Circular mask: everything outside the circle inscribed in the 224 x 224 frame is set to 300 K, which reads
 # as clear tropical ocean (0 would be 180 K, the coldest cloud top the scale allows).
@@ -37,7 +55,16 @@ class TCDataset(Dataset):
     def __init__(self, processed_root, storm_ids, circular_mask=False, rotate=False, generator=None):
         """circular_mask: fill outside the inscribed circle with MASK_FILL. rotate: rotate each sample by a
         uniform random angle (training augmentation; requires circular_mask, so no frame corner sampled from
-        outside the crop is ever visible). With both off, preprocessing is exactly as before."""
+        outside the crop is ever visible). With both off, preprocessing is exactly as before.
+
+        Raises ValueError, before anything is read, for a storm ID that is malformed or spent (SPENT_2025),
+        and after reading a manifest whose rows belong to another storm or point outside its directory."""
+        ids = list(storm_ids)
+        for storm_id in ids:
+            if not isinstance(storm_id, str) or not STORM_ID.fullmatch(storm_id):
+                raise ValueError(f"malformed storm ID {storm_id!r}: expected two capital letters and six digits")
+            if storm_id in SPENT_2025:
+                raise ValueError(f"{storm_id} is a spent 2025 test storm and is never loaded")
         if rotate and not circular_mask:
             raise ValueError("rotate requires circular_mask")
         self.circular_mask = circular_mask
@@ -46,9 +73,14 @@ class TCDataset(Dataset):
         self.processed_root = processed_root
         self.storm_ids = storm_ids
         frames = []
-        for storm_id in storm_ids:
+        for storm_id in ids:
             manifest_path = Path(processed_root) / storm_id / "manifest.csv"
             df = pd.read_csv(manifest_path)
+            if "atcf_id" not in df or (df["atcf_id"].astype(str) != storm_id).any():
+                raise ValueError(f"{manifest_path}: atcf_id missing or not {storm_id} in some rows")
+            stray = [p for p in df["crop_path"].dropna() if crop_storm(processed_root, p) != storm_id]
+            if stray:
+                raise ValueError(f"{manifest_path}: crop_path outside {storm_id}/ in {len(stray)} rows, e.g. {stray[0]}")
             frames.append(df)
         df = pd.concat(frames, ignore_index=True)
         df = df[df["crop_path"].notna()]
@@ -70,6 +102,9 @@ class TCDataset(Dataset):
 
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
+        storm = crop_storm(self.processed_root, row["crop_path"])
+        if storm is None or storm in SPENT_2025:
+            raise ValueError(f"{row['crop_path']} is a spent 2025 crop or outside {self.processed_root}")
         crop_path = Path(self.processed_root) / row["crop_path"]
         data = np.load(crop_path)
         bt = data["bt"]
