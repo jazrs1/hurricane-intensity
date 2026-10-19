@@ -2242,7 +2242,9 @@ No build step, training or evaluation run by this entry.
       - the records come from one launch commit L on the first-parent
         chain;
       - HEAD is pushed;
-      - HEAD differs from L only by the records.
+      - HEAD differs from L only by the records and the decisions docs
+        (logs/decisions.md, reports/decisions/*.md; never executed),
+        per git diff --no-renames -z.
     - Before the first H9 evaluation, evaluate runs every
       training-side check the analysis will apply, over all 20 records
       (analyze_n5.check_training, single_commit, verify_self at L).
@@ -2258,7 +2260,13 @@ No build step, training or evaluation run by this entry.
       from a fix commit (John's decision 2 below).
     - abort-eval: a crashed H9 evaluation. The same checkpoint is
       re-evaluated.
-    No abort is allowed after any H9 output, except abort-eval.
+    No abort-run or abort-all is allowed once H9 has been looked at:
+    any pinned H9 output or manifest, any aborted H9 evaluation, or
+    logs/n5_atlantic/phase2_started.json, which evaluate writes
+    (exclusive create) before its first H9 step and nothing moves;
+    launch refuses while it exists. evaluate also refuses pending
+    aborts, and checks each run's eval attempts before its H9 step.
+    abort-eval also takes a manifest that load_run refuses.
   - Procedural rule: no evaluate.py or ensemble_eval.py on
     models/n5_atlantic/* except through run_n5.py evaluate.
   - Guards:
@@ -2290,8 +2298,8 @@ No build step, training or evaluation run by this entry.
   - reports/v2_survey/n5/design.md:
     c08312358429067522691b761a512538c9e9e9e98ed783d280058e77778ff525
     [4638f3d8] ->
-    a6e11b3763d9bba78e98de6444877d6f5259d0e68a37a1861f57909a43de0017
-    [6eee3a47]
+    615e0f6f52b438125a76e32bb259f55a77cd732c137bf206575c1022142aaaea
+    [f35f0050]
   - scripts/analyze_n5.py:
     cc9083cabcc48ec442d3ca8c24bdb1347d33edc859117a5a6aa51f14d98ee6dc
     [5692d6d3] ->

@@ -116,9 +116,9 @@ def fake_git(root=None, dirty=False, differs_at=(), fetch_rc=0, head=COMMIT, fir
             return SimpleNamespace(stdout=b" M scripts/train.py\n" if dirty else b"", returncode=0)
         if args[:2] == ["diff", "--quiet"]:
             return SimpleNamespace(stdout=b"", returncode=1 if args[2] in differs_at else 0)
-        if args[:2] == ["diff", "--name-only"]:
-            names = [R.run_paths(a, s)["record"] for _, a, s in R.schedule(range(10))] if args[2] != head else []
-            return SimpleNamespace(stdout="\n".join(names + list(extra_changed)).encode(), returncode=0)
+        if args[:4] == ["diff", "--no-renames", "-z", "--name-only"]:
+            names = [R.run_paths(a, s)["record"] for _, a, s in R.schedule(range(10))] if args[4] != head else []
+            return SimpleNamespace(stdout="\0".join(names + list(extra_changed)).encode() + b"\0", returncode=0)
         if args[0] == "ls-files":
             return SimpleNamespace(stdout=b"", returncode=1 if args[-1] in untracked else 0)
         if args[0] == "show" and args[1].endswith(".train.json"):
@@ -140,12 +140,16 @@ class FakeRunner:
 
     def __init__(self, root, train_rc=0, on_train=None, fail=None):
         self.root, self.train_rc, self.on_train, self.fail, self.calls = root, train_rc, on_train, fail, []
+        self.eval_fail = set()  # --out paths whose evaluate.py "crashes" (rc 1, nothing written)
 
     def __call__(self, cmd, stdout, stderr, cwd, env):
         assert Path(cwd) == self.root and env["PYTHONUTF8"] == "1" and stderr is subprocess.STDOUT
         self.calls.append(cmd)
         args = dict(zip(cmd[3::2], cmd[4::2])) if cmd[2] == "scripts/train.py" else dict(zip(cmd[2::2], cmd[3::2]))
         rc = self.train_rc if cmd[2] == "scripts/train.py" else 0
+        if cmd[2] != "scripts/train.py" and args["--out"] in self.eval_fail:
+            stdout.write(b"Traceback (most recent call last):\n")
+            return SimpleNamespace(returncode=1)
         if cmd[2] == "scripts/train.py" and self.fail == (self.arm_of(args), int(args["--seed"])):
             rc = 1
         out = (self.train(args, rc) if cmd[2] == "scripts/train.py" else self.evaluate(args)) if cmd[1] != "x" else ""
@@ -531,7 +535,8 @@ def test_phase2_refuses_while_any_training_run_is_unfinished(tmp_path, fail):
     (dict(head="d" * 40, first_parent=(COMMIT,), pushed=False), "guard 5e: HEAD is not pushed"),
     (dict(head="d" * 40, first_parent=("d" * 40,)), f"guard 5: {COMMIT} is not on the first-parent chain"),
     (dict(head="d" * 40, first_parent=(COMMIT,), extra_changed=("scripts/train.py",)),
-     r"guard 5e: HEAD differs from the launch commit .* in more than the 20 records: \['scripts/train.py'\]"),
+     r"guard 5e: HEAD differs from the launch commit .* in more than the 20 records and the decisions docs: "
+     r"\['scripts/train.py'\]"),
 ], ids=["untracked", "differs", "not_pushed", "launch_not_first_parent", "code_changed"])
 def test_phase2_requires_the_committed_records_as_evidence(tmp_path, kw, match):
     """Item 16, finding 3: the 20 records committed and pushed before phase 2 witness that all trainings finished
@@ -738,6 +743,138 @@ def test_an_interrupted_abort_is_pending_blocks_launch_and_resumes(tmp_path, mon
     ab = json.loads((root / "logs/n5_atlantic/aborted/atlantic_seed1_attempt1/abort.json").read_text(encoding="utf-8"))
     assert ab["status"] == "complete" and all((root / v["to"]).is_file() for v in ab["moved"].values())
     assert len(go(root)[0]) == 20
+
+
+# ---- item 16b: a look survives abort-eval; pending aborts; 5e paths -----------------------------------------------
+def test_abort_eval_cannot_launder_an_h9_look(tmp_path):
+    """hc-adversary item 16b, finding 1, its exact sequence: control seed 0's native evaluation crashes after its
+    selected evaluation logged an MAE. abort-eval empties the pinned H9 paths, yet abort-all, abort-run and launch
+    stay refused: the eval abort and the phase-2 marker are the look."""
+    root = fake_repo(tmp_path)
+    runner = train(root)
+    runner.eval_fail = {"results/n5_atlantic/control_seed0_native_h9.csv"}
+    with pytest.raises(R.LaunchError, match="evaluation failed: logs/n5_atlantic/control_seed0_native_eval_h9.log"):
+        ev(root, runner=runner)
+    assert b"overall MAE:" in (root / "logs/n5_atlantic/control_seed0_eval_h9.log").read_bytes()  # the look
+    marker = json.loads((root / R.PHASE2_MARKER).read_text(encoding="utf-8"))
+    assert (marker["head"], marker["launch_commit"]) == (COMMIT, COMMIT)
+    R.abort_eval("control", 0, "native evaluation crashed", root)
+    assert R.h9_outputs(root, range(10)) == []  # the pinned paths are empty again...
+    for stage, match in ((lambda: R.abort_all("start over", root), "abort-all: H9 outputs exist"),
+                         (lambda: R.abort_run("atlantic", 3, "retrain", root), "abort-run: H9 outputs exist"),
+                         (lambda: train(root), "guard 4: logs/n5_atlantic/phase2_started.json exists")):
+        with pytest.raises(R.LaunchError, match=match):  # ...but the look is not forgotten
+            stage()
+    runner.eval_fail = set()
+    mans, runner = ev(root, runner=runner)
+    m = mans[0]
+    assert (m["arm"], m["seed"], m["eval_attempts"]) == ("control", 0, ["logs/n5_atlantic/aborted/control_seed0_eval1/abort.json"])
+    assert len(mans) == 20 and (root / R.PHASE2_MARKER).exists()
+
+
+def test_an_eval_abort_during_phase1_blocks_further_training(tmp_path):
+    """Item 16b, finding 1, phase-1 variant: an H9 output on a trained run, moved aside by abort-eval, still counts."""
+    root = fake_repo(tmp_path)
+
+    def plant(arm, seed):
+        if (arm, seed) == ("atlantic", 0):
+            (root / "results/n5_atlantic/control_seed0_h9.csv").write_text("looked")
+
+    with pytest.raises(R.LaunchError, match="phase 1: H9 outputs exist"):
+        train(root, runner=FakeRunner(root, on_train=plant))
+    R.abort_eval("control", 0, "stray H9 output", root)
+    assert R.h9_outputs(root, range(10)) == []
+    runner = FakeRunner(root)
+    with pytest.raises(R.LaunchError, match=r"guard 4: H9 outputs exist while runs remain to be trained: "
+                                            r"\['logs/n5_atlantic/aborted/control_seed0_eval1/abort.json'\]"):
+        train(root, runner=runner)
+    assert runner.calls == []
+    with pytest.raises(R.LaunchError, match="abort-all: H9 outputs exist"):
+        R.abort_all("start over", root)
+
+
+def test_a_pending_eval_abort_blocks_evaluate_and_resumes(tmp_path, monkeypatch):
+    """Item 16b, finding 2: evaluate refuses an unfinished abort before any H9 step; re-running abort-eval
+    finishes it."""
+    root = fake_repo(tmp_path)
+    runner = train(root)
+    runner.eval_fail = {"results/n5_atlantic/control_seed0_native_h9.csv"}
+    with pytest.raises(R.LaunchError, match="evaluation failed"):
+        ev(root, runner=runner)
+    runner.eval_fail, calls_before = set(), len(runner.calls)
+    real, n = R.write_json_replace, []
+
+    def flaky(path, obj):
+        n.append(path)
+        if len(n) == 2:  # the "complete" write
+            raise OSError("disk full")
+        return real(path, obj)
+
+    monkeypatch.setattr(R, "write_json_replace", flaky)
+    with pytest.raises(OSError):
+        R.abort_eval("control", 0, "native evaluation crashed", root)
+    monkeypatch.setattr(R, "write_json_replace", real)
+    with pytest.raises(R.LaunchError, match="guard 4: unfinished aborts .*control_seed0_eval1"):
+        ev(root, runner=runner)
+    assert len(runner.calls) == calls_before
+    R.abort_eval("control", 0, "native evaluation crashed", root)  # resumes the pending abort
+    mans, _ = ev(root, runner=runner)
+    assert mans[0]["eval_attempts"] == ["logs/n5_atlantic/aborted/control_seed0_eval1/abort.json"]
+
+
+def test_evaluate_one_checks_its_eval_attempts_before_the_h9_step(tmp_path, monkeypatch):
+    """Item 16b, finding 2, second half: even past the stage guard, no H9 step runs for a run whose recorded eval
+    attempt is incomplete."""
+    root = fake_repo(tmp_path)
+    runner = train(root)
+    d = root / "logs/n5_atlantic/aborted/control_seed0_eval1"
+    d.mkdir(parents=True)
+    (d / "abort.json").write_text(json.dumps({"status": "pending", "moved": {}}), encoding="utf-8")
+    monkeypatch.setattr(R, "pending_aborts", lambda root: [])  # as if the stage guard had missed it
+    with pytest.raises(R.LaunchError, match="before the H9 evaluation of control seed 0: .*control_seed0_eval1"):
+        ev(root, runner=runner)
+    assert all(is_train(c) for c in runner.calls)
+
+
+@pytest.mark.parametrize("extra, ok", [
+    (("logs/decisions.md",), True),
+    (("reports/decisions/N5.md", "logs/decisions.md"), True),
+    (("logs/decisions.md", "scripts/train.py"), False),
+    (("reports/decisions/sub/x.md",), False),
+    (("scripts/a b.py",), False),
+], ids=["decisions_md", "decision_records", "code_with_decisions", "nested_doc", "path_with_space"])
+def test_phase2_allows_decisions_docs_between_l_and_head(tmp_path, extra, ok):
+    """Item 16b, finding 3: `git diff --no-renames -z` (the fake git asserts those flags); docs may change between L
+    and HEAD, code may not, and a path with a space is one path."""
+    root = fake_repo(tmp_path)
+    runner = train(root)
+    git = fake_git(root, head="d" * 40, first_parent=(COMMIT, "d" * 40), extra_changed=extra)
+    if ok:
+        assert len(ev(root, git=git, runner=runner)[0]) == 20
+    else:
+        bad = [p for p in extra if not p.startswith(("logs/decisions.md", "reports/decisions/N5"))]
+        with pytest.raises(R.LaunchError, match=re.escape(f"records and the decisions docs: {bad}")):
+            ev(root, git=git, runner=runner)
+
+
+def test_abort_eval_takes_a_manifest_that_load_run_refuses(tmp_path):
+    """Item 16b, finding 4: an H9 CSV changed after its manifest. evaluate refuses with the remedy; abort-eval moves
+    the outputs and the manifest; evaluate re-evaluates the same recorded checkpoint, that run only."""
+    root = fake_repo(tmp_path)
+    mans, runner = go(root)
+    with pytest.raises(R.LaunchError, match="abort-eval: atlantic seed 3 is evaluated"):
+        R.abort_eval("atlantic", 3, "valid manifest", root)
+    (root / "results/n5_atlantic/atlantic_seed3_h9.csv").write_bytes(b"damaged")
+    with pytest.raises(R.LaunchError, match="phase 2: .*atlantic_seed3.json: h9_csv .* abort-eval atlantic 3"):
+        ev(root, runner=runner)
+    dest = R.abort_eval("atlantic", 3, "H9 CSV damaged after its manifest", root)
+    assert "logs/n5_atlantic/runs/atlantic_seed3.json" in json.loads((root / dest / "abort.json").read_text(
+        encoding="utf-8"))["moved"]
+    n = len(runner.calls)
+    mans, runner = ev(root, runner=runner)
+    assert [c[c.index("--checkpoint") + 1] for c in runner.calls[n:]] == ["models/n5_atlantic/atlantic/seed3.pt"]
+    m = next(m for m in mans if (m["arm"], m["seed"]) == ("atlantic", 3))
+    assert m["eval_attempts"] == [f"{dest}/abort.json"]
 
 
 # ---- condition (a): the tie rule ---------------------------------------------------------------------------------

@@ -23,7 +23,8 @@ launch also requires:
      analysis blob; and no H9 output exists while any run is still to be trained;
   5. after `git fetch origin`, HEAD is on the first-parent chain of origin/phase2-experiments (a merge commit).
 evaluate also requires (5e) the 20 records to come from one launch commit L on that first-parent chain, HEAD to be
-pushed (an ancestor of origin/phase2-experiments), `git diff L HEAD` to touch only the 20 records, and every record
+pushed (an ancestor of origin/phase2-experiments), `git diff --no-renames L HEAD` to touch only the 20 records and
+the decisions docs (logs/decisions.md, reports/decisions/*.md), and every record
 to be tracked and identical to HEAD's blob. Then, before the first H9 evaluation, it applies every training-side
 check of the analysis (analyze_n5.check_training, single_commit, verify_self) to all 20 records.
 
@@ -40,9 +41,12 @@ writes.
 
 Aborts (§14): each moves files, unchanged, to logs/n5_atlantic/aborted/<arm>_seed<s>_<attempt|eval><k>/, after
 writing abort.json there with every file's SHA-256 and status "pending"; the status becomes "complete" once all are
-moved, and a pending abort is resumed by running the same command again. abort-run and abort-all refuse once any H9
-output exists; abort-run refuses a run whose record verifies. abort-eval only takes a run whose record verifies and
-whose H9 outputs exist without a manifest; the same recorded checkpoint is then evaluated again.
+moved, and a pending abort is resumed by running the same command again (every other stage refuses while one is
+pending). abort-run and abort-all refuse once H9 has been looked at: any pinned H9 output or manifest, any aborted H9
+evaluation, or logs/n5_atlantic/phase2_started.json, which evaluate writes before its first H9 step and nothing
+moves; launch refuses while that marker exists. abort-run refuses a run whose record verifies. abort-eval only takes
+a run whose record verifies and whose H9 outputs exist without a manifest, or with a manifest load_run refuses; the
+same recorded checkpoint is then evaluated again.
 """
 import argparse
 import datetime
@@ -63,6 +67,8 @@ SELF_ANALYSIS = "scripts/analyze_n5.py"
 UPSTREAM = "origin/phase2-experiments"
 ABORTED = "logs/n5_atlantic/aborted"
 LOCK = "logs/n5_atlantic/run_n5.lock"
+PHASE2_MARKER = "logs/n5_atlantic/phase2_started.json"  # written once, before the first H9 step; never moved
+DOC_PATHS = ("logs/decisions.md",)  # 5e: docs a merge may add between L and HEAD; never executed (coordinator)
 OUTPUT_ROOTS = ("models/n5_atlantic/", "results/n5_atlantic/", "logs/n5_atlantic/")
 NEVER_WRITTEN = ("best_model.pt", "models/baseline_9kt.pt", "results/heldout_predictions.csv", "models/storms/",
                  "results/storms/", "results/ensemble/", "results/final_2025/", "site/")
@@ -224,6 +230,18 @@ def h9_outputs(root, seeds):
             if k in p and (Path(root) / p[k]).exists()]
 
 
+def looked(root, seeds):
+    """Evidence of an H9 look: any pinned H9 output or manifest, any aborted H9 evaluation, or the phase-2 marker.
+    abort-eval moves pinned H9 outputs aside, so the pinned paths alone can't say whether H9 was seen (item 16b)."""
+    found = h9_outputs(root, seeds)
+    found += sorted(f.relative_to(root).as_posix() for f in Path(root).glob(f"{ABORTED}/*_eval*/abort.json"))
+    return found + ([PHASE2_MARKER] if (Path(root) / PHASE2_MARKER).exists() else [])
+
+
+def doc_path(p):
+    return p in DOC_PATHS or (p.startswith("reports/decisions/") and p.endswith(".md") and p.count("/") == 2)
+
+
 def abort_files(root, arm, seed, kind):
     """abort.json paths of one run's aborts of one kind ("attempt" or "eval"), in attempt order."""
     found = Path(root).glob(f"{ABORTED}/{arm}_seed{seed}_{kind}*/abort.json")
@@ -328,6 +346,9 @@ def common_guards(root, git, main_root, check, cuda_ok, child_import):
                           f"{Path(root) / 'src'}")
     if not cuda_ok():
         raise LaunchError("guard 6: torch.cuda.is_available() is False; the runs need the GPU")
+    pending = pending_aborts(root)
+    if pending:
+        raise LaunchError(f"guard 4: unfinished aborts {pending}; run the same abort command again to finish them")
     commit = git(["rev-parse", "HEAD"]).stdout.decode().strip()
     blob_sha, blob_id = head_blob(git, commit)
     return dict(A=A, design=design, expected=expected, commit=commit, blob_sha=blob_sha, blob_id=blob_id, git=git)
@@ -348,9 +369,9 @@ def preflight(root, git, main_root, check, cuda_ok, child_import):
     ctx = common_guards(root, git, main_root, check, cuda_ok, child_import)
     A, expected = ctx["A"], ctx["expected"]
     check_output_paths(planned_outputs(A.SEEDS))
-    pending = pending_aborts(root)
-    if pending:
-        raise LaunchError(f"guard 4: unfinished aborts {pending}; run the same abort command again to finish them")
+    if (root / PHASE2_MARKER).exists():
+        raise LaunchError(f"guard 4: {PHASE2_MARKER} exists: phase 2 has started, so no training may run "
+                          "(2026-10-19 amendment, condition (b))")
     states = {(arm, s): run_state(root, arm, s, expected) for _, arm, s in schedule(A.SEEDS)}
     bad = [(arm, s) for (arm, s), st in states.items() if st == "bad_record"]
     if bad:
@@ -373,9 +394,9 @@ def preflight(root, git, main_root, check, cuda_ok, child_import):
         raise LaunchError(f"guard 4: runs recorded at another commit or analysis blob than HEAD {ctx['commit']}: "
                           f"{stale[:3]}; relaunch only at their commit, or (before any H9 output) move every run aside "
                           "with `run_n5.py abort-all --reason ...` and restart all 20 (§14, decided by John)")
-    looked = h9_outputs(root, A.SEEDS)
-    if looked and any(st == "fresh" for st in states.values()):
-        raise LaunchError(f"guard 4: H9 outputs exist while runs remain to be trained: {looked[:3]}; no training "
+    seen = looked(root, A.SEEDS)
+    if seen and any(st == "fresh" for st in states.values()):
+        raise LaunchError(f"guard 4: H9 outputs exist while runs remain to be trained: {seen[:3]}; no training "
                           "may follow an H9 evaluation (2026-10-19 amendment, condition (b))")
     first_parent(git, ctx["commit"])
     return ctx
@@ -428,9 +449,9 @@ def train_one(order, arm, seed, ctx, root, main_root, hooks):
     existing = [v for v in p.values() if (root / v).exists()]
     if existing:
         raise LaunchError(f"refusing to overwrite {existing}")
-    looked = h9_outputs(root, A.SEEDS)
-    if looked:
-        raise LaunchError(f"phase 1: H9 outputs exist ({looked[:3]}); no training may follow an H9 evaluation")
+    seen = looked(root, A.SEEDS)
+    if seen:
+        raise LaunchError(f"phase 1: H9 outputs exist ({seen[:3]}); no training may follow an H9 evaluation")
     before = protected_now(main_root, ctx["expected"])
     if before != ctx["expected"]:
         raise LaunchError(f"protected hashes differ before {arm} seed {seed}")
@@ -524,10 +545,12 @@ def records_evidence(root, git, A):
     if git(["merge-base", "--is-ancestor", "HEAD", UPSTREAM], check=False).returncode != 0:
         raise LaunchError(f"guard 5e: HEAD is not pushed to {UPSTREAM}; push the commit with the 20 records first")
     allowed = {run_paths(arm, s)["record"] for _, arm, s in schedule(A.SEEDS)}
-    changed = git(["diff", "--name-only", launch_commit, "HEAD"]).stdout.decode().split()
-    if set(changed) - allowed:
+    changed = [p for p in git(["diff", "--no-renames", "-z", "--name-only", launch_commit, "HEAD"]).stdout
+               .decode("utf-8").split("\0") if p]
+    other = sorted(p for p in changed if p not in allowed and not doc_path(p))
+    if other:
         raise LaunchError(f"guard 5e: HEAD differs from the launch commit {launch_commit} in more than the 20 "
-                          f"records: {sorted(set(changed) - allowed)[:5]}")
+                          f"records and the decisions docs: {other[:5]}")
     return launch_commit, recs
 
 
@@ -557,11 +580,17 @@ def evaluate_phase(ctx, root, main_root, runner):
             A.check_training(rec, arm, s, ctx["design"], root, run_paths(arm, s)["record"])
     except A.DesignError as e:
         raise LaunchError(f"phase 2 entry, before any H9 evaluation: {e}") from None
+    if not (root / PHASE2_MARKER).exists():
+        write_json_new(root / PHASE2_MARKER, {"head": ctx["commit"], "launch_commit": launch_commit, "time": now_iso()})
     mans = []
     for k, arm, s in order:
         p = run_paths(arm, s)
         if states[(arm, s)] == "evaluated":
-            A.load_run(root / p["manifest"], arm, s, ctx["design"], root)
+            try:
+                A.load_run(root / p["manifest"], arm, s, ctx["design"], root)
+            except A.DesignError as e:
+                raise LaunchError(f"phase 2: {e}; move its H9 outputs and manifest aside with "
+                                  f"`run_n5.py abort-eval {arm} {s} --reason ...` to re-evaluate the same checkpoint") from None
             mans.append(json.loads((root / p["manifest"]).read_text(encoding="utf-8")))
             print(f"order {k}: {arm} seed {s} already evaluated; skipped", flush=True)
         else:
@@ -575,6 +604,10 @@ def evaluate_one(order, arm, seed, ctx, root, main_root, runner):
     p = run_paths(arm, seed)
     man = verify_record(root, arm, seed, ctx["expected"])
     man.update(h9_csv=p["h9_csv"], eval_log=p["eval_log"], eval_attempts=aborted_attempts(root, arm, seed, "eval"))
+    try:
+        A.check_attempts({"eval_attempts": man["eval_attempts"]}, root, p["record"])
+    except A.DesignError as e:
+        raise LaunchError(f"before the H9 evaluation of {arm} seed {seed}: {e}") from None
     if arm == "control":
         man.update(native_h9_csv=p["native_h9_csv"], native_eval_log=p["native_eval_log"])
     before = protected_now(main_root, ctx["expected"])
@@ -673,9 +706,9 @@ def abort_run(arm, seed, reason, root=ROOT):
         A = analysis(root)
         if (arm, seed) not in {(a, s) for _, a, s in schedule(A.SEEDS)} or not reason:
             raise LaunchError(f"abort-run: unknown run {arm} seed {seed}, or no --reason")
-        looked = h9_outputs(root, A.SEEDS)
-        if looked:
-            raise LaunchError(f"abort-run: H9 outputs exist ({looked[:3]}); no run may be aborted after an H9 evaluation")
+        seen = looked(root, A.SEEDS)
+        if seen:
+            raise LaunchError(f"abort-run: H9 outputs exist ({seen[:3]}); no run may be aborted after an H9 evaluation")
         if run_state(root, arm, seed, A.PROTECTED) in ("trained", "eval_partial", "evaluated"):
             raise LaunchError(f"abort-run: {arm} seed {seed} has a training record that verifies; finished runs are "
                               "not aborted (abort-all restarts all 20, §14)")
@@ -691,9 +724,9 @@ def abort_all(reason, root=ROOT):
         A = analysis(root)
         if not reason:
             raise LaunchError("abort-all: no --reason")
-        looked = h9_outputs(root, A.SEEDS)
-        if looked:
-            raise LaunchError(f"abort-all: H9 outputs exist ({looked[:3]}); no run may be aborted after an H9 evaluation")
+        seen = looked(root, A.SEEDS)
+        if seen:
+            raise LaunchError(f"abort-all: H9 outputs exist ({seen[:3]}); no run may be aborted after an H9 evaluation")
         done = []
         for _, arm, s in schedule(A.SEEDS):
             if run_state(root, arm, s, A.PROTECTED) != "fresh" or any(
@@ -716,10 +749,16 @@ def abort_eval(arm, seed, reason, root=ROOT):
         state = run_state(root, arm, seed, A.PROTECTED)
         pending = any(json.loads(f.read_text(encoding="utf-8")).get("status") != "complete"
                       for f in abort_files(root, arm, seed, "eval"))
-        if state != "eval_partial" and not (pending and state == "trained"):
+        if state == "evaluated":
+            try:
+                A.load_run(root / run_paths(arm, seed)["manifest"], arm, seed, A.design_constants(), root)
+            except A.DesignError:
+                state = "evaluated, refused by load_run"
+        if state not in ("eval_partial", "evaluated, refused by load_run") and not (pending and state == "trained"):
             raise LaunchError(f"abort-eval: {arm} seed {seed} is {state}; only a run with a verified training record "
-                              "and H9 outputs without a manifest can be re-evaluated")
-        return _abort_one(root, A, arm, seed, reason, "eval", [k for k in H9_KEYS if k != "manifest"])
+                              "and H9 outputs without a manifest (or with a manifest load_run refuses) can be "
+                              "re-evaluated")
+        return _abort_one(root, A, arm, seed, reason, "eval", H9_KEYS)  # the same recorded checkpoint is re-evaluated
 
 
 def plan(root=ROOT):
