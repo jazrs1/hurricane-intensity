@@ -181,3 +181,6 @@ logs/decisions.md          running log of decisions and why I made them
 
 Data is not committed. `scripts/build_batch.py --ids-file storms_train.txt`
 rebuilds it from public NOAA sources.
+
+Requires Python 3.12 or later (`check_nan.py` uses
+`pathlib.Path.is_junction`); developed on 3.13.
