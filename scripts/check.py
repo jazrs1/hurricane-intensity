@@ -364,6 +364,25 @@ def check_gitignores(main_root):
     return f"{len(MUST_BE_IGNORED)} paths ignored and trailing newline, in the PR checkout and the main checkout"
 
 
+def remove_tree(path):
+    """Remove a temp dir, never ignoring errors. Returns None once it is gone, or why it is still there (a file
+    held open on Windows, e.g. an unclosed np.load, makes rmtree fail; ignore_errors would hide that)."""
+    try:
+        shutil.rmtree(path)
+    except OSError as e:
+        return f"could not remove {path}: {e!r}"
+    return f"{path} still exists after rmtree" if Path(path).exists() else None
+
+
+def warn_stale_e2e_dirs():
+    """hc_e2e_* dirs already in the temp dir: an earlier run was killed before its finally (a hard kill or os._exit).
+    Reported as a WARNING, not a failure, so they are visible; this run never touches them."""
+    stale = sorted(Path(tempfile.gettempdir()).glob("hc_e2e_*"))
+    for p in stale:
+        print(f"WARNING: stale e2e temp dir from an earlier run: {p}")
+    return stale
+
+
 def snapshot(root):
     """path -> (size, mtime_ns) for every file under root."""
     out = {}
@@ -431,6 +450,7 @@ def check_e2e(main_root, case):
         return functools.partial(orig_scan, scratch_path=scratch)(s3_client, key, *a, **kw)
 
     t0 = time.perf_counter()
+    error = None
     try:
         # The pipeline is never given hurdat2_url or force_hurdat2_refresh: either would write the
         # protected Atlantic cache. The stub serves the cache read-only, or a temp copy of another file.
@@ -468,11 +488,11 @@ def check_e2e(main_root, case):
         label = float(fix["wind_kt"].iloc[0])
         assert float(row["wind_kt"]) == label and not bool(row["is_interpolated"])
 
-        d = np.load(built)
-        bt = d["bt"]
+        with np.load(built) as d:  # closed at once: an open NpzFile locks the crop and the temp dir on Windows
+            bt = d["bt"]
+            dqf_nonzero = int(np.count_nonzero(d["dqf"]))
         bt_min, bt_max = float(np.min(bt)), float(np.max(bt))
         nans = int(np.isnan(bt).sum())
-        dqf_nonzero = int(np.count_nonzero(d["dqf"]))
 
         # Training preprocessing: TCDataset on the manifest run_pipeline wrote (clip 180-320, scale,
         # bilinear to 224, 3 channels; the expanded members were trained unmasked and unrotated).
@@ -507,7 +527,8 @@ def check_e2e(main_root, case):
         problems = []
         if on_disk is not None:
             same_bytes = built.read_bytes() == on_disk.read_bytes()
-            same_bt = bool(np.array_equal(bt, np.load(on_disk)["bt"]))
+            with np.load(on_disk) as z:
+                same_bt = bool(np.array_equal(bt, z["bt"]))
             print(f"  byte-identical to {case['crop']}: {same_bytes}  (bt arrays equal: {same_bt})")
             if not same_bytes:
                 problems.append(f"temp crop differs from {on_disk} (bt arrays equal: {same_bt})")
@@ -541,12 +562,26 @@ def check_e2e(main_root, case):
             problems.append(f"ensemble mean {preds.mean():.2f} kt is more than {E2E_TOLERANCE_KT} kt from {label}")
         if problems:
             raise AssertionError("\n".join(problems))
+    except BaseException as e:
+        error = e
+        raise
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        # Runs on success and on any exception partway. A cleanup failure fails the case loudly; it never replaces
+        # the case's own exception, which propagates with the cleanup failures attached and printed.
+        failures = []
+        leak = remove_tree(tmp)
+        if leak:
+            failures.append(f"temp dir left behind: {leak}")
         data_after = snapshot(main_root / "data")
         if data_after != data_before:
             changed = sorted(set(data_after.items()) ^ set(data_before.items()))
-            raise AssertionError(f"data/ changed during e2e: {changed[:10]}")
+            failures.append(f"data/ changed during e2e: {changed[:10]}")
+        if failures:
+            if error is None:
+                raise AssertionError("\n".join(failures))
+            for f in failures:
+                print(f"  ALSO: {f}", flush=True)
+                error.add_note(f"also: {f}")
     return f"{storm} {case['time']}: ensemble {preds.mean():.1f} kt vs label {label:.0f} kt; data/ unchanged"
 
 
@@ -598,6 +633,7 @@ def main():
             # --e2e uses the main install: config.PROJECT_ROOT must be the main checkout (see the docstring).
             import hurricane_intensity
             print(f"hurricane_intensity imported from: {Path(hurricane_intensity.__file__).resolve()} (main install)")
+            warn_stale_e2e_dirs()
             sections = [hashes]
             for case in E2E_CASES:
                 sections.append((case["name"], functools.partial(check_e2e, main_root, case)))
