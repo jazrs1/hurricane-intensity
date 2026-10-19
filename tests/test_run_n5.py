@@ -747,6 +747,17 @@ def test_after_a_look_a_bad_record_asks_for_the_bytes_back(tmp_path):
     assert len(ev(root, runner=runner)[0]) == 20
 
 
+def test_launch_after_a_phase1_look_asks_for_the_bytes_back(tmp_path):
+    """No marker yet, but an eval abort during phase 1 is a look: launch's bad-record message must not offer abort-run."""
+    root = fake_repo(tmp_path)
+    train(root)
+    (root / "results/n5_atlantic/control_seed0_h9.csv").write_text("stray")
+    R.abort_eval("control", 0, "stray H9 output", root)
+    touch_kept(root / "models/n5_atlantic/control/seed8_epochs/epoch_13.pt", b"bit rot")
+    with pytest.raises(R.LaunchError, match="guard 4: training records that do not verify: .*restore the exact bytes") as e:
+        train(root)
+    assert "abort-run" not in str(e.value)
+
 def test_a_crashed_evaluation_is_moved_aside_and_the_same_checkpoint_re_evaluated(tmp_path):
     """Item 16, finding 4(b)."""
     root = fake_repo(tmp_path)
