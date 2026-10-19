@@ -11,6 +11,17 @@ worktree. Storm lists and tests come from the checkout this script lives in. A m
 is a failure, never a skip. Every section runs even if an earlier one fails; the exit code is 1 if
 any failed.
 
+Expected protected hashes are never read from a file this checkout (a PR) can change. They come from
+the fenced ```sha256 block under "## Protected hashes (check.py source of truth)" in the main
+checkout's COORDINATOR.md (gitignored, coordinator-owned), or --coordinator-md. The block must list
+exactly PROTECTED_PATHS; anything else, or a missing file or block, is a failure.
+
+Which code is tested: pytest and the evaluate.py smoke run import hurricane_intensity from this
+checkout's src/ (PYTHONPATH), not the venv's editable install, which points at the main checkout; a PR
+that changes src/ is tested with its own code. --e2e stays on the main install, because
+config.PROJECT_ROOT ties the package location to data/ (the HURDAT2 cache, data/processed) and
+check_e2e refuses to run if the two differ. Each section prints the src it imported.
+
 Nothing here writes outside a tempfile.mkdtemp() directory, which is removed at the end.
 """
 from __future__ import annotations
@@ -28,8 +39,18 @@ import traceback
 from pathlib import Path
 
 CHECKOUT_ROOT = Path(__file__).resolve().parents[1]
-HASH_FILE = CHECKOUT_ROOT / "scripts" / "protected_sha256.txt"
+CHECKOUT_SRC = CHECKOUT_ROOT / "src"
 MAIN_SHA = "fbb39c4"  # I6: main == origin/main == this commit, and site/ is unchanged since it
+
+# I1: the protected files (FEATURES.md). Their expected hashes come from COORDINATOR.md, never from this repo.
+PROTECTED_PATHS = [
+    "models/baseline_9kt.pt",
+    "best_model.pt",
+    "results/heldout_predictions.csv",
+    *[f"models/storms/expanded/seed{s}.pt" for s in range(10)],
+    "data/interim/hurdat2_atlantic.txt",
+]
+HASH_HEADING = "## Protected hashes (check.py source of truth)"
 
 # Must be ignored in the main checkout: a root .pt (the existing one and a new one), an ensemble member,
 # and anything under models/ or data/. A missing trailing newline once turned `*.pt` into
@@ -49,12 +70,15 @@ E2E_CASES = [
     # byte for byte the same way on 2026-10-15 (logs/decisions.md, 23:05).
     dict(name="e2e GOES-16 Michael", storm="AL142018", time="2018-10-09T12:00:00Z", bucket="noaa-goes16",
          hurdat2=None, crop="data/processed/AL142018/crops/AL142018_20181009T1200Z.npz"),
-    # F3: Dora, GOES-18, East Pacific, near GOES-18 nadir; training-only for v2. HURDAT2 comes from the
-    # nepac file, fetched into the temp dir: the pipeline's default cache path is the protected Atlantic
-    # file, so force_hurdat2_refresh or a nepac hurdat2_url would overwrite it (I7). Dora crosses the
-    # antimeridian and build_sample_grid interpolates lon linearly, so only the one exact fix is built.
-    # Expected numbers are hc-survey's read of the same scan.
-    dict(name="e2e GOES-18 Dora", storm="EP052023", time="2023-08-06T06:00:00Z", bucket="noaa-goes18",
+    # F3: GOES-18 read/crop regression check. One exact fix of Dora EP052023, near GOES-18 nadir. It is NOT
+    # East Pacific readiness: real EP builds are still blocked by the HURDAT2 cache path (pipeline.py:111)
+    # and the linear longitude interpolation across the antimeridian. Its expected numbers come from
+    # hc-survey's read of the same scan through the same crop code path, so this catches regressions, not
+    # errors shared with that path. n=1; the ensemble result is not evidence of EP skill.
+    # HURDAT2 comes from the nepac file, fetched into the temp dir: the pipeline's default cache path is
+    # the protected Atlantic file, so force_hurdat2_refresh or a nepac hurdat2_url would overwrite it (I7).
+    # Only the one exact fix is built, which avoids the antimeridian interpolation.
+    dict(name="e2e GOES-18 read Dora", storm="EP052023", time="2023-08-06T06:00:00Z", bucket="noaa-goes18",
          hurdat2=("https://www.nhc.noaa.gov/data/hurdat/hurdat2-nepac-1949-2025-092926.txt",
                   "caece626f7038db64a803a73f5985b563693f0130f3ff16b4b0a0a93c7aa0507"),
          key="ABI-L2-CMIPF/2023/218/06/OR_ABI-L2-CMIPF-M6C13_G18_s20232180600203_e20232180609523_c20232180609587.nc",
@@ -86,17 +110,37 @@ def sha256(path):
     return h.hexdigest()
 
 
-def load_expected():
+def load_expected(coordinator_md):
+    """(path, sha256) pairs from the first ```sha256 block after HASH_HEADING in COORDINATOR.md."""
+    coordinator_md = Path(coordinator_md)
+    if not coordinator_md.is_file():
+        raise FileNotFoundError(f"{coordinator_md}: the source of truth for protected hashes is missing")
+    lines = coordinator_md.read_text(encoding="utf-8-sig").splitlines()
+    try:
+        start = next(i for i, l in enumerate(lines) if l.strip() == HASH_HEADING)
+        fence = next(i for i in range(start + 1, len(lines)) if lines[i].strip().startswith("```"))
+        if lines[fence].strip() != "```sha256":
+            raise StopIteration
+        end = next(i for i in range(fence + 1, len(lines)) if lines[i].strip() == "```")
+    except StopIteration:
+        raise AssertionError(f"{coordinator_md} has no ```sha256 block under {HASH_HEADING!r}") from None
     expected = []
-    for line in HASH_FILE.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            digest, rel = line.split(maxsplit=1)
-            expected.append((rel.strip().lstrip("*"), digest))
+    for line in lines[fence + 1:end]:
+        if not line.strip():
+            continue
+        parts = line.split()
+        if len(parts) != 2 or len(parts[0]) != 64 or any(c not in "0123456789abcdef" for c in parts[0]):
+            raise AssertionError(f"{coordinator_md}: malformed hash line {line!r}")
+        expected.append((parts[1].lstrip("*").replace("\\", "/"), parts[0]))
+    paths = [p for p, _ in expected]
+    if sorted(paths) != sorted(PROTECTED_PATHS) or len(set(paths)) != len(paths):
+        raise AssertionError(f"{coordinator_md} lists {sorted(paths)}, expected exactly {sorted(PROTECTED_PATHS)}")
     return expected
 
 
-def check_hashes(main_root):
-    expected = load_expected()
+def check_hashes(main_root, coordinator_md):
+    print(f"expected hashes from: {coordinator_md}")
+    expected = load_expected(coordinator_md)
     bad = []
     for rel, digest in expected:
         path = main_root / rel
@@ -109,8 +153,20 @@ def check_hashes(main_root):
     return f"{len(expected)} protected files match"
 
 
+def checkout_env(**extra):
+    """Environment that makes a subprocess import hurricane_intensity from this checkout's src/."""
+    env = dict(os.environ, PYTHONPATH=str(CHECKOUT_SRC), **extra)
+    r = subprocess.run([sys.executable, "-c", "import hurricane_intensity; print(hurricane_intensity.__file__)"],
+                       env=env, capture_output=True, text=True, check=True)
+    imported = Path(r.stdout.strip()).resolve()
+    print(f"hurricane_intensity imported from: {imported}")
+    if not imported.is_relative_to(CHECKOUT_SRC):
+        raise AssertionError(f"hurricane_intensity resolves to {imported}, not under {CHECKOUT_SRC}")
+    return env
+
+
 def check_pytest(main_root):
-    env = dict(os.environ, HC_MAIN_ROOT=str(main_root))
+    env = checkout_env(HC_MAIN_ROOT=str(main_root))
     r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests"],
                        cwd=CHECKOUT_ROOT, env=env, capture_output=True, text=True)
     print(r.stdout.rstrip())
@@ -131,6 +187,8 @@ def make_fixture(tmp):
 
     from hurricane_intensity import splits
 
+    if not Path(splits.__file__).resolve().is_relative_to(CHECKOUT_SRC):
+        raise AssertionError(f"fixture imported splits from {splits.__file__}, not {CHECKOUT_SRC}")
     fake = "XX991900"
     crops = tmp / "data" / "processed" / fake / "crops"
     crops.mkdir(parents=True)
@@ -173,6 +231,7 @@ def check_smoke(main_root):
     protected_csvs = [main_root / "results" / "heldout_predictions.csv",
                       CHECKOUT_ROOT / "results" / "heldout_predictions.csv"]
     before = {p: (p.stat().st_size, p.stat().st_mtime_ns) for p in protected_csvs if p.exists()}
+    env = checkout_env()
     tmp = Path(tempfile.mkdtemp(prefix="hc_check_"))
     try:
         ckpt, holdout, train, n = make_fixture(tmp)
@@ -182,7 +241,8 @@ def check_smoke(main_root):
                "--train-list", str(train), "--out", str(out)]
         print("cwd:", tmp)
         print("cmd:", subprocess.list2cmdline(cmd))
-        r = subprocess.run(cmd, cwd=tmp, capture_output=True, text=True)
+        print(f"PYTHONPATH={env['PYTHONPATH']}")
+        r = subprocess.run(cmd, cwd=tmp, env=env, capture_output=True, text=True)
         print(r.stdout.rstrip())
         if r.returncode != 0:
             print(r.stderr.rstrip())
@@ -221,7 +281,12 @@ def check_git(main_root):
 
 def check_gitignore(target):
     target = Path(target)
-    missing = []
+    print(f"{target / '.gitignore'}:")
+    raw = (target / ".gitignore").read_bytes()
+    if not raw.endswith(b"\n"):
+        missing = ["(file does not end with a newline; the next appended line joins the last one)"]
+    else:
+        missing = []
     for rel in MUST_BE_IGNORED:
         r = git("check-ignore", "--no-index", "-q", rel, cwd=target, check=False)
         if r.returncode == 1:
@@ -230,8 +295,22 @@ def check_gitignore(target):
             raise RuntimeError(f"git check-ignore {rel} in {target} exited {r.returncode}: {r.stderr.strip()}")
         print(f"  {'ignored    ' if r.returncode == 0 else 'NOT IGNORED'}  {rel}")
     if missing:
-        raise AssertionError(f"{target / '.gitignore'} does not ignore: {missing}")
-    return f"{len(MUST_BE_IGNORED)} paths ignored in {target}"
+        raise AssertionError(f"{target / '.gitignore'} fails: {missing}")
+    return f"{len(MUST_BE_IGNORED)} paths ignored, ends with a newline: {target}"
+
+
+def check_gitignores(main_root):
+    """The PR's own .gitignore and the main checkout's; both must pass."""
+    failed = []
+    for root in dict.fromkeys([CHECKOUT_ROOT, main_root]):
+        try:
+            check_gitignore(root)
+        except AssertionError as e:
+            print(f"  FAIL: {e}")
+            failed.append(str(root))
+    if failed:
+        raise AssertionError(f".gitignore fails in {failed}")
+    return f"{len(MUST_BE_IGNORED)} paths ignored and trailing newline, in the PR checkout and the main checkout"
 
 
 def snapshot(root):
@@ -450,6 +529,7 @@ def main():
     p.add_argument("--repo-root", help="main checkout holding data/, models/ and results/ (default: from git)")
     p.add_argument("--e2e", action="store_true", help="instead of F1, run the E2E_CASES (Michael GOES-16, Dora GOES-18): download, build, predict")
     p.add_argument("--gitignore-target", help="run only the gitignore section, against this repo")
+    p.add_argument("--coordinator-md", help="file holding the protected-hash block (default: <main root>/COORDINATOR.md)")
     args = p.parse_args()
 
     t0 = time.perf_counter()
@@ -458,23 +538,30 @@ def main():
         failed = run_sections([("gitignore", lambda: check_gitignore(args.gitignore_target))])
     else:
         main_root = find_main_root(args.repo_root)
+        coordinator_md = Path(args.coordinator_md).resolve() if args.coordinator_md else main_root / "COORDINATOR.md"
         print(f"checkout:  {CHECKOUT_ROOT}")
         print(f"main root: {main_root}")
         print(f"python:    {sys.executable}")
-        hashes = ("hashes", lambda: check_hashes(main_root))
+        hashes = ("hashes", lambda: check_hashes(main_root, coordinator_md))
         if args.e2e:
+            # --e2e uses the main install: config.PROJECT_ROOT must be the main checkout (see the docstring).
+            import hurricane_intensity
+            print(f"hurricane_intensity imported from: {Path(hurricane_intensity.__file__).resolve()} (main install)")
             sections = [hashes]
             for case in E2E_CASES:
                 sections.append((case["name"], functools.partial(check_e2e, main_root, case)))
-                sections.append((f"hashes after {case['name'].split()[-1]}", lambda: check_hashes(main_root)))
+                sections.append((f"hashes after {case['name'].split()[-1]}",
+                                 lambda: check_hashes(main_root, coordinator_md)))
         else:
+            # F1 tests this checkout's code, in this process too (the smoke fixture reads splits.VAL_LIST).
+            sys.path.insert(0, str(CHECKOUT_SRC))
             sections = [
                 hashes,
                 ("pytest", lambda: check_pytest(main_root)),
                 ("evaluate.py smoke", lambda: check_smoke(main_root)),
-                ("hashes after smoke", lambda: check_hashes(main_root)),
+                ("hashes after smoke", lambda: check_hashes(main_root, coordinator_md)),
                 ("git I3/I6", lambda: check_git(main_root)),
-                ("gitignore", lambda: check_gitignore(main_root)),
+                ("gitignore", lambda: check_gitignores(main_root)),
             ]
         failed = run_sections(sections)
     print(f"\n{'FAIL' if failed else 'PASS'}  total {time.perf_counter() - t0:.1f} s"
