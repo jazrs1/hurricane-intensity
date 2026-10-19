@@ -19,10 +19,11 @@ expanded_seed<s>_h9.csv), for a descriptive, unpaired reproducibility check only
     python scripts/analyze_n5.py --manifest-dir logs/n5_atlantic/runs --out-dir results/n5_atlantic/analysis
         [--frozen-dir results/storms] [--deviations logs/n5_atlantic/deviations.json]
 
---deviations (rule (A), John 2026-10-19 17:03; design.md §14) is an explicit, recorded input, never inferred:
-{"dropped_pairs": [{"seed": <s>, "reason": "<why>"}, ...]}. The named seed pairs (both arms) are left out; the
-report names the deviation, labels the verdict NON-CONFIRMATORY, and states the reduced n and its effect on the
-power of both primaries, recomputed as in power.py (design §5).
+--deviations (rule (A), John 2026-10-19 17:03; design.md §14) is an explicit, recorded input, never inferred: the
+committed, clean file logs/n5_atlantic/deviations.json, {"dropped_pairs": [{"seed": <s>, "reason": "<why>"}, ...]}.
+Only a pair with a run whose training record no longer verifies may be named. Its two runs are left out; the report
+names the deviation and the file's blob SHA-256, labels the verdict NON-CONFIRMATORY, and states the reduced n and
+its effect on the power of both primaries (n = 10: design §5's table; the reduced n: power.py's method).
 
 Writes into --out-dir (refuses to overwrite): primary_tests.csv, sensitivity.csv, per_run.csv, per_arm.csv,
 paired_differences.csv, per_storm.csv, ensemble.csv, val_trace.csv, frozen_vs_control.csv (with --frozen-dir),
@@ -80,7 +81,10 @@ SESOI = {"overall MAE": 0.9, ">96 bias": 3.0}  # kt, power-derived (not a meanin
 SECONDARY = (">96 MAE",)  # alpha 0.05, uncorrected, labelled secondary
 SECONDARY_ALPHA = 0.05
 POWER_SD = {"overall MAE": (0.40, 0.69, 0.85), ">96 bias": (2.03, 2.44, 2.84)}  # design §5 sd_diff rows
-POWER_REPS, POWER_SEED = 2000, 20261018  # power.py's reps per cell and seed
+# design.md §5 tables, n = 10, at the SESOI (0.9 kt / 3.0 kt): the pre-registered power, quoted, not re-simulated
+POWER_N10 = {"overall MAE": {0.40: 1.00, 0.69: 0.89, 0.85: 0.71}, ">96 bias": {2.03: 0.95, 2.44: 0.83, 2.84: 0.71}}
+POWER_REPS, POWER_SEED = 20000, 20261018  # reduced n only; SE <= 0.0036 per cell; power.py's seed
+DEVIATIONS_PATH = "logs/n5_atlantic/deviations.json"  # rule (A): the one place a dropped pair may be named
 UNDERTRAIN_FRACTION = 0.85  # flag: selected checkpoint in the last 15% of steps
 UNDERTRAIN_RUNS = 5  # >= 5/10 runs flagged in either arm -> the result is "budget-limited"
 HIGH = 96  # ">96" means truth > 96 kt, as in scripts/storms_analysis.py
@@ -159,11 +163,12 @@ def signflip_ci(d, alpha, n_grid=4001, n=len(SEEDS)):
     return (float(min(keep)), float(max(keep))) if keep else (np.nan, np.nan)
 
 
-def power_at(n, delta, sd):
+def power_at(n, delta, sd, reps=POWER_REPS):
     """Power of one primary's test (two-sided exact sign-flip, alpha ALPHA) with n paired seeds, under the design's
-    normal model of the per-seed differences (power.py): POWER_REPS draws from a fixed-seed generator."""
-    rng = np.random.default_rng(POWER_SEED)
-    return float(np.mean([signflip_p(rng.normal(delta, sd, n), n) < ALPHA for _ in range(POWER_REPS)]))
+    normal model of the per-seed differences (power.py): reps draws of n differences from a fixed-seed generator."""
+    d = np.random.default_rng(POWER_SEED).normal(delta, sd, (reps, n))
+    p = (np.abs(sign_matrix(n) @ d.T) / n >= np.abs(d.mean(axis=1)) - 1e-12).mean(axis=0)
+    return float((p < ALPHA).mean())
 
 
 def load_deviations(path):
@@ -183,6 +188,31 @@ def load_deviations(path):
     if len(out) > len(SEEDS) - 2:
         raise DesignError(f"{path}: drops {len(out)} of {len(SEEDS)} pairs; fewer than 2 would remain")
     return out
+
+
+def record_fails(manifest_dir, root, arm, seed):
+    """True when this run's training record exists and a file it hashed is missing or changed."""
+    p = Path(manifest_dir) / f"{arm}_seed{seed}.train.json"
+    if not p.is_file():
+        return False
+    files = json.loads(read_text_strict(p)).get("files_sha256", {})
+    return any(not (Path(root) / f).is_file() or sha256_file(Path(root) / f) != h for f, h in files.items())
+
+
+def check_deviations(path, root, manifest_dir, git):
+    """Rule (A)'s input: the committed, clean DEVIATIONS_PATH, naming only pairs with a run whose record fails.
+    Returns ({seed: reason}, the file's blob SHA-256 at HEAD)."""
+    if Path(path).resolve() != (Path(root) / DEVIATIONS_PATH).resolve():
+        raise DesignError(f"--deviations must be {DEVIATIONS_PATH} in the repo, not {path}")
+    if git(["ls-files", "--error-unmatch", DEVIATIONS_PATH], check=False).returncode != 0 or \
+            git(["status", "--porcelain", "--", DEVIATIONS_PATH]).stdout.strip():
+        raise DesignError(f"{DEVIATIONS_PATH} must be committed and unchanged before the analysis runs")
+    dropped = load_deviations(path)
+    healthy = [s for s in dropped if not any(record_fails(manifest_dir, root, arm, s) for arm in ARMS)]
+    if healthy:
+        raise DesignError(f"{DEVIATIONS_PATH}: seeds {healthy} have no run whose training record fails; rule (A) "
+                          "drops only a pair whose kept files can't be restored")
+    return dropped, hashlib.sha256(git(["show", f"HEAD:{DEVIATIONS_PATH}"]).stdout).hexdigest()
 
 
 def unpaired_p(a, b):
@@ -573,7 +603,8 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
     clash = [f for f in OUTPUTS if (out_dir / f).exists()]
     if clash:
         raise DesignError(f"refusing to overwrite {clash} in {out_dir}")
-    dropped = load_deviations(deviations)
+    g = git or real_git(root)
+    dropped, dev_sha = check_deviations(deviations, root, manifest_dir, g) if deviations else ({}, None)
     seeds = [s for s in SEEDS if s not in dropped]
     n = len(seeds)
     runs = {}
@@ -584,7 +615,7 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
                 raise DesignError(f"missing run manifest {p}")
             runs[(arm, s)] = load_run(p, arm, s, design, root)
     commit = single_commit([r["man"] for r in runs.values()])
-    blob_sha, blob_id = verify_self(commit, root, git or real_git(root), check_path=git is None)
+    blob_sha, blob_id = verify_self(commit, root, g, check_path=git is None)
 
     ref = runs[("control", seeds[0])]["d"]
     vecs = {}
@@ -697,14 +728,14 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
 
     deviation = []
     if dropped:
-        cells = {k: [(sd, power_at(len(SEEDS), SESOI[k], sd), power_at(n, SESOI[k], sd)) for sd in POWER_SD[k]]
-                 for k in PRIMARIES}
+        cells = {k: [(sd, POWER_N10[k][sd], power_at(n, SESOI[k], sd)) for sd in POWER_SD[k]] for k in PRIMARIES}
         deviation = [
             f"DEVIATION (rule (A), John 2026-10-19 17:03): seed pairs dropped, both arms: "
             + "; ".join(f"seed {s}: {why}" for s, why in sorted(dropped.items())),
-            f"  The verdict is NON-CONFIRMATORY. n = {n} paired seeds instead of {len(SEEDS)}.",
-            f"  Power at the SESOI, n = {len(SEEDS)} -> {n} (two-sided exact sign-flip, alpha {ALPHA}; normal model, "
-            f"{POWER_REPS} reps, as power.py and design §5):",
+            f"  The verdict is NON-CONFIRMATORY. n = {n} paired seeds instead of {len(SEEDS)}. "
+            f"{DEVIATIONS_PATH} blob sha256 {dev_sha}.",
+            f"  Power at the SESOI, n = {len(SEEDS)} -> {n} (n = {len(SEEDS)}: design §5's table; n = {n}: two-sided "
+            f"exact sign-flip, alpha {ALPHA}, normal model, {POWER_REPS} reps, as power.py):",
             *[f"    {k} ({SESOI[k]} kt): " + ", ".join(f"sd_diff {sd:.2f}: {a:.2f} -> {b:.2f}" for sd, a, b in cells[k])
               for k in PRIMARIES]]
 

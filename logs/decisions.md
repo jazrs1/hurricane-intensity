@@ -2387,31 +2387,41 @@ or evaluation.
   The launch-safety design is now closed. From here, only a concrete
   defect reopens it, not new hypothetical cases. Log further edge-case
   ideas as follow-ups."
-  - Rule (A) in analyze_n5.py. A pair is dropped only through
-    --deviations <file>, an explicit, committed
+  - Rule (A) in analyze_n5.py and run_n5.py. A pair is dropped only
+    through the one committed file logs/n5_atlantic/deviations.json,
     {"dropped_pairs": [{seed, reason}]}, never inferred.
+    - Both `run_n5.py evaluate --deviations` and `analyze_n5.py
+      --deviations` read it. It must be committed (evaluate: identical
+      to HEAD's blob; analysis: clean), and its path is in guard 5e's
+      allowed set.
+    - It may name only a seed with a run whose training record no
+      longer verifies.
+    - evaluate leaves both runs of a named seed out of its checks and
+      its H9 steps and evaluates the rest. So rule (A) completes even
+      when the bad record appears part-way through phase 2
+      (hc-adversary item 17).
   - Both arms of each named seed are left out and the tests run on the
     remaining n. report.txt names the deviation and labels the verdict
-    NON-CONFIRMATORY. primary_tests.csv gets n_pairs, confirmatory and
-    dropped_seeds.
+    NON-CONFIRMATORY and gives the deviations file's blob SHA-256.
+    primary_tests.csv gets n_pairs, confirmatory and dropped_seeds.
   - Power at the SESOI is stated for each design section-5 sd_diff
-    row, at n = 10 and at the reduced n, with power.py's method
-    (two-sided exact sign-flip, alpha 0.025, normal model, 2000 reps,
-    seed 20261018).
+    row. The n = 10 column is section 5's own table, quoted as
+    constants. The reduced n is simulated with power.py's method
+    (two-sided exact sign-flip, alpha 0.025, normal model, seed
+    20261018) at 20000 reps, SE at most 0.0036.
     - One dropped pair (n = 9): overall MAE 0.9 kt goes 1.00 / 0.89 /
-      0.72 -> 1.00 / 0.83 / 0.65; >96 bias 3.0 kt goes 0.95 / 0.86 /
-      0.72 -> 0.91 / 0.78 / 0.64.
-    - At n = 10 these match the design's figures within Monte Carlo
-      error, except the bias row at sd 2.44: 0.86 here vs 0.83 there,
-      because the generator is re-seeded per cell.
+      0.71 -> 1.00 / 0.83 / 0.64; >96 bias 3.0 kt goes 0.95 / 0.83 /
+      0.71 -> 0.91 / 0.78 / 0.64.
 - Launch blobs, SHA-256 of the committed bytes [blob id]:
   - scripts/analyze_n5.py:
-    fd440c5b23a8c29e2c4f3b0f0558ebde0f4495ac3c465fddc509156189e9aa40
-    [12faf5f9]. That is the two constants plus rule (A).
+    0130641583cf09c8abb5791b9ea9467fd6410b953bc8a57c3a2ae68fb3bb1288
+    [679e2169]. That is the two constants plus rule (A) with item 17's
+    fixes.
   - reports/v2_survey/n5/design.md:
-    6d3d45a4be88969683334a11d37026803562c1522523ad25ff68d64266a05d44
-    [39cd7781]. Section 14 has the 16c wording, rule (A) and John's
-    closing note; it is still a pure append against e8e4fc1.
+    334e51f01c841d47b12beed90ede0a966151dddc5ec9e9f29cc66daa34f4a271
+    [49a5d80e]. Section 14 has the 16c wording, rule (A) (with item
+    17's fixes) and John's closing note; it is still a pure append
+    against e8e4fc1.
   - tests/test_analyze_n5.py:
-    7429b6b9854a4c45e5acbfdd49a1c534b3972706c74c042c38f5bdee80994c59
-    [6732d317].
+    fa1c079ff7b97ce26f1d0c9c206cc16030acf9e2234348a787fdaffdbf16e8fb
+    [4d531f39].

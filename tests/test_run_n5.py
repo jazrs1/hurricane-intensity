@@ -124,7 +124,7 @@ def fake_git(root=None, dirty=False, differs_at=(), fetch_rc=0, head=COMMIT, fir
             return SimpleNamespace(stdout="\0".join(names + list(extra_changed)).encode() + b"\0", returncode=0)
         if args[0] == "ls-files":
             return SimpleNamespace(stdout=b"", returncode=1 if args[-1] in untracked else 0)
-        if args[0] == "show" and args[1].endswith(".train.json"):
+        if args[0] == "show" and args[1].endswith((".train.json", "deviations.json")):
             rel = args[1].split(":", 1)[1]
             data = (root / rel).read_bytes() if (root / rel).exists() else b""
             return SimpleNamespace(stdout=data + (b" " if rel in committed_differs else b""), returncode=0)
@@ -231,11 +231,11 @@ def train(root, git=None, runner=None, reval=reval_from_curve, main_root=None, c
     return runner
 
 
-def ev(root, git=None, runner=None, pkg=pkg_in_src):
+def ev(root, git=None, runner=None, pkg=pkg_in_src, deviations=None):
     """Phase 2 (evaluate). Returns (manifests, runner)."""
     runner = runner or FakeRunner(root)
-    return R.evaluate(root, git=git or fake_git(root), main_root=root, check=CHECK, runner=runner,
-                      cuda_ok=lambda: True, child_import=pkg), runner
+    return R.evaluate(root, deviations=deviations, git=git or fake_git(root), main_root=root, check=CHECK,
+                      runner=runner, cuda_ok=lambda: True, child_import=pkg), runner
 
 
 def go(root, git=None, runner=None, **kw):
@@ -938,10 +938,12 @@ def test_evaluate_one_checks_its_eval_attempts_before_the_h9_step(tmp_path, monk
 @pytest.mark.parametrize("extra, ok", [
     (("logs/decisions.md",), True),
     (("reports/decisions/N5.md", "logs/decisions.md"), True),
+    (("logs/n5_atlantic/deviations.json",), True),
     (("logs/decisions.md", "scripts/train.py"), False),
     (("reports/decisions/sub/x.md",), False),
     (("scripts/a b.py",), False),
-], ids=["decisions_md", "decision_records", "code_with_decisions", "nested_doc", "path_with_space"])
+], ids=["decisions_md", "decision_records", "deviations_file", "code_with_decisions", "nested_doc",
+        "path_with_space"])
 def test_phase2_allows_decisions_docs_between_l_and_head(tmp_path, extra, ok):
     """Item 16b, finding 3: `git diff --no-renames -z` (the fake git asserts those flags); docs may change between L
     and HEAD, code may not, and a path with a space is one path."""
@@ -951,9 +953,63 @@ def test_phase2_allows_decisions_docs_between_l_and_head(tmp_path, extra, ok):
     if ok:
         assert len(ev(root, git=git, runner=runner)[0]) == 20
     else:
-        bad = [p for p in extra if not p.startswith(("logs/decisions.md", "reports/decisions/N5"))]
+        bad = [p for p in extra if not p.startswith(("logs/decisions.md", "reports/decisions/N5",
+                                                    "logs/n5_atlantic/deviations.json"))]
         with pytest.raises(R.LaunchError, match=re.escape(f"records and the decisions docs: {bad}")):
             ev(root, git=git, runner=runner)
+
+
+# ---- rule (A) in phase 2 (hc-adversary item 17) ---------------------------------------------------------------------
+def write_deviations(root, rows):
+    (root / A_REAL.DEVIATIONS_PATH).write_text(json.dumps({"dropped_pairs": rows}), encoding="utf-8")
+    return A_REAL.DEVIATIONS_PATH
+
+
+def test_rule_a_completes_when_a_record_breaks_mid_phase2(tmp_path):
+    """Item 17, finding 1, the adversary's sequence: phase 2 stops at order 7; control seed 0 (already evaluated) then
+    loses a kept file. Without a deviations file evaluate refuses everything; with the committed file naming seed 0,
+    the 18 other runs are evaluated and the analysis completes at n = 9, NON-CONFIRMATORY."""
+    root = fake_repo(tmp_path)
+    runner = train(root)
+    runner.eval_fail = {"results/n5_atlantic/atlantic_seed3_h9.csv"}  # order 7
+    with pytest.raises(R.LaunchError, match="evaluation failed: logs/n5_atlantic/atlantic_seed3_eval_h9.log"):
+        ev(root, runner=runner)
+    assert (root / "logs/n5_atlantic/runs/control_seed0.json").exists()
+    touch_kept(root / "models/n5_atlantic/control/seed0_epochs/epoch_13.pt", b"bit rot")
+    runner.eval_fail = set()
+    with pytest.raises(R.LaunchError, match=r"do not verify: \[\('control', 0\)\]; H9 has been looked at"):
+        ev(root, runner=runner)
+    R.abort_eval("atlantic", 3, "evaluation crashed", root)
+    dev = write_deviations(root, [{"seed": 0, "reason": "control seed 0 epoch_13.pt changed after H9; bytes lost"}])
+    n = len(runner.calls)
+    mans, runner = ev(root, runner=runner, deviations=dev)
+    assert sorted((m["arm"], m["seed"]) for m in mans) == sorted((a, s) for _, a, s in R.schedule(range(10)) if s)
+    assert not any("seed0" in c[c.index("--checkpoint") + 1] for c in runner.calls[n:])  # no H9 step for seed 0
+    A = load("analyze_n5_fake_rule_a", root / "scripts" / "analyze_n5.py")
+    res = A.run(root / "logs/n5_atlantic/runs", root / "results/n5_atlantic/analysis", root=root, git=fake_git(root),
+                deviations=root / dev)
+    assert res["n_pairs"] == 9 and res["joint"].startswith("NON-CONFIRMATORY")
+
+
+@pytest.mark.parametrize("case", ["healthy", "untracked", "differs", "other_path"])
+def test_evaluate_refuses_a_deviation_rule_a_does_not_cover(tmp_path, case):
+    """Item 17, finding 2: only a pair with a run whose record fails, named in the committed file at its fixed path."""
+    root = fake_repo(tmp_path)
+    runner = train(root)
+    touch_kept(root / "models/n5_atlantic/control/seed0_epochs/epoch_13.pt", b"bit rot")
+    dev = write_deviations(root, [{"seed": 3 if case == "healthy" else 0, "reason": "x"}])
+    git = fake_git(root, untracked=(dev,) if case == "untracked" else (),
+                   committed_differs=(dev,) if case == "differs" else ())
+    if case == "other_path":
+        (root / "deviations.json").write_text((root / dev).read_text(encoding="utf-8"), encoding="utf-8")
+        dev = "deviations.json"
+    match = {"healthy": r"names seeds \[3\], but none of their runs has a record that fails",
+             "untracked": "must be committed, and identical to its blob at HEAD",
+             "differs": "must be committed, and identical to its blob at HEAD",
+             "other_path": "--deviations must be logs/n5_atlantic/deviations.json"}[case]
+    with pytest.raises(R.LaunchError, match=match):
+        ev(root, git=git, runner=runner, deviations=dev)
+    assert all(is_train(c) for c in runner.calls) and not (root / R.PHASE2_MARKER).exists()
 
 
 def test_abort_eval_takes_a_manifest_that_load_run_refuses(tmp_path):
@@ -1035,7 +1091,8 @@ def test_build_spec_and_plan_run_nothing(capsys, monkeypatch):
     assert out.index("PHASE 1") < out.index("BETWEEN THE PHASES") < out.index("PHASE 2")
     assert "eval:" not in out[:out.index("PHASE 2")]
     for bad in (["abort-run"], ["abort-run", "atlantic", "1"], ["plan", "control", "0"], ["abort-all"],
-                ["evaluate", "--reason", "x"], ["abort-eval", "--reason", "x"], ["abort-all", "control", "0", "--reason", "x"]):
+                ["evaluate", "--reason", "x"], ["abort-eval", "--reason", "x"], ["abort-all", "control", "0", "--reason", "x"],
+                ["launch", "--deviations", "logs/n5_atlantic/deviations.json"]):
         with pytest.raises(SystemExit):
             R.main(bad)
 

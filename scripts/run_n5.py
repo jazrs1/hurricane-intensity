@@ -551,7 +551,7 @@ def records_evidence(root, git, A):
     first_parent(git, launch_commit)
     if git(["merge-base", "--is-ancestor", "HEAD", UPSTREAM], check=False).returncode != 0:
         raise LaunchError(f"guard 5e: HEAD is not pushed to {UPSTREAM}; push the commit with the 20 records first")
-    allowed = {run_paths(arm, s)["record"] for _, arm, s in schedule(A.SEEDS)}
+    allowed = {run_paths(arm, s)["record"] for _, arm, s in schedule(A.SEEDS)} | {A.DEVIATIONS_PATH}
     changed = [p for p in git(["diff", "--no-renames", "-z", "--name-only", launch_commit, "HEAD"]).stdout
                .decode("utf-8").split("\0") if p]
     other = sorted(p for p in changed if p not in allowed and not doc_path(p))
@@ -561,11 +561,37 @@ def records_evidence(root, git, A):
     return launch_commit, recs
 
 
-def evaluate_phase(ctx, root, main_root, runner):
+def deviations_in(root, git, A, path, states):
+    """Rule (A) in phase 2: the committed DEVIATIONS_PATH names the seed pairs left out; each must have a run whose
+    record no longer verifies (hc-adversary item 17). Returns the left-out (arm, seed) runs."""
+    if path is None:
+        return set()
+    if Path(path).as_posix() != A.DEVIATIONS_PATH:
+        raise LaunchError(f"--deviations must be {A.DEVIATIONS_PATH}, not {path}")
+    if git(["ls-files", "--error-unmatch", A.DEVIATIONS_PATH], check=False).returncode != 0 or \
+            git(["show", f"HEAD:{A.DEVIATIONS_PATH}"], check=False).stdout != \
+            (root / A.DEVIATIONS_PATH).read_bytes().replace(b"\r\n", b"\n"):
+        raise LaunchError(f"{A.DEVIATIONS_PATH} must be committed, and identical to its blob at HEAD")
+    try:
+        dropped = A.load_deviations(root / A.DEVIATIONS_PATH)
+    except A.DesignError as e:
+        raise LaunchError(f"phase 2: {e}") from None
+    healthy = [s for s in dropped if all(states[(arm, s)] != "bad_record" for arm in A.ARMS)]
+    if healthy:
+        raise LaunchError(f"phase 2: {A.DEVIATIONS_PATH} names seeds {healthy}, but none of their runs has a record "
+                          "that fails; rule (A) drops only such a pair")
+    return {(arm, s) for s in dropped for arm in A.ARMS}
+
+
+def evaluate_phase(ctx, root, main_root, runner, deviations=None):
     """Condition (b): no H9 evaluation runs until all 20 training runs have finished, AND every training-side check
-    the analysis will apply has passed on all 20 records (hc-adversary item 16)."""
+    the analysis will apply has passed on all 20 records (hc-adversary item 16). Under rule (A) the pairs named in
+    the deviations file are left out of every check and step here, as the analysis leaves them out."""
     A, git, order = ctx["A"], ctx["git"], schedule(ctx["A"].SEEDS)
     states = {(arm, s): run_state(root, arm, s, ctx["expected"]) for _, arm, s in order}
+    skip = deviations_in(root, git, A, deviations, states)
+    order = [(k, arm, s) for k, arm, s in order if (arm, s) not in skip]
+    states = {(arm, s): st for (arm, s), st in states.items() if (arm, s) not in skip}
     bad = [(arm, s) for (arm, s), st in states.items() if st == "bad_record"]
     if bad:
         raise LaunchError(f"phase 2: training records that do not verify: {bad}; " + (
@@ -585,8 +611,9 @@ def evaluate_phase(ctx, root, main_root, runner):
         raise LaunchError(f"phase 2: the records' analysis blob is not HEAD's {ctx['blob_sha']}")
     try:
         A.verify_self(launch_commit, root, git)
-        for (_, arm, s), rec in zip(order, recs):
-            A.check_training(rec, arm, s, ctx["design"], root, run_paths(arm, s)["record"])
+        for (_, arm, s), rec in zip(schedule(A.SEEDS), recs):
+            if (arm, s) not in skip:
+                A.check_training(rec, arm, s, ctx["design"], root, run_paths(arm, s)["record"])
     except A.DesignError as e:
         raise LaunchError(f"phase 2 entry, before any H9 evaluation: {e}") from None
     if not (root / PHASE2_MARKER).exists():
@@ -663,14 +690,15 @@ def launch(root=ROOT, *, git=None, main_root=None, check=None, runner=subprocess
     return records
 
 
-def evaluate(root=ROOT, *, git=None, main_root=None, check=None, runner=subprocess.run, cuda_ok=cuda_available,
-             child_import=child_package_path):
-    """Phase 2 only. The keyword hooks exist for the synthetic tests only; main() exposes none."""
+def evaluate(root=ROOT, *, deviations=None, git=None, main_root=None, check=None, runner=subprocess.run,
+             cuda_ok=cuda_available, child_import=child_package_path):
+    """Phase 2 only. deviations: rule (A)'s committed file (main() passes --deviations). The other keyword hooks
+    exist for the synthetic tests only; main() exposes none."""
     root, git, main_root, check, _ = resolve_hooks(root, git, main_root, check)
     with Lock(root):
         ctx = common_guards(root, git, main_root, check, cuda_ok, child_import)
         print(f"HEAD {ctx['commit']}; analysis blob sha256 {ctx['blob_sha']} (id {ctx['blob_id']})", flush=True)
-        return evaluate_phase(ctx, root, main_root, runner)
+        return evaluate_phase(ctx, root, main_root, runner, deviations)
 
 
 def _abort_one(root, A, arm, seed, reason, kind, keys):
@@ -819,7 +847,10 @@ def main(argv=None):
     ap.add_argument("arm", nargs="?", choices=["control", "atlantic"], help="abort-run and abort-eval only")
     ap.add_argument("seed", nargs="?", type=int, help="abort-run and abort-eval only")
     ap.add_argument("--reason", help="abort stages only: why (recorded in abort.json)")
+    ap.add_argument("--deviations", help="evaluate only: rule (A)'s committed logs/n5_atlantic/deviations.json")
     args = ap.parse_args(argv)
+    if args.deviations and args.stage != "evaluate":
+        ap.error("--deviations is for evaluate only")
     run_args = args.stage in ("abort-run", "abort-eval")
     if (args.arm is not None, args.seed is not None) != (run_args, run_args) or \
             bool(args.reason) != args.stage.startswith("abort-"):
@@ -838,7 +869,7 @@ def main(argv=None):
     elif args.stage == "abort-eval":
         abort_eval(args.arm, args.seed, args.reason)
     elif args.stage == "evaluate":
-        evaluate()
+        evaluate(deviations=args.deviations)
     else:
         launch()
 
