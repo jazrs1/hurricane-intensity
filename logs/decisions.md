@@ -2242,7 +2242,8 @@ No build step, training or evaluation run by this entry.
   epochs, so the pre-registered first minimum over the odd grid stands.
   The manifest records the near tie as odd_grid_near_ties.
 - Hashes, as SHA-256 of `git show <commit>:<path>` bytes (blob id in
-  brackets), before (e8e4fc1) -> after (3d1a0e6):
+  brackets), before (e8e4fc1) -> after (3d1a0e6; the test file at
+  f2a20cb, which added one tie-rule refusal test):
   - reports/v2_survey/n5/design.md:
     c08312358429067522691b761a512538c9e9e9e98ed783d280058e77778ff525
     [4638f3d8] ->
@@ -2256,8 +2257,8 @@ No build step, training or evaluation run by this entry.
   - tests/test_analyze_n5.py:
     343059b8008ed7365fd92dbea07e61ab214660ab5a992d0a3f4aa02d3ad89f38
     [d2d15bde] ->
-    7243e1efc06bc1c5e1437f158a8d7f9a17641a6a8ac9c3856b106c9fcb74943f
-    [9a9888cd]
+    ba7e233b43bc47c6cb611b75e5273d45080a728a751ca7498ef9b760b052f3f4
+    [aa6c5b0c]
 - Notes:
   - The approved draft test file
     (reports/v2_survey/n5/test_analyze_n5.py, d4d1d56b...3cbe) differs
