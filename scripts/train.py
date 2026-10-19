@@ -8,16 +8,16 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision.models import resnet18
 from hurricane_intensity.dataset import TCDataset
-from hurricane_intensity.splits import TRAIN_LIST, VAL_LIST, load_splits
+from hurricane_intensity.splits import load_splits
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--train-list", default=str(TRAIN_LIST),
+parser.add_argument("--train-list", required=True,
                     help="storm list to train on; its validation storms (--val-list) are held out of training")
-parser.add_argument("--val-list", default=str(VAL_LIST),
-                    help="validation storm list; every storm in it must also be in --train-list (default storms_val.txt)")
+parser.add_argument("--val-list", required=True,
+                    help="validation storm list; every storm in it must also be in --train-list")
 parser.add_argument("--seed", type=int, default=None,
                     help="seed python, numpy and torch (weight init and shuffle order); default: unseeded")
-parser.add_argument("--out", default="best_model.pt", help="where to save the best-validation checkpoint")
+parser.add_argument("--out", required=True, help="where to save the best-validation checkpoint")
 parser.add_argument("--epochs", type=int, default=20)
 parser.add_argument("--epoch-dir", default=None,
                     help="also save every epoch's weights here as epoch_NN.pt (diagnostics); default: off")
