@@ -5,6 +5,7 @@ Reads data/processed and the pinned Atlantic HURDAT2 in the main checkout; write
 """
 import hashlib
 import importlib.util
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -61,3 +62,45 @@ def test_frame_list_bytes_survive_checkout():
     r = subprocess.run(["git", "check-attr", "text", "--", "results/n5_atlantic/frame_list_atlantic.txt"],
                        cwd=CHECKOUT, capture_output=True, text=True, check=True)
     assert r.stdout.strip().endswith("text: unset"), r.stdout
+
+
+def test_refuses_an_unpinned_hurdat2(main_root, tmp_path, monkeypatch):
+    monkeypatch.chdir(CHECKOUT)
+    bad = tmp_path / "hurdat2.txt"
+    bad.write_bytes((main_root / "data" / "interim" / "hurdat2_atlantic.txt").read_bytes() + b"x")
+    a = args(main_root, tmp_path / "out.txt")
+    a[a.index("--hurdat2") + 1] = str(bad)
+    with pytest.raises(SystemExit, match="not the pinned Atlantic HURDAT2"):
+        F.main(a)
+
+
+def test_refuses_an_other_basin_storm_from_marcos_year(main_root, tmp_path, monkeypatch):
+    """An East Pacific protected storm from 2020 could share a time with Marco but isn't in the Atlantic file."""
+    for name in (F.TRAIN_LIST, F.VAL_LIST, *F.PROTECTED_LISTS):
+        shutil.copy(CHECKOUT / name, tmp_path / name)
+    with open(tmp_path / "storms_holdout_hep.txt", "a", encoding="utf-8") as f:
+        f.write("\nEP132020\n")
+    monkeypatch.setattr(F, "ROOT", tmp_path)
+    monkeypatch.chdir(CHECKOUT)
+    with pytest.raises(SystemExit, match=r"\['EP132020'\] share Marco's year"):
+        F.main(args(main_root, tmp_path / "out.txt"))
+
+
+def test_exclusions_keep_the_pinned_counts(main_root, monkeypatch):
+    """The regenerated excluded_crops.txt added entries for the 31 new storms only: the control, validation and H9
+    frame sets the analysis pins are unchanged."""
+    from hurricane_intensity.dataset import TCDataset
+    from hurricane_intensity.splits import load_splits
+    monkeypatch.chdir(CHECKOUT)
+    processed = str(main_root / "data" / "processed")
+    ctl, val, _ = load_splits(train_list="storms_train_expanded.txt", val_list="storms_val_expanded.txt")
+    assert len(TCDataset(processed, ctl).df) == A.CONTROL_TRAIN_FRAMES
+    assert len(TCDataset(processed, val).df) == A.VAL_FRAMES
+    h9 = TCDataset(processed, list(A.H9)).df
+    assert h9["atcf_id"].value_counts().to_dict() == A.H9
+    assert A.h9_pin(h9.assign(truth=h9["wind_kt"]).sort_values("crop_path")) == A.H9_PIN
+    entries = (CHECKOUT / "excluded_crops.txt").read_text().splitlines()
+    old = subprocess.run(["git", "show", "e8e4fc1:excluded_crops.txt"], cwd=CHECKOUT, capture_output=True,
+                         check=True).stdout.decode().splitlines()
+    assert [e for e in entries if e in old] == old  # every earlier entry kept, in order
+    assert {e.split("\\")[0] for e in entries if e not in old} <= set(A.NEW_IDS)
