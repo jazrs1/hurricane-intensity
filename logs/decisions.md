@@ -2425,3 +2425,24 @@ or evaluation.
   - tests/test_analyze_n5.py:
     fa1c079ff7b97ce26f1d0c9c206cc16030acf9e2234348a787fdaffdbf16e8fb
     [4d531f39].
+
+2026-10-19, 19:55. N5 Atlantic-only arm: phase 1 (training) done;
+training records committed. No H9 evaluation.
+- Phase 1 ran 19:09:04-19:49:57 EDT in the main checkout, at the launch
+  commit L = 2ce5eb6 (analysis blob 01306415...), after John's yes. EXIT 0.
+- 20 training records, logs/n5_atlantic/runs/<arm>_seed<s>.train.json,
+  committed here byte-identical to the main checkout's files.
+  - Every record has commit 2ce5eb6, analysis blob 01306415..., and
+    protected_before == protected_after.
+  - The coordinator verified that all 170 hashed kept files match and
+    are read-only.
+- Selected epochs, from the records (validation only):
+  - control, matched odd grid, selected (train.py's native) by seed
+    0-9: 25 (24), 23 (24), 21 (18), 15 (15), 23 (24), 23 (23),
+    25 (25), 21 (24), 17 (22), 13 (13). Native is the re-validated
+    argmin, which equals train.py's last 'saved'; the tie rule never
+    fired.
+  - atlantic, native, by seed 0-9: 13, 5, 13, 13, 9, 12, 8, 13, 9, 11.
+- No tie-rule firing, no off-grid primary, no odd-grid near ties, no
+  aborted attempts. No H9 output and no phase2_started.json.
+- Phase 2 not run; awaits John's separate yes.
