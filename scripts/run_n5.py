@@ -1,8 +1,10 @@
-"""N5 driver: the 20 training runs, their H9 evaluations and per-run manifests (reports/v2_survey/n5/design.md §8).
+"""N5 driver: the 20 training runs, their H9 evaluations and per-run manifests (reports/v2_survey/n5/design.md §8 and
+its 2026-10-19 amendment).
 
     python scripts/run_n5.py plan          # print every command of the 20 runs; runs nothing
     python scripts/run_n5.py build-spec    # print the build and exclusion steps (§12.3-4); runs nothing
-    python scripts/run_n5.py launch        # the 20 runs; refuses until PR B has filled analyze_n5's constants
+    python scripts/run_n5.py launch        # phase 1, then phase 2; resumable; refuses until PR B fills the constants
+    python scripts/run_n5.py abort-run ARM SEED --reason TEXT   # move an unfinished run aside (amendment, abort)
 
 launch refuses to start unless:
   1. the tracked tree is clean, and scripts/analyze_n5.py equals its committed blob at HEAD;
@@ -10,17 +12,28 @@ launch refuses to start unless:
      exists with that SHA-256;
   3. analyze_n5.PROTECTED equals the protected block in the main checkout's COORDINATOR.md, and every protected
      file has that hash;
-  4. every output path of all 20 runs is under {models,results,logs}/n5_atlantic/, outside the design's
-     never-written paths, and does not exist.
+  4. every output path of all 20 runs is under {models,results,logs}/n5_atlantic/ and outside the design's
+     never-written paths; no unfinished run has files on disk (abort-run moves them aside); and no H9 output exists
+     while any run is still to be trained;
+  5. after `git fetch origin`, HEAD is an ancestor of origin/phase2-experiments (amendment guard B);
+  6. the checkout is the main checkout, not a worktree, and torch.cuda.is_available() is True (amendment guard C).
 
-Each step is a subprocess with list arguments (no shell); its stdout and stderr go to a log opened in binary, so
-the bytes are written unchanged (UTF-8, no BOM; the child gets PYTHONUTF8=1). The driver writes RUN/START before
-and END (or TRAIN_FAILED) after each training run. The control trains with --epoch-dir; all 25 epochs are then
-re-validated on validation only, the unrounded argmin must equal train.py's own pick (its last "saved"), and the
-first minimum over the odd epochs is the checkpoint evaluated on H9, plus the native one as the pre-registered
-sensitivity. The 12 even-epoch files are deleted after that check; the 13 odd ones are kept until the analysis
-has run. After each run its manifest is checked with analyze_n5's own load_run, and the protected hashes are
-taken again; any mismatch stops the driver.
+Phase 1 trains the 20 runs in the §4 order and evaluates nothing on H9. Each step is a subprocess with list
+arguments (no shell); its stdout and stderr go to a log opened in binary, so the bytes are written unchanged (UTF-8,
+no BOM; the child gets PYTHONUTF8=1). The driver writes RUN/START before and END (or TRAIN_FAILED) after each
+training run. The control trains with --epoch-dir; all 25 epochs are then re-validated on validation only, and the
+selection follows analyze_n5.control_selection: the unrounded argmin must be train.py's own pick (its last "saved"),
+except within the tie window (|d| < TIE_KT), where train.py's saved checkpoint is the one evaluated; otherwise the
+first minimum over the odd epochs is. The 12 even-epoch files are deleted after that check; the 13 odd ones are kept
+until the analysis has run. A finished run gets a training record, logs/n5_atlantic/runs/<arm>_seed<s>.train.json.
+Phase 2 starts only when all 20 training records exist and verify. It evaluates each run's selected checkpoint (and
+the control's native one) on H9, writes the manifest and checks it with analyze_n5's own load_run. The protected
+hashes are taken before and after every step; any mismatch stops the driver.
+
+A failed run stops the driver. Abort procedure (design.md, 2026-10-19 amendment): `abort-run ARM SEED --reason`
+moves that run's files, unchanged, to logs/n5_atlantic/aborted/<arm>_seed<s>_attempt<k>/ and records them with their
+SHA-256s in abort.json there; `launch` then skips the finished runs and restarts that run in its original order
+position with its original seed. abort-run refuses once any H9 output exists, and refuses a finished run.
 """
 import argparse
 import datetime
@@ -38,9 +51,13 @@ HOLDOUT_LIST = "storms_holdout_h9.txt"
 FRAME_LIST = "results/n5_atlantic/frame_list_atlantic.txt"
 BUILD_IDS = "storms_n5_new.txt"
 SELF_ANALYSIS = "scripts/analyze_n5.py"
+UPSTREAM = "origin/phase2-experiments"
+ABORTED = "logs/n5_atlantic/aborted"
 OUTPUT_ROOTS = ("models/n5_atlantic/", "results/n5_atlantic/", "logs/n5_atlantic/")
 NEVER_WRITTEN = ("best_model.pt", "models/baseline_9kt.pt", "results/heldout_predictions.csv", "models/storms/",
                  "results/storms/", "results/ensemble/", "results/final_2025/", "site/")
+TRAIN_KEYS = ("train_log", "native_checkpoint", "epoch_dir", "record")  # phase 1 writes these
+H9_KEYS = ("h9_csv", "eval_log", "native_h9_csv", "native_eval_log", "manifest")  # phase 2 writes these
 
 
 class LaunchError(SystemExit):
@@ -72,7 +89,8 @@ def run_paths(arm, seed):
          "native_checkpoint": f"models/n5_atlantic/{arm}/seed{seed}.pt",
          "h9_csv": f"results/n5_atlantic/{arm}_seed{seed}_h9.csv",
          "eval_log": f"logs/n5_atlantic/{arm}_seed{seed}_eval_h9.log",
-         "manifest": f"logs/n5_atlantic/runs/{arm}_seed{seed}.json"}
+         "manifest": f"logs/n5_atlantic/runs/{arm}_seed{seed}.json",
+         "record": f"logs/n5_atlantic/runs/{arm}_seed{seed}.train.json"}
     if arm == "control":
         p.update(epoch_dir=f"models/n5_atlantic/control/seed{seed}_epochs",
                  native_h9_csv=f"results/n5_atlantic/control_seed{seed}_native_h9.csv",
@@ -113,6 +131,11 @@ def real_git(root):
     def git(args, check=True):
         return subprocess.run(["git", "-C", str(root), *args], capture_output=True, check=check)
     return git
+
+
+def cuda_available():
+    import torch
+    return torch.cuda.is_available()
 
 
 def nvidia_snapshot():
@@ -171,8 +194,45 @@ def planned_outputs(seeds):
     return [v for _, arm, s in schedule(seeds) for v in run_paths(arm, s).values()]
 
 
-def preflight(root, git, main_root, check):
-    """Guards 1-4 (module docstring), in order. Returns what launch needs."""
+def h9_outputs(root, seeds):
+    """Every H9 output (CSV, eval log or manifest) of any run that exists on disk."""
+    return [p[k] for _, arm, s in schedule(seeds) for p in [run_paths(arm, s)] for k in H9_KEYS
+            if k in p and (Path(root) / p[k]).exists()]
+
+
+def aborted_attempts(root, arm, seed):
+    found = Path(root).glob(f"{ABORTED}/{arm}_seed{seed}_attempt*/abort.json")
+    return [f.relative_to(root).as_posix() for f in sorted(found, key=lambda f: int(f.parent.name.rsplit("attempt", 1)[1]))]
+
+
+def verify_record(root, arm, seed, expected):
+    """A training record is valid only while every file it hashed is unchanged and its protected hashes held."""
+    rel = run_paths(arm, seed)["record"]
+    rec = json.loads((Path(root) / rel).read_text(encoding="utf-8"))
+    if (rec.get("arm"), rec.get("seed")) != (arm, seed):
+        raise LaunchError(f"training record {rel} is for {rec.get('arm')} seed {rec.get('seed')}")
+    changed = [f for f, h in rec.get("files_sha256", {}).items()
+               if not (Path(root) / f).is_file() or sha256_file(Path(root) / f) != h]
+    if changed or not rec.get("files_sha256"):
+        raise LaunchError(f"training record {rel}: files missing or changed since training: {changed}")
+    if rec.get("protected_after") != expected:
+        raise LaunchError(f"training record {rel}: protected hashes differ")
+    return rec
+
+
+def run_state(root, arm, seed, expected):
+    """fresh (nothing on disk), partial (files but no record), trained, eval_partial or evaluated."""
+    p = run_paths(arm, seed)
+    if not (Path(root) / p["record"]).exists():
+        return "partial" if any((Path(root) / v).exists() for v in p.values()) else "fresh"
+    verify_record(root, arm, seed, expected)
+    if (Path(root) / p["manifest"]).exists():
+        return "evaluated"
+    return "eval_partial" if any((Path(root) / p[k]).exists() for k in H9_KEYS if k in p) else "trained"
+
+
+def preflight(root, git, main_root, check, cuda_ok):
+    """Guards 1-6 (module docstring), in order. Returns what launch needs."""
     if git(["status", "--porcelain", "--untracked-files=no"]).stdout.strip():
         raise LaunchError("guard 1: the tracked tree has uncommitted changes; launch from a clean commit")
     if git(["diff", "--quiet", "HEAD", "--", SELF_ANALYSIS], check=False).returncode != 0:
@@ -191,11 +251,25 @@ def preflight(root, git, main_root, check):
     actual = protected_now(main_root, expected)
     if actual != expected:
         raise LaunchError(f"guard 3: protected files differ: {sorted(k for k in expected if actual[k] != expected[k])}")
-    outputs = planned_outputs(A.SEEDS)
-    check_output_paths(outputs)
-    existing = [p for p in outputs if (root / p).exists()]
-    if existing:
-        raise LaunchError(f"guard 4: refusing to overwrite existing outputs: {existing[:5]}{' ...' if len(existing) > 5 else ''}")
+    check_output_paths(planned_outputs(A.SEEDS))
+    states = {(arm, s): run_state(root, arm, s, expected) for _, arm, s in schedule(A.SEEDS)}
+    partial = [v for (arm, s), st in states.items() if st == "partial"
+               for v in run_paths(arm, s).values() if (root / v).exists()]
+    if partial:
+        raise LaunchError(f"guard 4: unfinished runs have files on disk: {partial[:5]}{' ...' if len(partial) > 5 else ''}"
+                          "; move each run aside with `run_n5.py abort-run ARM SEED --reason ...`")
+    looked = h9_outputs(root, A.SEEDS)
+    if looked and any(st == "fresh" for st in states.values()):
+        raise LaunchError(f"guard 4: H9 outputs exist while runs remain to be trained: {looked[:3]}; no training "
+                          "may follow an H9 evaluation (2026-10-19 amendment, condition (b))")
+    if git(["fetch", "origin"], check=False).returncode != 0:
+        raise LaunchError("guard 5: git fetch origin failed; can't check the launch commit against the remote")
+    if git(["merge-base", "--is-ancestor", "HEAD", UPSTREAM], check=False).returncode != 0:
+        raise LaunchError(f"guard 5: HEAD is not an ancestor of {UPSTREAM}; launch only from a merged commit")
+    if Path(root).resolve() != Path(main_root).resolve() or not (Path(root) / ".git").is_dir():
+        raise LaunchError(f"guard 6: {root} is not the main checkout {main_root} (a worktree has a .git file)")
+    if not cuda_ok():
+        raise LaunchError("guard 6: torch.cuda.is_available() is False; the runs need the GPU")
     commit = git(["rev-parse", "HEAD"]).stdout.decode().strip()
     blob = git(["show", f"{commit}:{SELF_ANALYSIS}"]).stdout
     blob_id = git(["rev-parse", f"{commit}:{SELF_ANALYSIS}"]).stdout.decode().strip()
@@ -212,6 +286,11 @@ def child_env():
 def write_line(f, text):
     f.write((text + "\n").encode("utf-8"))
     f.flush()
+
+
+def write_json_new(path, obj):
+    with open(path, "x", encoding="utf-8", newline="\n") as f:
+        f.write(json.dumps(obj, indent=1) + "\n")
 
 
 def run_step(runner, cmd, log_path, root, header=None):
@@ -231,12 +310,16 @@ def evaluate(runner, py, root, checkpoint, train_list, out, log):
         raise LaunchError(f"evaluation failed: {log}")
 
 
-def one_run(order, arm, seed, ctx, root, main_root, runner, revalidate_fn, snapshot):
+def train_one(order, arm, seed, ctx, root, main_root, runner, revalidate_fn, snapshot):
+    """Phase 1 for one run: train, re-validate and select (control), write the training record. No H9."""
     A, design, py = ctx["A"], ctx["design"], sys.executable
     p = run_paths(arm, seed)
     existing = [v for v in p.values() if (root / v).exists()]
     if existing:
         raise LaunchError(f"refusing to overwrite {existing}")
+    looked = h9_outputs(root, A.SEEDS)
+    if looked:
+        raise LaunchError(f"phase 1: H9 outputs exist ({looked[:3]}); no training may follow an H9 evaluation")
     before = protected_now(main_root, ctx["expected"])
     if before != ctx["expected"]:
         raise LaunchError(f"protected hashes differ before {arm} seed {seed}")
@@ -254,28 +337,52 @@ def one_run(order, arm, seed, ctx, root, main_root, runner, revalidate_fn, snaps
         raise LaunchError(f"training failed: {p['train_log']}")
     ep, native_epoch = A.parse_train_log(log, arm, seed, design)
 
-    man = {"arm": arm, "seed": seed, "order": order, "commit": ctx["commit"],
+    rec = {"arm": arm, "seed": seed, "order": order, "commit": ctx["commit"],
            "analysis_blob_sha256": ctx["blob_sha"], "analysis_blob_id": ctx["blob_id"],
            "train_list": design["train_lists"][arm], "frame_list_sha256": design["frame_list_sha"][arm],
            "train_log": p["train_log"], "native_checkpoint": p["native_checkpoint"],
-           "h9_csv": p["h9_csv"], "eval_log": p["eval_log"]}
+           "aborted_attempts": aborted_attempts(root, arm, seed)}
+    kept = [p["train_log"], p["native_checkpoint"]]
     if arm == "control":
         reval = revalidate_fn(root / p["epoch_dir"], A.CONTROL_EPOCHS, design["train_lists"][arm])
         logged = {e: va for e, _, va in ep}
         if sorted(reval) != list(range(1, A.CONTROL_EPOCHS + 1)) or \
                 any(abs(round(v, 2) - logged[e]) > 0.0051 for e, v in reval.items()):
             raise LaunchError(f"control seed {seed}: re-validated values do not round to the logged ones")
-        if min(reval, key=lambda e: (reval[e], e)) != native_epoch:
-            raise LaunchError(f"control seed {seed}: re-validation minimum is not train.py's pick (epoch "
-                              f"{native_epoch}); the re-validation path does not reproduce training")
-        sel = min(A.CONTROL_GRID, key=lambda e: (reval[e], e))
+        try:
+            sel, tie = A.control_selection(reval, native_epoch)
+        except A.DesignError as e:
+            raise LaunchError(f"control seed {seed}: {e}") from None
         for e in range(2, A.CONTROL_EPOCHS + 1, 2):  # even epochs are not candidates; odd ones stay for the analysis
             (root / p["epoch_dir"] / f"epoch_{e:02d}.pt").unlink()
-        man.update(selected_epoch=sel, selected_checkpoint=f"{p['epoch_dir']}/epoch_{sel:02d}.pt",
-                   val_mae_revalidated={str(e): reval[e] for e in sorted(reval)},
-                   native_h9_csv=p["native_h9_csv"], native_eval_log=p["native_eval_log"])
+        kept += [f"{p['epoch_dir']}/epoch_{e:02d}.pt" for e in A.CONTROL_GRID]
+        selected = p["native_checkpoint"] if tie else f"{p['epoch_dir']}/epoch_{sel:02d}.pt"
+        rec.update(selected_epoch=sel, selected_checkpoint=selected, tie_rule=tie,
+                   odd_grid_near_ties=sorted(e for e in A.CONTROL_GRID
+                                             if e != sel and abs(reval[e] - reval[sel]) < A.TIE_KT),
+                   val_mae_revalidated={str(e): reval[e] for e in sorted(reval)})
     else:
-        man.update(selected_epoch=native_epoch, selected_checkpoint=p["native_checkpoint"])
+        rec.update(selected_epoch=native_epoch, selected_checkpoint=p["native_checkpoint"])
+    rec["files_sha256"] = {f: sha256_file(root / f) for f in kept}
+    rec["protected_before"] = before
+    rec["protected_after"] = protected_now(main_root, ctx["expected"])
+    if rec["protected_after"] != ctx["expected"]:
+        changed = sorted(k for k, v in ctx["expected"].items() if rec["protected_after"][k] != v)
+        raise LaunchError(f"protected hashes changed during {arm} seed {seed}: {changed}")
+    write_json_new(root / p["record"], rec)
+    print(f"order {order}: {arm} seed {seed} trained; selected epoch {rec['selected_epoch']} (native {native_epoch})"
+          + (f"; tie rule fired {tie}" if rec.get("tie_rule") else ""), flush=True)
+    return rec
+
+
+def evaluate_one(order, arm, seed, ctx, root, main_root, runner):
+    """Phase 2 for one run: H9 evaluation of the recorded selection (and the control's native), then the manifest."""
+    A, design, py = ctx["A"], ctx["design"], sys.executable
+    p = run_paths(arm, seed)
+    man = verify_record(root, arm, seed, ctx["expected"])
+    man.update(h9_csv=p["h9_csv"], eval_log=p["eval_log"])
+    if arm == "control":
+        man.update(native_h9_csv=p["native_h9_csv"], native_eval_log=p["native_eval_log"])
     evaluate(runner, py, root, man["selected_checkpoint"], man["train_list"], p["h9_csv"], p["eval_log"])
     if arm == "control":
         evaluate(runner, py, root, p["native_checkpoint"], man["train_list"], p["native_h9_csv"], p["native_eval_log"])
@@ -283,29 +390,93 @@ def one_run(order, arm, seed, ctx, root, main_root, runner, revalidate_fn, snaps
               "native_eval_log"):
         if k in man:
             man[f"{k}_sha256"] = sha256_file(root / man[k])
-    man["protected_before"] = before
-    man["protected_after"] = protected_now(main_root, ctx["expected"])
-    with open(root / p["manifest"], "x", encoding="utf-8", newline="\n") as f:
-        f.write(json.dumps(man, indent=1) + "\n")
-    if man["protected_after"] != ctx["expected"]:
-        raise LaunchError(f"protected hashes changed during {arm} seed {seed}")
+    man["protected_after_eval"] = protected_now(main_root, ctx["expected"])
+    write_json_new(root / p["manifest"], man)
+    if man["protected_after_eval"] != ctx["expected"]:
+        raise LaunchError(f"protected hashes changed during the H9 evaluation of {arm} seed {seed}")
     A.load_run(root / p["manifest"], arm, seed, design, root)  # the analysis's own linkage checks, now
-    print(f"order {order}: {arm} seed {seed} done; selected epoch {man['selected_epoch']} (native {native_epoch})",
-          flush=True)
+    print(f"order {order}: {arm} seed {seed} evaluated on H9", flush=True)
     return man
 
 
+def train_phase(ctx, root, main_root, runner, revalidate_fn, snapshot):
+    for order, arm, s in schedule(ctx["A"].SEEDS):
+        if run_state(root, arm, s, ctx["expected"]) in ("trained", "eval_partial", "evaluated"):
+            print(f"order {order}: {arm} seed {s} already trained; skipped", flush=True)
+            continue
+        train_one(order, arm, s, ctx, root, main_root, runner, revalidate_fn, snapshot)
+
+
+def evaluate_phase(ctx, root, main_root, runner):
+    """Condition (b): no H9 evaluation runs until every one of the 20 training runs has a verified record."""
+    order = schedule(ctx["A"].SEEDS)
+    states = {(arm, s): run_state(root, arm, s, ctx["expected"]) for _, arm, s in order}
+    unfinished = [(k, arm, s) for k, arm, s in order if states[(arm, s)] not in ("trained", "evaluated")]
+    if unfinished:
+        raise LaunchError(f"phase 2: H9 evaluation refuses to start until all {len(order)} training runs have "
+                          f"finished; unfinished: {unfinished}")
+    half = [(arm, s) for (arm, s), st in states.items() if st == "eval_partial"]
+    if half:
+        raise LaunchError(f"phase 2: H9 outputs without a manifest for {half}; inspect them before evaluating again")
+    mans = []
+    for k, arm, s in order:
+        if states[(arm, s)] == "evaluated":
+            ctx["A"].load_run(root / run_paths(arm, s)["manifest"], arm, s, ctx["design"], root)
+            mans.append(json.loads((root / run_paths(arm, s)["manifest"]).read_text(encoding="utf-8")))
+            print(f"order {k}: {arm} seed {s} already evaluated; skipped", flush=True)
+        else:
+            mans.append(evaluate_one(k, arm, s, ctx, root, main_root, runner))
+    return mans
+
+
 def launch(root=ROOT, *, git=None, main_root=None, check=None, runner=subprocess.run, revalidate_fn=revalidate,
-           snapshot=nvidia_snapshot):
-    """The 20 runs. The keyword hooks exist for the synthetic tests only; main() exposes none."""
+           snapshot=nvidia_snapshot, cuda_ok=cuda_available):
+    """Phase 1 (all 20 trainings), then phase 2 (H9). The keyword hooks exist for the synthetic tests only; main()
+    exposes none."""
     root = Path(root)
     git = git or real_git(root)
     check = check or load_module("check", root / "scripts" / "check.py")
     main_root = Path(main_root) if main_root else check.find_main_root(None)
-    ctx = preflight(root, git, main_root, check)
+    ctx = preflight(root, git, main_root, check, cuda_ok)
     print(f"commit {ctx['commit']}; analysis blob sha256 {ctx['blob_sha']} (id {ctx['blob_id']})", flush=True)
-    return [one_run(order, arm, s, ctx, root, main_root, runner, revalidate_fn, snapshot)
-            for order, arm, s in schedule(ctx["A"].SEEDS)]
+    train_phase(ctx, root, main_root, runner, revalidate_fn, snapshot)
+    return evaluate_phase(ctx, root, main_root, runner)
+
+
+def abort_run(arm, seed, reason, root=ROOT):
+    """Move an unfinished run's files aside, unchanged and hashed, so launch restarts it in its order position."""
+    root = Path(root)
+    A = analysis(root)
+    order = {(a, s): k for k, a, s in schedule(A.SEEDS)}
+    if (arm, seed) not in order or not reason:
+        raise LaunchError(f"abort-run: unknown run {arm} seed {seed}, or no --reason")
+    looked = h9_outputs(root, A.SEEDS)
+    if looked:
+        raise LaunchError(f"abort-run: H9 outputs exist ({looked[:3]}); no run may be aborted after an H9 evaluation")
+    p = run_paths(arm, seed)
+    if (root / p["record"]).exists():
+        raise LaunchError(f"abort-run: {arm} seed {seed} has a training record; finished runs are not aborted")
+    present = [p[k] for k in TRAIN_KEYS if k in p and (root / p[k]).exists()]
+    if not present:
+        raise LaunchError(f"abort-run: {arm} seed {seed} has no files to move")
+    attempt = len(list(root.glob(f"{ABORTED}/{arm}_seed{seed}_attempt*"))) + 1
+    dest_rel = f"{ABORTED}/{arm}_seed{seed}_attempt{attempt}"
+    check_output_paths([dest_rel + "/"])
+    (root / dest_rel).mkdir(parents=True)
+    moved = {}
+    for rel in present:
+        src = root / rel
+        files = [src] if src.is_file() else sorted(f for f in src.rglob("*") if f.is_file())
+        for f in files:
+            r = f.relative_to(root).as_posix()
+            moved[r] = {"to": f"{dest_rel}/{r}", "sha256": sha256_file(f)}
+        (root / dest_rel / rel).parent.mkdir(parents=True, exist_ok=True)
+        os.rename(src, root / dest_rel / rel)
+    write_json_new(root / dest_rel / "abort.json", {"arm": arm, "seed": seed, "order": order[(arm, seed)],
+                                                    "attempt": attempt, "reason": reason, "time": now_iso(),
+                                                    "moved": moved})
+    print(f"aborted {arm} seed {seed} (order {order[(arm, seed)]}, attempt {attempt}): {len(moved)} files -> {dest_rel}")
+    return dest_rel
 
 
 def plan(root=ROOT):
@@ -313,15 +484,22 @@ def plan(root=ROOT):
     epochs = {"control": A.CONTROL_EPOCHS,
               "atlantic": A.epochs_for(A.ARM_TRAIN_FRAMES)[0] if A.ARM_TRAIN_FRAMES else "<epochs_for(ARM_TRAIN_FRAMES)>"}
     py = "PY"
+    print("PHASE 1: the 20 trainings; no H9 evaluation")
     for order, arm, s in schedule(A.SEEDS):
         p = run_paths(arm, s)
         print(f"order {order}: {arm} seed {s}")
         print("  train:", train_cmd(py, arm, s, A.TRAIN_LISTS, epochs), "->", p["train_log"])
         if arm == "control":
-            print("  re-validate all epochs on", VAL_LIST, "only; argmin must equal the last 'saved'; select the first "
-                  "minimum over", list(A.CONTROL_GRID))
-            print("  eval:", eval_cmd(py, f"{p['epoch_dir']}/epoch_<NN>.pt", A.TRAIN_LISTS[arm], p["h9_csv"]),
-                  "->", p["eval_log"])
+            print("  re-validate all epochs on", VAL_LIST, "only; analyze_n5.control_selection: argmin must be the last "
+                  f"'saved' (tie window {A.TIE_KT} kt: train.py's checkpoint), else the first minimum over",
+                  list(A.CONTROL_GRID))
+        print("  record:", p["record"])
+    print("PHASE 2: only after all 20 training records verify")
+    for order, arm, s in schedule(A.SEEDS):
+        p = run_paths(arm, s)
+        print(f"order {order}: {arm} seed {s}")
+        if arm == "control":
+            print("  eval:", eval_cmd(py, "<selected_checkpoint>", A.TRAIN_LISTS[arm], p["h9_csv"]), "->", p["eval_log"])
             print("  native:", eval_cmd(py, p["native_checkpoint"], A.TRAIN_LISTS[arm], p["native_h9_csv"]),
                   "->", p["native_eval_log"])
         else:
@@ -345,14 +523,22 @@ def build_spec():
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("stage", choices=["plan", "build-spec", "launch"])
+    ap.add_argument("stage", choices=["plan", "build-spec", "launch", "abort-run"])
+    ap.add_argument("arm", nargs="?", choices=["control", "atlantic"], help="abort-run only")
+    ap.add_argument("seed", nargs="?", type=int, help="abort-run only")
+    ap.add_argument("--reason", help="abort-run only: why the run is aborted (recorded)")
     args = ap.parse_args(argv)
+    given = (args.arm is not None, args.seed is not None, bool(args.reason))
+    if given != ((args.stage == "abort-run"),) * 3:
+        ap.error("abort-run takes ARM SEED --reason TEXT; the other stages take none of them")
     os.chdir(ROOT)
     sys.path.insert(0, str(ROOT / "src"))
     if args.stage == "plan":
         plan()
     elif args.stage == "build-spec":
         build_spec()
+    elif args.stage == "abort-run":
+        abort_run(args.arm, args.seed, args.reason)
     else:
         launch()
 

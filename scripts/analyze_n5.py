@@ -62,6 +62,7 @@ TRAIN_LISTS = {"control": "storms_train_expanded.txt", "atlantic": "storms_train
 CONTROL_TRAIN_FRAMES = 2081
 CONTROL_EPOCHS = 25
 CONTROL_GRID = tuple(range(1, CONTROL_EPOCHS + 1, 2))  # primary: control re-selected on odd epochs (13 candidates)
+TIE_KT = 1e-4  # 2026-10-19 amendment (a): re-validation argmin != train.py's pick is a tie only when |d| < TIE_KT kt
 ARM_TRAIN_FRAMES = None  # filled from the build (post-exclusion, post-Marco frame list), before hashing
 FRAME_LIST_SHA256 = None  # SHA-256 of results/n5_atlantic/frame_list_atlantic.txt, filled with ARM_TRAIN_FRAMES
 BATCH = 32
@@ -280,6 +281,21 @@ def check_eval_log(path, checkpoint, csv_rel, d):
                           f"{csv_rel} ({d['abs_error'].mean():.3f}): CSV and log are not from the same evaluation")
 
 
+def control_selection(reval, native_epoch):
+    """(selected epoch, tie record or None) for the control (2026-10-19 amendment, condition (a)). The unrounded
+    re-validation argmin must be train.py's pick (its last 'saved'). When it is not, but the two differ by less than
+    TIE_KT, the tie rule fires: the checkpoint train.py saved (seed<s>.pt) is the one evaluated, never a re-ranked
+    one. Otherwise the selection is the first minimum over the odd epochs (the matched grid)."""
+    argmin = min(reval, key=lambda e: (reval[e], e))
+    if argmin == native_epoch:
+        return min(CONTROL_GRID, key=lambda e: (reval[e], e)), None
+    delta = reval[native_epoch] - reval[argmin]
+    if not abs(delta) < TIE_KT:
+        raise DesignError(f"re-validation minimum is not train.py's native selection (epoch {native_epoch}): the "
+                          "re-validation path does not reproduce training")
+    return native_epoch, {"revalidated_argmin": argmin, "native_epoch": native_epoch, "delta_kt": delta}
+
+
 def pinned_paths(arm, seed):
     """Every manifest path is fixed by arm and seed (design §8); nothing may point elsewhere."""
     p = {"train_log": f"logs/n5_atlantic/{arm}_seed{seed}.log",
@@ -327,13 +343,21 @@ def load_run(manifest_path, arm, seed, design, root):
         logged = {e: va for e, _, va in ep}
         if sorted(reval) != list(range(1, CONTROL_EPOCHS + 1)) or                 any(abs(round(v, 2) - logged[e]) > 0.0051 for e, v in reval.items()):
             raise DesignError(f"{manifest_path}: re-validated values missing or inconsistent with the train log")
-        if min(reval, key=lambda e: (reval[e], e)) != native_epoch:
-            raise DesignError(f"{manifest_path}: re-validation minimum is not train.py's native selection "
-                              f"(epoch {native_epoch}): the re-validation path does not reproduce training")
-        sel = min(CONTROL_GRID, key=lambda e: (reval[e], e))
-        want = f"models/n5_atlantic/control/seed{seed}_epochs/epoch_{sel:02d}.pt"
+        try:
+            sel, tie = control_selection(reval, native_epoch)
+        except DesignError as e:
+            raise DesignError(f"{manifest_path}: {e}") from None
+        if "tie_rule" not in man:
+            raise DesignError(f"{manifest_path}: no tie_rule field (2026-10-19 amendment); null when it did not fire")
+        core = ("revalidated_argmin", "native_epoch")
+        got = None if man["tie_rule"] is None else {k: man["tie_rule"].get(k) for k in core}
+        if got != (None if tie is None else {k: tie[k] for k in core}):
+            raise DesignError(f"{manifest_path}: tie_rule {man['tie_rule']} does not match the re-validated values "
+                              f"({tie})")
+        want = man["native_checkpoint"] if tie else f"models/n5_atlantic/control/seed{seed}_epochs/epoch_{sel:02d}.pt"
         if man.get("selected_epoch") != sel or Path(man["selected_checkpoint"]).as_posix() != want:
-            raise DesignError(f"{manifest_path}: selected checkpoint is not the validation minimum on the odd-epoch grid")
+            raise DesignError(f"{manifest_path}: selected checkpoint is not the validation minimum on the odd-epoch grid"
+                              " (or, when the tie rule fired, train.py's own saved checkpoint)")
     else:
         sel = native_epoch
         if man.get("selected_epoch") != sel or man["selected_checkpoint"] != man["native_checkpoint"]:
@@ -589,6 +613,8 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
         f"JOINT VERDICT: {joint}",
         f"Under-training flag (selected step in the last 15%): control {under['control']}/10, "
         f"atlantic {under['atlantic']}/10",
+        f"Tie rule (2026-10-19 amendment, |d| < {TIE_KT} kt; train.py's own checkpoint evaluated): control seeds "
+        f"{[s for (arm, s), r in runs.items() if arm == 'control' and r['man']['tie_rule']] or 'none'}",
         "SENSITIVITY (pre-registered; control at its native 25-epoch selection; does not change the verdict):",
         *[prow(r) for r in sens.values()],
         "SECONDARY (alpha 0.05, uncorrected):",

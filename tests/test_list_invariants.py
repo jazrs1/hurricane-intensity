@@ -53,8 +53,9 @@ LIST_ROLES = {
     "storms_test_2025.txt": "test_spent",  # blocked in TCDataset (SPENT_2025)
     "storms_gradcam.txt": "analysis",  # Grad-CAM survey of held-out storms; never trained on
     "storms_n5_new.txt": "build",  # build_batch.py --ids-file for the 31 N5 storms; inside a train list
+    "2021_storms.txt": "example",  # build_batch.py's docstring example; UTF-16 LE, so no list test reads it
 }
-ROLES = {"train", "val", "heldout", "heldout_sealed", "test_spent", "analysis", "build"}
+ROLES = {"train", "val", "heldout", "heldout_sealed", "test_spent", "analysis", "build", "example"}
 
 
 def ids(root, name):
@@ -68,6 +69,10 @@ def alias_closed(storms):
 
 def repo_lists(pattern):
     return sorted(p.name for p in Path(__file__).resolve().parents[1].glob(pattern))
+
+
+def storm_lists():
+    return sorted(set(repo_lists("storms_*.txt")) | set(repo_lists("*_storms.txt")))
 
 
 def train_lists():
@@ -170,9 +175,9 @@ def test_no_2026_processed_dir(main_root):
 
 # ---- list-role registry -------------------------------------------------------------------------------------
 def test_every_list_has_a_role(checkout_root):
-    unclassified = sorted(set(repo_lists("storms_*.txt")) - set(LIST_ROLES))
+    unclassified = sorted(set(storm_lists()) - set(LIST_ROLES))
     assert not unclassified, f"add these to LIST_ROLES in {__file__}: {unclassified}"
-    assert not sorted(set(LIST_ROLES) - set(repo_lists("storms_*.txt"))), "LIST_ROLES names lists that don't exist"
+    assert not sorted(set(LIST_ROLES) - set(storm_lists())), "LIST_ROLES names lists that don't exist"
     assert set(LIST_ROLES.values()) <= ROLES
 
 

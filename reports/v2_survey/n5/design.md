@@ -425,3 +425,58 @@ manifest:           logs/n5_atlantic/runs/<arm>_seed<s>.json
 - The synthetic tests (`tests/test_analyze_n5.py`, adapted from the n5 draft's tests).
 - **Never included:** `reports/v2_survey/n5/__pycache__/` or `n5/synthetic/`. The `__pycache__` folder came from earlier pytest runs; tests now run with `-B`.
 - **Before any build,** the PR goes back to hc-adversary and John (§12 step 0).
+
+## 14. Amendment, 2026-10-19 (John): tie rule and abort
+
+This section amends §4, §8 and §9. The text above is unchanged; where they disagree, this section applies. John's decision, verbatim:
+
+> "ASK A: approved with two conditions.
+> (a) Tie rule: when it fires, the checkpoint train.py actually saved is the one evaluated on H9, never a post-hoc choice; this applies to both arms, including the control's matched-grid re-selection.
+> (b) Abort: no H9 evaluation runs until all 20 training runs have finished, so an abort can never follow a look at held-out results; restarted runs keep their original seed and run-order position.
+> Record both as a dated amendment in decisions.md with the new design.md and analyze_n5.py hashes, in PR B, before launch."
+
+**Why a tie rule.** Re-validating on the GPU can differ from train.py's in-training validation in the last digits. If two epochs are within that noise, the §4 check "the unrounded re-validation minimum equals train.py's pick" would stop a valid run.
+
+**(a) Tie rule.** It is implemented once, in `analyze_n5.control_selection`, and both `run_n5.py` and the analysis call it.
+- **When it fires:** the unrounded re-validation minimum over all 25 control epochs is not train.py's pick (its last `saved`), and the two differ by less than `TIE_KT` = 1e-4 kt. All 25 re-validated values must still round to the logged ones (the §4 check, unchanged).
+- **What is evaluated:** train.py's own `models/n5_atlantic/control/seed<s>.pt` becomes the primary's checkpoint. `selected_epoch` is train.py's epoch, whether it is odd or even. The re-validated values never re-rank the epochs once the rule has fired.
+- **What is recorded:** the manifest field `tie_rule` holds `{revalidated_argmin, native_epoch, delta_kt}` when the rule fired, and `null` otherwise.
+- **What the analysis refuses:**
+  - a control manifest without `tie_rule`;
+  - a `tie_rule` that does not match the re-validated values;
+  - a selected checkpoint other than train.py's when the rule fired.
+
+  `report.txt` lists the seeds for which it fired.
+- **Outside the window** (|d| ≥ 1e-4 kt), the driver stops and the analysis refuses, as before.
+- **Atlantic arm:** there is no re-validation. Its evaluated checkpoint is always train.py's own (§4), so the rule holds by construction.
+- **Odd-grid near ties, open for John.** Sometimes train.py's pick is reproduced, but two odd epochs are within `TIE_KT` of each other. train.py never chose between odd epochs: it saved every epoch file, and its `saved` line only marks running minima over all 25. In that case the pre-registered first minimum over the odd grid stands, and the manifest records the other epochs as `odd_grid_near_ties`.
+
+**(b) Two phases.** `run_n5.py launch` runs them in order.
+- **Phase 1** trains the 20 runs in the §4 order. It evaluates nothing on H9.
+  - After each run it re-validates and selects (control), then deletes the even epoch files.
+  - It then writes a training record, `logs/n5_atlantic/runs/<arm>_seed<s>.train.json`. The record holds the selection, `tie_rule`, the SHA-256 of every file kept (train log, native checkpoint, the 13 odd epoch files) and the protected hashes before and after.
+  - A run whose protected hashes change gets no record.
+  - Phase 1 refuses to train while any H9 output (CSV, eval log or manifest) exists. It checks at launch and again before each run.
+- **Phase 2** starts only when all 20 training records exist and verify: every file is unchanged and the protected hashes held. Then, in the §4 order, it:
+  - evaluates each run's selected checkpoint on H9, plus the control's native one;
+  - writes the §8 manifest, which is the record plus the H9 files and their SHA-256s;
+  - checks it with `load_run`.
+
+**Resuming.** `launch` is resumable. Runs that already have a valid record (or manifest) are skipped. Any other run whose files are on disk is refused until it has been aborted.
+
+**Abort procedure (b).**
+1. **When to abort:** a run fails (`TRAIN_FAILED`, a refused re-validation, a protected-hash change or a crash). The driver stops.
+2. **Move it aside:** `python scripts/run_n5.py abort-run <arm> <seed> --reason "<why>"`. This moves that run's files, unchanged, to `logs/n5_atlantic/aborted/<arm>_seed<s>_attempt<k>/` (same relative paths). It writes `abort.json` there with the arm, seed, order, attempt, reason, time and every moved file's SHA-256.
+3. **Restart:** run `python scripts/run_n5.py launch` again. The finished runs are skipped. The aborted run is trained again with the **same seed, in the same order position**, at the pinned paths, which are empty again because its files were moved.
+   - Its record and manifest list `aborted_attempts`, the paths of its `abort.json` files.
+   - The original attempt is kept, not deleted.
+4. **What `abort-run` refuses:**
+   - any run once **any** H9 output exists, so an abort can never follow a look at held-out results;
+   - a run with a training record, because finished runs are not aborted;
+   - a run with no files.
+
+**Guards added to `launch`, both approved by John:**
+- **Guard 5 (B):** `git fetch origin`, then HEAD must be an ancestor of `origin/phase2-experiments`. The analysis blob SHA-256 is printed at launch.
+- **Guard 6 (C):** the checkout must be the main checkout (its `.git` is a directory, not a worktree's file), and `torch.cuda.is_available()` must be True.
+
+**Hashes.** The SHA-256 of the committed `design.md`, `scripts/analyze_n5.py` and `tests/test_analyze_n5.py` blobs, before and after this amendment, are recorded in `logs/decisions.md` (2026-10-19 entry).

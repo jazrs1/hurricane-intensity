@@ -71,6 +71,7 @@ def val_curve(arm, seed, shift=None):
 def fake_repo(tmp_path, filled=True, frame_list_ok=True, protected_drift=False):
     root = tmp_path / "repo"
     (root / "scripts").mkdir(parents=True)
+    (root / ".git").mkdir()  # the main checkout has a .git directory; a worktree has a .git file
     prot = {}
     for i, rel in enumerate(CHECK.PROTECTED_PATHS):
         p = root / rel
@@ -95,8 +96,14 @@ def fake_repo(tmp_path, filled=True, frame_list_ok=True, protected_drift=False):
     return root
 
 
-def fake_git(dirty=False, differs=False):
+def fake_git(dirty=False, differs=False, fetch_rc=0, ancestor_rc=0):
     def git(args, check=True):
+        if args[0] == "fetch":
+            assert args == ["fetch", "origin"]
+            return SimpleNamespace(stdout=b"", returncode=fetch_rc)
+        if args[0] == "merge-base":
+            assert args == ["merge-base", "--is-ancestor", "HEAD", "origin/phase2-experiments"]
+            return SimpleNamespace(stdout=b"", returncode=ancestor_rc)
         if args[0] == "status":
             return SimpleNamespace(stdout=b" M scripts/train.py\n" if dirty else b"", returncode=0)
         if args[0] == "diff":
@@ -114,20 +121,27 @@ def fake_git(dirty=False, differs=False):
 class FakeRunner:
     """Stands in for subprocess.run on train.py and evaluate.py: writes their stdout lines and output files."""
 
-    def __init__(self, root, train_rc=0, on_train=None):
-        self.root, self.train_rc, self.on_train, self.calls = root, train_rc, on_train, []
+    def __init__(self, root, train_rc=0, on_train=None, fail=None):
+        self.root, self.train_rc, self.on_train, self.fail, self.calls = root, train_rc, on_train, fail, []
 
     def __call__(self, cmd, stdout, stderr, cwd, env):
         assert Path(cwd) == self.root and env["PYTHONUTF8"] == "1" and stderr is subprocess.STDOUT
         self.calls.append(cmd)
         args = dict(zip(cmd[3::2], cmd[4::2])) if cmd[2] == "scripts/train.py" else dict(zip(cmd[2::2], cmd[3::2]))
-        out = (self.train(args) if cmd[2] == "scripts/train.py" else self.evaluate(args)) if cmd[1] != "x" else ""
+        rc = self.train_rc if cmd[2] == "scripts/train.py" else 0
+        if cmd[2] == "scripts/train.py" and self.fail == (self.arm_of(args), int(args["--seed"])):
+            rc = 1
+        out = (self.train(args, rc) if cmd[2] == "scripts/train.py" else self.evaluate(args)) if cmd[1] != "x" else ""
         stdout.write(out.encode("utf-8"))
-        return SimpleNamespace(returncode=self.train_rc if cmd[2] == "scripts/train.py" else 0)
+        return SimpleNamespace(returncode=rc)
 
-    def train(self, a):
+    @staticmethod
+    def arm_of(a):
+        return "atlantic" if a["--train-list"] == "storms_train_n5_atlantic.txt" else "control"
+
+    def train(self, a, rc):
         assert a["--val-list"] == "storms_val_expanded.txt" and a["--loss"] == "l1"
-        arm = "atlantic" if a["--train-list"] == "storms_train_n5_atlantic.txt" else "control"
+        arm = self.arm_of(a)
         seed, epochs = int(a["--seed"]), int(a["--epochs"])
         ids = A_REAL.ARM_IDS if arm == "atlantic" else A_REAL.CONTROL_IDS
         frames = ARM_FRAMES if arm == "atlantic" else A_REAL.CONTROL_TRAIN_FRAMES
@@ -138,7 +152,7 @@ class FakeRunner:
         lines.append(f"train samples: {frames}  val samples: {A_REAL.VAL_FRAMES}")
         if self.on_train:
             self.on_train(arm, seed)
-        if self.train_rc:
+        if rc:
             return "\n".join(lines + ["Traceback (most recent call last):"]) + "\n"
         val, best = val_curve(arm, seed), np.inf
         for e in range(1, epochs + 1):
@@ -175,10 +189,14 @@ def reval_from_curve(epoch_dir, epochs, train_list):
     return val_curve("control", seed)
 
 
-def go(root, git=None, runner=None, reval=reval_from_curve):
+def go(root, git=None, runner=None, reval=reval_from_curve, main_root=None, cuda=True):
     runner = runner or FakeRunner(root)
-    return R.launch(root, git=git or fake_git(), main_root=root, check=CHECK, runner=runner, revalidate_fn=reval,
-                    snapshot=lambda: "gpu 40 C"), runner
+    return R.launch(root, git=git or fake_git(), main_root=main_root or root, check=CHECK, runner=runner,
+                    revalidate_fn=reval, snapshot=lambda: "gpu 40 C", cuda_ok=lambda: cuda), runner
+
+
+def is_train(cmd):
+    return cmd[2] == "scripts/train.py"
 
 
 # ---- commands and order -------------------------------------------------------------------------------------
@@ -266,12 +284,18 @@ def test_refuses_any_existing_output(tmp_path):
 
 
 # ---- the runs -----------------------------------------------------------------------------------------------
-def test_launch_end_to_end_and_the_analysis_accepts_it(tmp_path):
+def test_launch_end_to_end_and_the_analysis_accepts_it(tmp_path, capsys):
     root = fake_repo(tmp_path)
     mans, runner = go(root)
+    assert f"analysis blob sha256 {hashlib.sha256(b'blob bytes' + bytes([10])).hexdigest()}" in capsys.readouterr().out
     assert [(m["order"], m["arm"], m["seed"]) for m in mans] == R.schedule(range(10))
     scripts = [c[2] if c[1] == "-u" else c[1] for c in runner.calls]
     assert set(scripts) == {"scripts/train.py", "scripts/evaluate.py"} and len(runner.calls) == 50
+    # condition (b): all 20 trainings, in the schedule's order, before the first H9 evaluation
+    assert [is_train(c) for c in runner.calls] == [True] * 20 + [False] * 30
+    assert [(FakeRunner.arm_of(dict(zip(c[3::2], c[4::2]))), int(c[c.index("--seed") + 1])) for c in runner.calls[:20]] \
+        == [(a, s) for _, a, s in R.schedule(range(10))]
+    assert all(m["tie_rule"] is None for m in mans if m["arm"] == "control")
     for m in mans:
         log = (root / m["train_log"]).read_bytes()
         assert log.startswith(b"RUN arm=") and b"\r" not in log and not log.startswith(b"\xef\xbb\xbf")
@@ -304,10 +328,10 @@ def test_revalidation_that_misses_train_py_pick_stops(tmp_path, monkeypatch):
     def moved(epoch_dir, epochs, train_list):
         return {**flat, 14: 8.0012}  # 14 still rounds to 8.00, but 16 (8.0010) is now the minimum
 
-    with pytest.raises(R.LaunchError, match="re-validation minimum is not train.py's pick"):
-        go(root, reval=moved)
+    with pytest.raises(R.LaunchError, match="re-validation minimum is not train.py's native selection"):
+        go(root, reval=moved)  # |d| = 2e-4 kt: outside the tie window
     assert len(list((root / "models/n5_atlantic/control/seed0_epochs").iterdir())) == 25  # nothing deleted
-    assert not (root / "logs/n5_atlantic/runs/control_seed0.json").exists()
+    assert not (root / "logs/n5_atlantic/runs/control_seed0.train.json").exists()
 
 
 def test_revalidation_that_does_not_round_to_the_log_stops(tmp_path):
@@ -335,11 +359,10 @@ def test_protected_file_changed_during_a_run_stops(tmp_path):
         if (arm, seed) == ("atlantic", 0):
             (root / "results/heldout_predictions.csv").write_bytes(b"overwritten")
 
-    with pytest.raises(R.LaunchError, match="protected hashes changed during atlantic seed 0"):
+    with pytest.raises(R.LaunchError, match=r"protected hashes changed during atlantic seed 0: "
+                                            r"\['results/heldout_predictions.csv'\]"):
         go(root, runner=FakeRunner(root, on_train=tamper))
-    man = json.loads((root / "logs/n5_atlantic/runs/atlantic_seed0.json").read_text(encoding="utf-8"))
-    assert man["protected_after"]["results/heldout_predictions.csv"] != man["protected_before"][
-        "results/heldout_predictions.csv"]
+    assert not (root / "logs/n5_atlantic/runs/atlantic_seed0.train.json").exists()  # no record: the run is unfinished
 
 
 def test_driver_refuses_an_output_that_appears_mid_launch(tmp_path):
@@ -354,6 +377,152 @@ def test_driver_refuses_an_output_that_appears_mid_launch(tmp_path):
         go(root, runner=FakeRunner(root, on_train=plant))
 
 
+# ---- 2026-10-19 amendment, guards B and C --------------------------------------------------------------------
+@pytest.mark.parametrize("git, match", [(fake_git(fetch_rc=1), "guard 5: git fetch origin failed"),
+                                        (fake_git(ancestor_rc=1), "guard 5: HEAD is not an ancestor of "
+                                                                  "origin/phase2-experiments")],
+                         ids=["fetch_fails", "not_ancestor"])
+def test_refuses_a_commit_not_on_the_remote_branch(tmp_path, git, match):
+    with pytest.raises(R.LaunchError, match=match):
+        go(fake_repo(tmp_path), git=git)
+
+
+def test_refuses_a_worktree_or_another_checkout(tmp_path):
+    root = fake_repo(tmp_path / "a")
+    (root / ".git").rmdir()
+    (root / ".git").write_text("gitdir: C:/elsewhere/.git/worktrees/wt\n")  # what a worktree has
+    with pytest.raises(R.LaunchError, match="guard 6: .* is not the main checkout"):
+        go(root)
+    other = fake_repo(tmp_path / "b")  # same protected bytes, so guards 1-5 pass; but it isn't the main checkout
+    with pytest.raises(R.LaunchError, match="guard 6: .* is not the main checkout"):
+        go(other, main_root=fake_repo(tmp_path / "c"))
+
+
+def test_refuses_without_cuda(tmp_path):
+    with pytest.raises(R.LaunchError, match=r"guard 6: torch.cuda.is_available\(\) is False"):
+        go(fake_repo(tmp_path), cuda=False)
+
+
+# ---- 2026-10-19 amendment, condition (b): the phase split and the abort procedure ------------------------------
+def train_calls(runner):
+    return [(FakeRunner.arm_of(dict(zip(c[3::2], c[4::2]))), int(c[c.index("--seed") + 1])) for c in runner.calls
+            if is_train(c)]
+
+
+@pytest.mark.parametrize("fail", [("atlantic", 1), ("control", 9)], ids=["order3", "order20"])
+def test_phase2_refuses_while_any_training_run_is_unfinished(tmp_path, fail):
+    root = fake_repo(tmp_path)
+    ctx = R.preflight(root, fake_git(), root, CHECK, lambda: True)
+    runner = FakeRunner(root, fail=fail)
+    with pytest.raises(R.LaunchError, match="training failed"):
+        R.train_phase(ctx, root, root, runner, reval_from_curve, lambda: "gpu 40 C")
+    k = {(a, s): k for k, a, s in R.schedule(range(10))}[fail]
+    with pytest.raises(R.LaunchError, match=r"phase 2: H9 evaluation refuses to start until all 20 training runs have "
+                                            rf"finished; unfinished: \[\({k}, '{fail[0]}', {fail[1]}\)"):
+        R.evaluate_phase(ctx, root, root, runner)
+    assert all(is_train(c) for c in runner.calls) and R.h9_outputs(root, range(10)) == []
+
+
+def test_training_never_follows_an_h9_output(tmp_path):
+    root = fake_repo(tmp_path)
+    with pytest.raises(R.LaunchError, match="training failed"):
+        go(root, runner=FakeRunner(root, fail=("atlantic", 1)))
+    R.abort_run("atlantic", 1, "planted failure", root)
+    (root / "results/n5_atlantic/control_seed0_h9.csv").write_text("looked")
+    with pytest.raises(R.LaunchError, match=r"guard 4: H9 outputs exist while runs remain to be trained"):
+        go(root)
+
+
+def test_an_h9_output_planted_mid_phase1_stops_training(tmp_path):
+    root = fake_repo(tmp_path)
+
+    def plant(arm, seed):
+        if (arm, seed) == ("atlantic", 0):  # order 2; order 1 (control seed 0) has its record by now
+            (root / "results/n5_atlantic/control_seed0_h9.csv").write_text("looked")
+
+    runner = FakeRunner(root, on_train=plant)
+    with pytest.raises(R.LaunchError, match="phase 1: H9 outputs exist"):
+        go(root, runner=runner)
+    assert train_calls(runner) == [("control", 0), ("atlantic", 0)]
+
+
+def test_abort_then_restart_keeps_seed_and_order_and_records_the_attempt(tmp_path):
+    root = fake_repo(tmp_path)
+    with pytest.raises(R.LaunchError, match="training failed: logs/n5_atlantic/atlantic_seed1.log"):
+        go(root, runner=FakeRunner(root, fail=("atlantic", 1)))
+    with pytest.raises(R.LaunchError, match="guard 4: unfinished runs have files on disk: .*atlantic_seed1.log.*abort-run"):
+        go(root)
+    failed = (root / "logs/n5_atlantic/atlantic_seed1.log").read_bytes()
+    dest = R.abort_run("atlantic", 1, "planted training failure", root)
+    assert dest == "logs/n5_atlantic/aborted/atlantic_seed1_attempt1"
+    ab = json.loads((root / dest / "abort.json").read_text(encoding="utf-8"))
+    assert (ab["arm"], ab["seed"], ab["order"], ab["attempt"]) == ("atlantic", 1, 3, 1)
+    assert ab["moved"] == {"logs/n5_atlantic/atlantic_seed1.log": {
+        "to": f"{dest}/logs/n5_atlantic/atlantic_seed1.log", "sha256": hashlib.sha256(failed).hexdigest()}}
+    assert (root / dest / "logs/n5_atlantic/atlantic_seed1.log").read_bytes() == failed  # kept, unchanged
+    mans, runner = go(root)
+    assert train_calls(runner) == [(a, s) for k, a, s in R.schedule(range(10)) if k >= 3]  # resumes at order 3
+    m = next(m for m in mans if (m["arm"], m["seed"]) == ("atlantic", 1))
+    assert (m["order"], m["seed"], m["aborted_attempts"]) == (3, 1, [f"{dest}/abort.json"])
+    assert (root / m["train_log"]).read_bytes().startswith(b"RUN arm=atlantic seed=1 order=3 ")
+    A = load("analyze_n5_fake_abort", root / "scripts" / "analyze_n5.py")
+    assert len(A.run(root / "logs/n5_atlantic/runs", root / "results/n5_atlantic/analysis", root=root,
+                     git=fake_git())["per_run"]) == 20
+
+
+def test_abort_run_refusals(tmp_path):
+    root = fake_repo(tmp_path)
+    with pytest.raises(R.LaunchError, match="no files to move"):
+        R.abort_run("control", 0, "nothing there", root)
+    with pytest.raises(R.LaunchError, match="training failed"):
+        go(root, runner=FakeRunner(root, fail=("atlantic", 1)))
+    with pytest.raises(R.LaunchError, match="has a training record; finished runs are not aborted"):
+        R.abort_run("control", 0, "finished", root)
+    (root / "results/n5_atlantic/control_seed0_h9.csv").write_text("looked")
+    with pytest.raises(R.LaunchError, match="no run may be aborted after an H9 evaluation"):
+        R.abort_run("atlantic", 1, "after a look", root)
+    assert (root / "logs/n5_atlantic/atlantic_seed1.log").exists() and not (root / R.ABORTED).exists()
+
+
+# ---- 2026-10-19 amendment, condition (a): the tie rule ---------------------------------------------------------
+@pytest.mark.parametrize("native, other", [(14, 16), (13, 15)], ids=["even_native", "odd_native"])
+def test_tie_rule_evaluates_the_checkpoint_train_py_saved(tmp_path, monkeypatch, native, other):
+    """train.py saved `native` (logged 8.00); re-validation puts `other` (also 8.00) 5e-5 kt below it, inside the
+    tie window. For every seed the evaluated checkpoint is train.py's own seed<s>.pt. In the odd case two odd epochs
+    tie (13, 15): the matched grid's first minimum alone would have taken 15; the tie rule takes 13."""
+    root = fake_repo(tmp_path)
+    flat = {e: 8.2 + 0.01 * e for e in range(1, 26)}
+    flat.update({native: 7.9990, other: 8.0010})
+    monkeypatch.setitem(globals(), "val_curve", lambda arm, seed: dict(flat) if arm == "control" else
+                        {e: 8.0 + 0.02 * (e - 8) ** 2 + 0.001 * seed for e in range(1, 14)})
+    mans, runner = go(root, reval=lambda epoch_dir, epochs, train_list: {**flat, native: 8.00105})
+    ctl = [m for m in mans if m["arm"] == "control"]
+    for m in ctl:
+        assert (m["selected_epoch"], m["selected_checkpoint"]) == (native, m["native_checkpoint"])
+        assert m["tie_rule"] == {"revalidated_argmin": other, "native_epoch": native,
+                                 "delta_kt": pytest.approx(5e-5)}
+    primary_evals = [c[c.index("--checkpoint") + 1] for c in runner.calls if c[-1].endswith(("control_seed0_h9.csv",))]
+    assert primary_evals == ["models/n5_atlantic/control/seed0.pt"]
+    A = load("analyze_n5_fake_tie", root / "scripts" / "analyze_n5.py")
+    A.run(root / "logs/n5_atlantic/runs", root / "results/n5_atlantic/analysis", root=root, git=fake_git())
+    report = (root / "results/n5_atlantic/analysis/report.txt").read_text(encoding="utf-8")
+    assert f"control seeds {list(range(10))}" in report
+
+
+def test_odd_grid_near_tie_is_recorded_and_the_first_minimum_stands(tmp_path, monkeypatch):
+    """No disagreement with train.py (its pick, 14, is the re-validated argmin), but odd epochs 13 and 15 are within
+    TIE_KT of each other. train.py never chose between them, so the pre-registered first minimum over the odd grid
+    (15) stands, and the near tie is recorded for the reader."""
+    root = fake_repo(tmp_path)
+    flat = {e: 8.2 + 0.01 * e for e in range(1, 26)}
+    flat.update({14: 7.9900, 13: 8.00105, 15: 8.0010})
+    monkeypatch.setitem(globals(), "val_curve", lambda arm, seed: dict(flat) if arm == "control" else
+                        {e: 8.0 + 0.02 * (e - 8) ** 2 + 0.001 * seed for e in range(1, 14)})
+    mans, _ = go(root, reval=lambda epoch_dir, epochs, train_list: dict(flat))
+    for m in (m for m in mans if m["arm"] == "control"):
+        assert (m["selected_epoch"], m["tie_rule"], m["odd_grid_near_ties"]) == (15, None, [13])
+
+
 # ---- spec stages and the protected copy ---------------------------------------------------------------------
 def test_build_spec_and_plan_run_nothing(capsys, monkeypatch):
     monkeypatch.chdir(CHECKOUT)
@@ -363,7 +532,11 @@ def test_build_spec_and_plan_run_nothing(capsys, monkeypatch):
     assert "never --force-hurdat2-refresh or --hurdat2-url" in out
     R.main(["plan"])
     out = capsys.readouterr().out
-    assert out.count("order ") == 20 and "<epochs_for(ARM_TRAIN_FRAMES)>" in out
+    assert out.count("order ") == 40 and "<epochs_for(ARM_TRAIN_FRAMES)>" in out
+    assert out.index("PHASE 1") < out.index("PHASE 2") and "eval:" not in out[:out.index("PHASE 2")]
+    for bad in (["abort-run"], ["abort-run", "atlantic", "1"], ["plan", "control", "0"]):
+        with pytest.raises(SystemExit):
+            R.main(bad)
 
 
 def test_analysis_protected_copy_equals_the_coordinator_block(main_root):
