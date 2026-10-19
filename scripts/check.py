@@ -377,7 +377,9 @@ def run_sections(sections):
             msg = fn()
             ok = True
         except Exception as e:
+            sys.stdout.flush()
             traceback.print_exc()
+            sys.stderr.flush()
             msg = str(e).splitlines()[0] if str(e) else type(e).__name__
             ok = False
         dt = time.perf_counter() - t
