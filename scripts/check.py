@@ -374,6 +374,15 @@ def remove_tree(path):
     return f"{path} still exists after rmtree" if Path(path).exists() else None
 
 
+def warn_stale_e2e_dirs():
+    """hc_e2e_* dirs already in the temp dir: an earlier run was killed before its finally (a hard kill or os._exit).
+    Reported as a WARNING, not a failure, so they are visible; this run never touches them."""
+    stale = sorted(Path(tempfile.gettempdir()).glob("hc_e2e_*"))
+    for p in stale:
+        print(f"WARNING: stale e2e temp dir from an earlier run: {p}")
+    return stale
+
+
 def snapshot(root):
     """path -> (size, mtime_ns) for every file under root."""
     out = {}
@@ -624,6 +633,7 @@ def main():
             # --e2e uses the main install: config.PROJECT_ROOT must be the main checkout (see the docstring).
             import hurricane_intensity
             print(f"hurricane_intensity imported from: {Path(hurricane_intensity.__file__).resolve()} (main install)")
+            warn_stale_e2e_dirs()
             sections = [hashes]
             for case in E2E_CASES:
                 sections.append((case["name"], functools.partial(check_e2e, main_root, case)))

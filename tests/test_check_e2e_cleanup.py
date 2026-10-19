@@ -8,6 +8,7 @@ no real models.
 import functools
 import hashlib
 import importlib.util
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -46,7 +47,10 @@ def env(tmp_path, monkeypatch, member):
     cache = main / "data" / "interim" / "hurdat2_atlantic.txt"
     cache.write_text("stub cache\n")
     (main / "models").mkdir()
-    shutil.copy(member, main / "models" / "seed0.pt")
+    try:  # a hard link: one 45 MB member per module, not one copy per test (pytest keeps 3 basetemps)
+        os.link(member, main / "models" / "seed0.pt")
+    except OSError:
+        shutil.copy(member, main / "models" / "seed0.pt")
     digest = hashlib.sha256((main / "models" / "seed0.pt").read_bytes()).hexdigest()
     (main / CHECK.MEMBERS_SHA).parent.mkdir(parents=True)
     (main / CHECK.MEMBERS_SHA).write_text(f"{digest}  models/seed0.pt\n" * 2)  # two members, so a spread prints
@@ -155,3 +159,20 @@ def test_cleanup_failure_does_not_mask_the_case_error(env, monkeypatch, capsys):
     finally:
         for p in Path(tmpdir).glob("hc_e2e_*"):
             real_rmtree(p)
+
+
+def test_stale_dirs_from_a_killed_run_are_reported_not_failed(tmp_path, monkeypatch, capsys):
+    """A hard kill skips the finally; the next --e2e lists what it left as a WARNING and leaves it alone."""
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    (tmp_path / "hc_e2e_killed").mkdir()
+    (tmp_path / "hc_check_other").mkdir()
+    assert CHECK.warn_stale_e2e_dirs() == [tmp_path / "hc_e2e_killed"]
+    out = capsys.readouterr().out
+    assert f"WARNING: stale e2e temp dir from an earlier run: {tmp_path / 'hc_e2e_killed'}" in out
+    assert "hc_check_other" not in out and (tmp_path / "hc_e2e_killed").is_dir()
+
+
+def test_main_e2e_calls_the_stale_dir_report():
+    src = (Path(__file__).resolve().parents[1] / "scripts" / "check.py").read_text(encoding="utf-8")
+    e2e_branch = src[src.index("if args.e2e:"):src.index("for case in E2E_CASES:")]
+    assert "warn_stale_e2e_dirs()" in e2e_branch
