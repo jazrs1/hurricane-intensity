@@ -2255,7 +2255,7 @@ No build step, training or evaluation run by this entry.
       verifies. It restarts with the same seed in the same order
       position.
     - abort-all: every run, before any H9 output, so all 20 restart
-      from a fix commit. This is item 16 option (i), pending John.
+      from a fix commit (John's decision 2 below).
     - abort-eval: a crashed H9 evaluation. The same checkpoint is
       re-evaluated.
     No abort is allowed after any H9 output, except abort-eval.
@@ -2269,40 +2269,39 @@ No build step, training or evaluation run by this entry.
       available.
     - seed<s>.pt must hold the same tensors as epoch_<native>.pt.
     - The epoch directory must resolve inside ROOT.
-- Open for John:
-  - Two matched-grid cases. Both are implemented as below until he
-    decides.
-    - Even native epoch: when the tie rule fires and train.py's pick
-      is an even epoch, that seed's primary evaluates train.py's
-      checkpoint, which is off the odd grid, so it isn't grid-matched
-      for that seed. The alternative keeps the grid and takes the
-      re-validated first minimum, which re-ranks on re-validated
-      values.
-    - Odd-grid near ties: two odd epochs within TIE_KT of each other
-      while train.py's pick is reproduced. train.py never chose between
-      odd epochs, so the pre-registered first minimum over the odd grid
-      stands. The manifest records the near tie as odd_grid_near_ties.
-  - After a fix commit: (i) abort-all and restart all 20 (implemented),
-    or (ii) relax the single-commit rule to "identical analyze_n5.py,
-    train.py, evaluate.py and src/hurricane_intensity/" (item 16).
+- Decided by John, 2026-10-19 15:48 (relayed by the coordinator),
+  verbatim: "1. Even-epoch tie: (i), evaluate train.py's own
+  checkpoint, marked off-grid. 2. Fix-commit restart: (i), restart all
+  20 from the fix commit, only before any H9 output exists. 3.
+  Odd-epoch near tie: keep the first minimum and record it."
+  - 1: when the tie rule fires on an even native epoch, that seed's
+    primary is train.py's checkpoint, off the odd grid. The manifest
+    sets off_grid_primary; the analysis verifies it; report.txt lists
+    the seed as an "off-grid primary".
+  - 2: abort-all, legal only while no H9 output exists; launch from the
+    fix commit then retrains all 20 in the original order.
+  - 3: two odd epochs within TIE_KT while train.py's pick is
+    reproduced: the pre-registered first minimum over the odd grid
+    stands; odd_grid_near_ties (against the odd-grid minimum) is
+    recorded, verified and reported.
 - Hashes, as SHA-256 of `git show <commit>:<path>` bytes (blob id in
   brackets), before (e8e4fc1) -> after (the PR #12 commit that records
   them):
   - reports/v2_survey/n5/design.md:
     c08312358429067522691b761a512538c9e9e9e98ed783d280058e77778ff525
     [4638f3d8] ->
-    096ea748e721f3ba9ce3d3ccecc13a5c459438825b54de8ad69e66ac08e1557c
-    [be4c3939]
+    a6e11b3763d9bba78e98de6444877d6f5259d0e68a37a1861f57909a43de0017
+    [6eee3a47]
   - scripts/analyze_n5.py:
     cc9083cabcc48ec442d3ca8c24bdb1347d33edc859117a5a6aa51f14d98ee6dc
     [5692d6d3] ->
-    b35dce769367200d8bcf8e4096a0f51ec2ab3a3fc4710f15d60163c680f8676b
-    [9b51fdfc]
+    2a70bf187beace35023e46572e0c2caec1433edd1bb75465759e2971c6147a82
+    [97a8dd2f]
   - tests/test_analyze_n5.py:
     343059b8008ed7365fd92dbea07e61ab214660ab5a992d0a3f4aa02d3ad89f38
     [d2d15bde] ->
-    15a231ddfb96b0bc5ed80a8f85c3152c8a77376d979a22c13d8a342bb41cef88
-    [ad24797b]
+    b10aaaabd84e088660e31a57e038cdd36c61a61a5c7f9f2815316b8171b5addb
+    [64c95e95]
 - Notes:
   - The approved draft test file
     (reports/v2_survey/n5/test_analyze_n5.py, d4d1d56b...3cbe) differs
@@ -2314,7 +2313,7 @@ No build step, training or evaluation run by this entry.
     approved" docstring. It was left byte-identical apart from this
     amendment (hc-adversary item 15).
   - TIE_KT was added between the "fixed before launch" markers. The
-    launch blob will differ from b35dce76... in exactly the
+    launch blob will differ from 2a70bf18... in exactly the
     ARM_TRAIN_FRAMES and FRAME_LIST_SHA256 lines. Those are filled from
     the build in PR B and recorded with the frame-list SHA-256 before
     launch.

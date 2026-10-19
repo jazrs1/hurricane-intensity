@@ -372,7 +372,7 @@ def preflight(root, git, main_root, check, cuda_ok, child_import):
     if stale:
         raise LaunchError(f"guard 4: runs recorded at another commit or analysis blob than HEAD {ctx['commit']}: "
                           f"{stale[:3]}; relaunch only at their commit, or (before any H9 output) move every run aside "
-                          "with `run_n5.py abort-all --reason ...` and restart all 20 (§14, pending John)")
+                          "with `run_n5.py abort-all --reason ...` and restart all 20 (§14, decided by John)")
     looked = h9_outputs(root, A.SEEDS)
     if looked and any(st == "fresh" for st in states.values()):
         raise LaunchError(f"guard 4: H9 outputs exist while runs remain to be trained: {looked[:3]}; no training "
@@ -476,6 +476,7 @@ def train_one(order, arm, seed, ctx, root, main_root, hooks):
         kept += [f"{p['epoch_dir']}/epoch_{e:02d}.pt" for e in A.CONTROL_GRID]
         selected = p["native_checkpoint"] if tie else f"{p['epoch_dir']}/epoch_{sel:02d}.pt"
         rec.update(selected_epoch=sel, selected_checkpoint=selected, tie_rule=tie,
+                   off_grid_primary=bool(tie) and sel % 2 == 0,
                    odd_grid_near_ties=A.odd_grid_near_ties(reval),
                    val_mae_revalidated={str(e): reval[e] for e in sorted(reval)})
     else:
@@ -682,7 +683,8 @@ def abort_run(arm, seed, reason, root=ROOT):
 
 
 def abort_all(reason, root=ROOT):
-    """§14, pending John (option (i)): before any H9 output, move every run aside, finished ones included, so a
+    """§14, decided by John 2026-10-19 (option (i)): before any H9 output, move every run aside, finished ones
+    included, so a
     relaunch from a fix commit restarts all 20 in the same order."""
     root = Path(root)
     with Lock(root):

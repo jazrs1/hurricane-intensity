@@ -151,6 +151,7 @@ def build(name, arm_scale=1.0, arm_hi=-7.0, ctl_hi=-7.0, seed_sd=0.03, bias_sd=0
                 sel = min(A.CONTROL_GRID, key=lambda e: (val[e], e))
                 man["val_mae_revalidated"] = {str(e): val[e] for e in range(1, epochs + 1)}
                 man["tie_rule"] = None
+                man["off_grid_primary"] = False
                 man["odd_grid_near_ties"] = A.odd_grid_near_ties(val)
                 man["selected_epoch"] = sel
                 man["selected_checkpoint"] = f"models/n5_atlantic/control/seed{s}_epochs/epoch_{sel:02d}.pt"
@@ -521,6 +522,7 @@ def plant_tie(delta, record=True, select_native=True):
         m["odd_grid_near_ties"] = A.odd_grid_near_ties({int(k): v for k, v in r.items()})
         if record:
             m["tie_rule"] = {"revalidated_argmin": int(e2), "native_epoch": int(nat), "delta_kt": delta}
+            m["off_grid_primary"] = int(nat) % 2 == 0
         if select_native == "epoch_only":  # train.py's epoch, but the grid pick's checkpoint file stays
             m["selected_epoch"] = int(nat)
         elif select_native:
@@ -565,6 +567,26 @@ def test_tie_rule_recorded_when_it_did_not_fire_or_field_missing(request):
         analyse(build(request.node.name, man_mutate=recorded))
     with pytest.raises(A.DesignError, match="no tie_rule field"):
         analyse(build(request.node.name, man_mutate=missing))
+
+
+@pytest.mark.parametrize("plant", ["no_tie_marked", "tie_unmarked"])
+def test_off_grid_primary_verified(request, plant):
+    """John, 2026-10-19, decision 1: an even-native tie's primary is marked off-grid; the mark must be exact."""
+    if plant == "no_tie_marked":
+        def man(arm, s, m, root):
+            if (arm, s) == ("control", 1):
+                m["off_grid_primary"] = True
+            return m
+    else:
+        tie = plant_tie(5e-5)
+
+        def man(arm, s, m, root):
+            m = tie(arm, s, m, root)
+            if (arm, s) == ("control", 0):
+                m["off_grid_primary"] = not m["off_grid_primary"]
+            return m
+    with pytest.raises(A.DesignError, match="off_grid_primary .* is wrong"):
+        analyse(build(request.node.name, man_mutate=man))
 
 
 def test_odd_grid_near_ties_verified_and_reported(request):

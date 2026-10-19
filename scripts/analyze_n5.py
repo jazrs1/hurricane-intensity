@@ -378,6 +378,9 @@ def check_training(man, arm, seed, design, root, where):
         got = None if man["tie_rule"] is None else {k: man["tie_rule"].get(k) for k in core}
         if got != (None if tie is None else {k: tie[k] for k in core}):
             raise DesignError(f"{where}: tie_rule {man['tie_rule']} does not match the re-validated values ({tie})")
+        if man.get("off_grid_primary") is not (tie is not None and sel % 2 == 0):
+            raise DesignError(f"{where}: off_grid_primary {man.get('off_grid_primary')} is wrong: the primary is off the "
+                              "odd grid exactly when the tie rule fired on an even native epoch (John, 2026-10-19)")
         if man.get("odd_grid_near_ties") != odd_grid_near_ties(reval):
             raise DesignError(f"{where}: odd_grid_near_ties {man.get('odd_grid_near_ties')} does not match the "
                               f"re-validated values ({odd_grid_near_ties(reval)})")
@@ -641,7 +644,7 @@ def run(manifest_dir, out_dir, frozen_dir=None, root=None, design=None, git=None
         frozen.to_csv(out_dir / "frozen_vs_control.csv", **kw)
 
     ties = [s for (arm, s), r in runs.items() if arm == "control" and r["man"]["tie_rule"]]
-    offgrid = [s for s in ties if runs[("control", s)]["sel"] % 2 == 0]
+    offgrid = [s for (arm, s), r in runs.items() if arm == "control" and r["man"]["off_grid_primary"]]
     near = {s: r["man"]["odd_grid_near_ties"] for (arm, s), r in runs.items()
             if arm == "control" and r["man"]["odd_grid_near_ties"]}
     attempts = {k: {f"{arm} seed {s}": r["man"][k] for (arm, s), r in runs.items() if r["man"].get(k)}

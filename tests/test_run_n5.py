@@ -408,6 +408,7 @@ def test_launch_end_to_end_and_the_analysis_accepts_it(tmp_path, capsys):
         assert re.search(rb"^START .* \| gpu 40 C$", log, re.M) and re.search(rb"^END ", log, re.M)
         assert m["commit"] == COMMIT and m["protected_before"] == m["protected_after"]
         assert m["aborted_attempts"] == [] and m["eval_attempts"] == []
+        assert m.get("off_grid_primary", False) is False
     assert all(m["tie_rule"] is None for m in mans if m["arm"] == "control")
     for s in range(10):
         epochs = root / f"models/n5_atlantic/control/seed{s}_epochs"
@@ -759,6 +760,7 @@ def test_tie_rule_evaluates_the_checkpoint_train_py_saved(tmp_path, monkeypatch,
         assert m["tie_rule"] == {"revalidated_argmin": other, "native_epoch": native,
                                  "delta_kt": pytest.approx(5e-5)}
         assert m["odd_grid_near_ties"] == A_REAL.odd_grid_near_ties(reval)  # against the odd-grid minimum
+        assert m["off_grid_primary"] is (native % 2 == 0)  # John, 2026-10-19, decision 1
     assert ctl[0]["odd_grid_near_ties"] == ([13] if (native, other) == (13, 15) else [])  # odd-grid minimum is 15
     primary_evals = [c[c.index("--checkpoint") + 1] for c in runner.calls if c[-1].endswith("control_seed0_h9.csv")]
     assert primary_evals == ["models/n5_atlantic/control/seed0.pt"]
