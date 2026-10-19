@@ -22,6 +22,8 @@ KNOWN_ROOTS = (Path("data/processed"), Path("data/hep_sealed"))
 # root (reported as a warning). Every other entry is re-derived by scanning its storm under its own root, and
 # is never dropped: if its crop or manifest row is gone, every run is refused until the entry is removed by a
 # reviewed, committed manual edit of excluded_crops.txt.
+# A root's new NaN frames appear only when that root is scanned (--processed-root): a run over one root
+# re-derives only the other roots' storms that already have entries, not every storm under them.
 
 
 def refuse(reason, lines=()):
@@ -33,6 +35,20 @@ def refuse(reason, lines=()):
 
 def storm_of(crop_path):
     return crop_path.replace("\\", "/").split("/")[0].strip().upper()
+
+
+def check_roots(processed):
+    """No root is a link or junction (data/hep_sealed -> data/processed would un-seal H-EP), and no two known
+    roots are the same directory."""
+    roots = [r for r in dict.fromkeys([processed, *KNOWN_ROOTS]) if r.exists()]
+    linked = [r for r in roots if r.is_symlink() or r.is_junction()
+              or os.path.normcase(r.resolve()) != os.path.normcase(r.parent.resolve() / r.name)]
+    if linked:
+        refuse("roots that are links or junctions", linked)
+    known = [r for r in KNOWN_ROOTS if r.exists()]
+    same = {os.path.normcase(r.resolve()) for r in known}
+    if len(same) != len(known):
+        refuse("known roots that are the same directory", known)
 
 
 def manifest_dirs(root):
@@ -123,6 +139,7 @@ def main(argv=None):
     processed = Path(parser.parse_args(argv).processed_root)
 
     old = read_old()
+    check_roots(processed)
     roots = [processed] + [r for r in KNOWN_ROOTS if r.is_dir() and r.resolve() != processed.resolve()]
     where = {}
     for root in roots:
@@ -141,6 +158,9 @@ def main(argv=None):
     for s in listed:
         if s in where:
             plan.setdefault(where[s][0], []).append(s)
+    no_manifest = [root / s for root, storms in plan.items() for s in storms if not (root / s / "manifest.csv").is_file()]
+    if no_manifest:
+        refuse("listed storms whose directory has no manifest.csv", no_manifest)
     found, n = [], 0
     for root, storms in plan.items():
         check_manifests(root, storms)

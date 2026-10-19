@@ -17,6 +17,7 @@ What the tests require of the block (hc-adversary items 5, 6 and 6b):
 """
 import ast
 import inspect
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -274,3 +275,69 @@ def test_non_spent_storm_still_loads(processed_root, storm_id):
     x, y = ds[0]
     assert tuple(x.shape) == (3, 224, 224)
     assert y.item() == pytest.approx(80.0 / 185.0)
+
+
+# --- F-18 -----------------------------------------------------------------------------------------------
+
+def test_storm_ids_are_the_checked_list(processed_root):
+    """storm_ids is the list that was checked, even if the caller passed a one-shot iterator."""
+    ds = TCDataset(str(processed_root), iter([LEGAL, EP_2025]))
+    assert ds.storm_ids == [LEGAL, EP_2025]
+    assert len(ds) == 4
+
+
+def test_each_crop_resolved_once_but_checked_every_item(processed_root, monkeypatch):
+    calls = []
+    real = dataset.resolved_crop_storm
+    monkeypatch.setattr(dataset, "resolved_crop_storm", lambda root, p: calls.append(p) or real(root, p))
+    ds = TCDataset(str(processed_root), [LEGAL])
+    for _ in range(3):
+        for i in range(len(ds)):
+            ds[i]
+    assert sorted(calls) == sorted(ds.df.crop_path)  # once per crop, at construction
+    # The check itself still runs on every item: a spent row added afterwards is resolved and refused.
+    ds.df = pd.concat([ds.df, pd.DataFrame([spent_row(processed_root)])], ignore_index=True)
+    for _ in range(3):  # refused every time, not only the first (when its resolution is not yet memoised)
+        with pytest.raises(ValueError):
+            ds[len(ds.df) - 1]
+    assert len(calls) == len(ds.df)
+
+
+@needs_windows
+def test_reassigned_processed_root_is_resolved_again(processed_root, tmp_path):
+    """The memo is keyed by processed_root too: pointing the dataset at another root re-resolves each crop there.
+    Under the other root, LEGAL's directory is a junction into the spent AL042025, so a stale memo (LEGAL, from
+    the first root) would let the crop through."""
+    import _winapi
+    ds = TCDataset(str(processed_root), [LEGAL])
+    ds[0]
+    other = tmp_path / "other"
+    other.mkdir()
+    _winapi.CreateJunction(str(processed_root / "AL042025"), str(other / LEGAL))
+    ds.processed_root = str(other)
+    with pytest.raises(ValueError):
+        ds[0]
+    ds.processed_root = str(processed_root)
+    assert tuple(ds[0][0].shape) == (3, 224, 224)
+
+
+@needs_windows
+def test_missing_crop_is_not_memoised(processed_root):
+    """hc-adversary item 12: a crop that does not exist yet must not leave a memo behind. Otherwise a crops
+    directory swapped for a junction into a spent storm afterwards would load the spent bytes."""
+    import _winapi
+    ds = TCDataset(str(processed_root), [LEGAL])
+    row = ds.df.iloc[0].to_dict()
+    row["crop_path"] = f"{LEGAL}\\crops\\AL042025_20250901T0000Z.npz"
+    ds.df = pd.concat([ds.df, pd.DataFrame([row])], ignore_index=True)
+    with pytest.raises(FileNotFoundError):
+        ds[len(ds.df) - 1]
+    shutil.rmtree(processed_root / LEGAL / "crops")
+    _winapi.CreateJunction(str(processed_root / "AL042025" / "crops"), str(processed_root / LEGAL / "crops"))
+    assert (processed_root / row["crop_path"]).is_file()
+    with pytest.raises(ValueError):
+        ds[len(ds.df) - 1]
+
+
+def test_docstring_names_the_path_based_limit():
+    assert "copied or hard-linked" in " ".join(TCDataset.__init__.__doc__.split())
