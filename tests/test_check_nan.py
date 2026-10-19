@@ -353,6 +353,29 @@ def test_storm_under_both_roots_refused(repo, check_nan, capsys):
     assert_refused(check_nan, repo, capsys, "more than one root")
 
 
+# --- F-19 -----------------------------------------------------------------------------------------------
+
+@pytest.mark.skipif(sys.platform != "win32", reason="directory junctions are Windows-only")
+@pytest.mark.parametrize("argv", [[], ["--processed-root", "data/hep_sealed"]], ids=["default", "hep-root"])
+def test_known_root_junction_refused(repo, check_nan, capsys, loads, argv):
+    """data/hep_sealed as a junction to data/processed would un-seal H-EP: refused before anything loads."""
+    import _winapi
+    _winapi.CreateJunction(str(repo / "data" / "processed"), str(repo / "data" / "hep_sealed"))
+    assert (repo / "data" / "hep_sealed" / "AL142018" / "manifest.csv").exists()
+    assert_refused(check_nan, repo, capsys, "roots that are links or junctions", argv)
+    assert loads == []
+
+
+@pytest.mark.parametrize("root", ["processed", "hep_sealed"])
+def test_listed_storm_without_manifest_refused(repo, check_nan, capsys, loads, root):
+    """A listed storm whose directory has no manifest.csv is a refusal with a message, not a FileNotFoundError."""
+    (repo / "data" / root / "EP112025").mkdir(parents=True)
+    (repo / "excluded_crops.txt").write_text(entry("EP112025", 0))
+    err = assert_refused(check_nan, repo, capsys, "no manifest.csv")
+    assert "EP112025" in err
+    assert loads == []
+
+
 @pytest.mark.parametrize("order", [("processed", "hep_sealed"), ("hep_sealed", "processed")])
 def test_two_roots_carry_each_other_forward(repo, check_nan, order):
     write_storm(repo / "data" / "hep_sealed", "EP112025", nan_hours=(2,))

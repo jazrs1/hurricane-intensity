@@ -20,7 +20,11 @@ STORM_ID = re.compile(r"[A-Z]{2}[0-9]{6}")
 
 def crop_storm(processed_root, crop_path):
     """The storm directory crop_path resolves to under processed_root, upper-cased; None if it is outside it."""
-    root = Path(processed_root).resolve()
+    return resolved_crop_storm(Path(processed_root).resolve(), crop_path)
+
+
+def resolved_crop_storm(root, crop_path):
+    """crop_storm for a processed_root that is already resolved."""
     try:
         parts = (root / crop_path).resolve().relative_to(root).parts
     except ValueError:
@@ -58,7 +62,9 @@ class TCDataset(Dataset):
         outside the crop is ever visible). With both off, preprocessing is exactly as before.
 
         Raises ValueError, before anything is read, for a storm ID that is malformed or spent (SPENT_2025),
-        and after reading a manifest whose rows belong to another storm or point outside its directory."""
+        and after reading a manifest whose rows belong to another storm or point outside its directory.
+        The block is path-based: it does not detect spent crop content copied or hard-linked under another
+        storm's directory. Keeping spent crops out of other storms' directories is a process rule."""
         ids = list(storm_ids)
         for storm_id in ids:
             if not isinstance(storm_id, str) or not STORM_ID.fullmatch(storm_id):
@@ -71,14 +77,16 @@ class TCDataset(Dataset):
         self.rotate = rotate
         self.generator = generator
         self.processed_root = processed_root
-        self.storm_ids = storm_ids
+        self.storm_ids = ids
+        self._resolved_root = (str(processed_root), Path(processed_root).resolve())
+        self._crop_storms = {}
         frames = []
         for storm_id in ids:
             manifest_path = Path(processed_root) / storm_id / "manifest.csv"
             df = pd.read_csv(manifest_path)
             if "atcf_id" not in df or (df["atcf_id"].astype(str) != storm_id).any():
                 raise ValueError(f"{manifest_path}: atcf_id missing or not {storm_id} in some rows")
-            stray = [p for p in df["crop_path"].dropna() if crop_storm(processed_root, p) != storm_id]
+            stray = [p for p in df["crop_path"].dropna() if self._crop_storm(p) != storm_id]
             if stray:
                 raise ValueError(f"{manifest_path}: crop_path outside {storm_id}/ in {len(stray)} rows, e.g. {stray[0]}")
             frames.append(df)
@@ -100,9 +108,20 @@ class TCDataset(Dataset):
     def __len__(self):
         return len(self.df)
 
+    def _crop_storm(self, crop_path):
+        """crop_storm under self.processed_root, memoised per (processed_root, crop_path) so each crop is resolved
+        once. Only the resolution is cached: __getitem__ still checks the result on every item, whatever df holds."""
+        root = str(self.processed_root)
+        if self._resolved_root[0] != root:
+            self._resolved_root = (root, Path(root).resolve())
+        key = (root, crop_path)
+        if key not in self._crop_storms:
+            self._crop_storms[key] = resolved_crop_storm(self._resolved_root[1], crop_path)
+        return self._crop_storms[key]
+
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
-        storm = crop_storm(self.processed_root, row["crop_path"])
+        storm = self._crop_storm(row["crop_path"])
         if storm is None or storm in SPENT_2025:
             raise ValueError(f"{row['crop_path']} is a spent 2025 crop or outside {self.processed_root}")
         crop_path = Path(self.processed_root) / row["crop_path"]
