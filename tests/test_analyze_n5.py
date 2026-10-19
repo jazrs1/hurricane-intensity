@@ -507,7 +507,9 @@ def plant_tie(delta, record=True, select_native=True):
         m["train_log_sha256"] = sha(p)
         if record:
             m["tie_rule"] = {"revalidated_argmin": int(e2), "native_epoch": int(nat), "delta_kt": delta}
-        if select_native:
+        if select_native == "epoch_only":  # train.py's epoch, but the grid pick's checkpoint file stays
+            m["selected_epoch"] = int(nat)
+        elif select_native:
             m["selected_epoch"], m["selected_checkpoint"] = int(nat), m["native_checkpoint"]
             shutil.copy(root / m["native_h9_csv"], root / m["h9_csv"])  # same checkpoint, same predictions
             write(root, m["eval_log"], eval_log(m["native_checkpoint"], m["h9_csv"], pd.read_csv(root / m["h9_csv"])))
@@ -528,7 +530,8 @@ def test_tie_rule_accepts_train_py_checkpoint_inside_the_window(request):
     (dict(delta=2e-4), "does not reproduce training"),  # outside the window: refused as before
     (dict(delta=5e-5, record=False), "tie_rule None does not match"),  # fired but not recorded
     (dict(delta=5e-5, select_native=False), "train.py's own saved checkpoint"),  # fired, but the grid pick evaluated
-], ids=["outside_window", "not_recorded", "grid_pick_evaluated"])
+    (dict(delta=5e-5, select_native="epoch_only"), "train.py's own saved checkpoint"),  # right epoch, other file
+], ids=["outside_window", "not_recorded", "grid_pick_evaluated", "other_checkpoint_file"])
 def test_tie_rule_refusals(request, kw, msg):
     with pytest.raises(A.DesignError, match=msg):
         analyse(build(request.node.name, man_mutate=plant_tie(**kw)))
