@@ -110,14 +110,18 @@ class TCDataset(Dataset):
 
     def _crop_storm(self, crop_path):
         """crop_storm under self.processed_root, memoised per (processed_root, crop_path) so each crop is resolved
-        once. Only the resolution is cached: __getitem__ still checks the result on every item, whatever df holds."""
+        once. Only the resolution is cached: __getitem__ still checks the result on every item, whatever df holds.
+        A crop that does not exist yet is not memoised, so a directory swapped in later is resolved afresh."""
         root = str(self.processed_root)
         if self._resolved_root[0] != root:
             self._resolved_root = (root, Path(root).resolve())
         key = (root, crop_path)
-        if key not in self._crop_storms:
-            self._crop_storms[key] = resolved_crop_storm(self._resolved_root[1], crop_path)
-        return self._crop_storms[key]
+        if key in self._crop_storms:
+            return self._crop_storms[key]
+        storm = resolved_crop_storm(self._resolved_root[1], crop_path)
+        if (Path(root) / crop_path).is_file():
+            self._crop_storms[key] = storm
+        return storm
 
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
