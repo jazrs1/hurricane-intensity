@@ -11,6 +11,7 @@ import importlib.util
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -608,7 +609,7 @@ def test_abort_all_refuses_after_an_h9_output(tmp_path):
     root = fake_repo(tmp_path)
     train(root)
     (root / "results/n5_atlantic/control_seed0_h9.csv").write_text("looked")
-    with pytest.raises(R.LaunchError, match="abort-all: H9 outputs exist"):
+    with pytest.raises(R.LaunchError, match="abort-all: H9 has been looked at"):
         R.abort_all("after a look", root)
     assert (root / "logs/n5_atlantic/runs/control_seed0.train.json").exists()
 
@@ -619,7 +620,7 @@ def test_training_never_follows_an_h9_output(tmp_path):
         train(root, runner=FakeRunner(root, fail=("atlantic", 1)))
     R.abort_run("atlantic", 1, "planted failure", root)
     (root / "results/n5_atlantic/control_seed0_h9.csv").write_text("looked")
-    with pytest.raises(R.LaunchError, match=r"guard 4: H9 outputs exist while runs remain to be trained"):
+    with pytest.raises(R.LaunchError, match=r"guard 4: H9 has been looked at while runs remain to be trained"):
         train(root)
 
 
@@ -631,7 +632,7 @@ def test_an_h9_output_planted_mid_phase1_stops_training(tmp_path):
             (root / "results/n5_atlantic/control_seed0_h9.csv").write_text("looked")
 
     runner = FakeRunner(root, on_train=plant)
-    with pytest.raises(R.LaunchError, match="phase 1: H9 outputs exist"):
+    with pytest.raises(R.LaunchError, match="phase 1: H9 has been looked at"):
         train(root, runner=runner)
     assert train_calls(runner) == [("control", 0), ("atlantic", 0)]
 
@@ -683,7 +684,7 @@ def test_a_record_that_fails_verification_can_be_aborted_and_retrained(tmp_path)
     record); relaunch retrains it alone; phase 2 then runs."""
     root = fake_repo(tmp_path)
     runner = train(root)
-    (root / "models/n5_atlantic/control/seed4_epochs/epoch_13.pt").write_bytes(b"swapped after training")
+    touch_kept(root / "models/n5_atlantic/control/seed4_epochs/epoch_13.pt", b"swapped after training")
     with pytest.raises(R.LaunchError, match=r"phase 2: training records that do not verify: \[\('control', 4\)\]"):
         ev(root, runner=runner)
     with pytest.raises(R.LaunchError, match=r"guard 4: training records that do not verify: \[\('control', 4\)\]"):
@@ -697,6 +698,55 @@ def test_a_record_that_fails_verification_can_be_aborted_and_retrained(tmp_path)
     assert len(mans) == 20
 
 
+def touch_kept(path, data):
+    """Bit rot or a deliberate edit of a read-only kept file: a plain write is refused first."""
+    with pytest.raises(PermissionError):
+        path.write_bytes(data)
+    os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+    path.write_bytes(data)
+
+
+def test_kept_files_are_read_only_and_abort_all_still_moves_them(tmp_path):
+    """Item 16c: once a record is written its kept files are read-only; abort-all moves them on Windows anyway."""
+    root = fake_repo(tmp_path)
+    train(root)
+    rec = json.loads((root / "logs/n5_atlantic/runs/control_seed2.train.json").read_text(encoding="utf-8"))
+    assert len(rec["files_sha256"]) == 15
+    for f in rec["files_sha256"]:
+        assert not os.access(root / f, os.W_OK), f
+    moved = R.abort_all("read-only files", root)
+    assert len(moved) == 20
+    dest = root / "logs/n5_atlantic/aborted/control_seed2_attempt1"
+    for f in rec["files_sha256"]:
+        assert not (root / f).exists() and (dest / f).is_file() and not os.access(dest / f, os.W_OK)
+    assert len(go(root)[0]) == 20
+
+
+def test_after_a_look_a_bad_record_asks_for_the_bytes_back(tmp_path):
+    """Item 16c, finding 6: after a look a run can't be retrained, so the message asks for the exact bytes, not for
+    abort-run; abort-run is refused; restoring the bytes lets phase 2 resume."""
+    root = fake_repo(tmp_path)
+    runner = train(root)
+    runner.eval_fail = {"results/n5_atlantic/atlantic_seed2_h9.csv"}
+    with pytest.raises(R.LaunchError, match="evaluation failed"):
+        ev(root, runner=runner)
+    kept = root / "models/n5_atlantic/control/seed8_epochs/epoch_13.pt"
+    good = kept.read_bytes()
+    touch_kept(kept, b"bit rot")
+    for stage, match in ((lambda: ev(root, runner=runner), r"do not verify: \[\('control', 8\)\]; H9 has been looked "
+                                                         r"at, so it can't be retrained: restore the exact bytes"),
+                         (lambda: train(root), "phase2_started.json exists")):
+        with pytest.raises(R.LaunchError, match=match) as e:
+            stage()
+        assert "abort-run" not in str(e.value)
+    with pytest.raises(R.LaunchError, match="abort-run: H9 has been looked at"):
+        R.abort_run("control", 8, "bit rot", root)
+    kept.write_bytes(good)
+    runner.eval_fail = set()
+    R.abort_eval("atlantic", 2, "evaluation crashed", root)
+    assert len(ev(root, runner=runner)[0]) == 20
+
+
 def test_a_crashed_evaluation_is_moved_aside_and_the_same_checkpoint_re_evaluated(tmp_path):
     """Item 16, finding 4(b)."""
     root = fake_repo(tmp_path)
@@ -708,7 +758,7 @@ def test_a_crashed_evaluation_is_moved_aside_and_the_same_checkpoint_re_evaluate
     (root / "logs/n5_atlantic/atlantic_seed2_eval_h9.log").write_text("checkpoint: x\noverall MAE: 9.99 kt\n")
     with pytest.raises(R.LaunchError, match=r"phase 2: H9 outputs without a manifest for \[\('atlantic', 2\)\]; .*abort-eval"):
         ev(root, runner=runner)
-    with pytest.raises(R.LaunchError, match="abort-run: H9 outputs exist"):
+    with pytest.raises(R.LaunchError, match="abort-run: H9 has been looked at"):
         R.abort_run("atlantic", 2, "retrain after a look", root)
     dest = R.abort_eval("atlantic", 2, "evaluation crashed", root)
     assert dest == "logs/n5_atlantic/aborted/atlantic_seed2_eval1"
@@ -765,8 +815,8 @@ def test_abort_eval_cannot_launder_an_h9_look(tmp_path):
     assert (marker["head"], marker["launch_commit"]) == (COMMIT, COMMIT)
     R.abort_eval("control", 0, "native evaluation crashed", root)
     assert R.h9_outputs(root, range(10)) == []  # the pinned paths are empty again...
-    for stage, match in ((lambda: R.abort_all("start over", root), "abort-all: H9 outputs exist"),
-                         (lambda: R.abort_run("atlantic", 3, "retrain", root), "abort-run: H9 outputs exist"),
+    for stage, match in ((lambda: R.abort_all("start over", root), "abort-all: H9 has been looked at"),
+                         (lambda: R.abort_run("atlantic", 3, "retrain", root), "abort-run: H9 has been looked at"),
                          (lambda: train(root), "guard 4: logs/n5_atlantic/phase2_started.json exists")):
         with pytest.raises(R.LaunchError, match=match):  # ...but the look is not forgotten
             stage()
@@ -785,16 +835,16 @@ def test_an_eval_abort_during_phase1_blocks_further_training(tmp_path):
         if (arm, seed) == ("atlantic", 0):
             (root / "results/n5_atlantic/control_seed0_h9.csv").write_text("looked")
 
-    with pytest.raises(R.LaunchError, match="phase 1: H9 outputs exist"):
+    with pytest.raises(R.LaunchError, match="phase 1: H9 has been looked at"):
         train(root, runner=FakeRunner(root, on_train=plant))
     R.abort_eval("control", 0, "stray H9 output", root)
     assert R.h9_outputs(root, range(10)) == []
     runner = FakeRunner(root)
-    with pytest.raises(R.LaunchError, match=r"guard 4: H9 outputs exist while runs remain to be trained: "
+    with pytest.raises(R.LaunchError, match=r"guard 4: H9 has been looked at while runs remain to be trained: "
                                             r"\['logs/n5_atlantic/aborted/control_seed0_eval1/abort.json'\]"):
         train(root, runner=runner)
     assert runner.calls == []
-    with pytest.raises(R.LaunchError, match="abort-all: H9 outputs exist"):
+    with pytest.raises(R.LaunchError, match="abort-all: H9 has been looked at"):
         R.abort_all("start over", root)
 
 
@@ -809,8 +859,8 @@ def test_the_phase2_marker_alone_is_a_look(tmp_path):
     for rel in R.h9_outputs(root, range(10)):
         (root / rel).unlink()
     assert R.looked(root, range(10)) == [R.PHASE2_MARKER]
-    for stage, match in ((lambda: R.abort_all("start over", root), "abort-all: H9 outputs exist .*phase2_started"),
-                         (lambda: R.abort_run("atlantic", 3, "retrain", root), "abort-run: H9 outputs exist .*phase2_started")):
+    for stage, match in ((lambda: R.abort_all("start over", root), "abort-all: H9 has been looked at .*phase2_started"),
+                         (lambda: R.abort_run("atlantic", 3, "retrain", root), "abort-run: H9 has been looked at .*phase2_started")):
         with pytest.raises(R.LaunchError, match=match):
             stage()
 
@@ -826,7 +876,7 @@ def test_an_eval_abort_appearing_mid_phase1_stops_training(tmp_path):
             (d / "abort.json").write_text(json.dumps({"status": "complete", "moved": {}}), encoding="utf-8")
 
     runner = FakeRunner(root, on_train=plant)
-    with pytest.raises(R.LaunchError, match="phase 1: H9 outputs exist .*control_seed0_eval1/abort.json"):
+    with pytest.raises(R.LaunchError, match="phase 1: H9 has been looked at .*control_seed0_eval1/abort.json"):
         train(root, runner=runner)
     assert train_calls(runner) == [("control", 0), ("atlantic", 0)]
 

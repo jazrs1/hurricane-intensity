@@ -54,6 +54,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -68,6 +69,9 @@ UPSTREAM = "origin/phase2-experiments"
 ABORTED = "logs/n5_atlantic/aborted"
 LOCK = "logs/n5_atlantic/run_n5.lock"
 PHASE2_MARKER = "logs/n5_atlantic/phase2_started.json"  # written once, before the first H9 step; never moved
+RESTORE_AFTER_LOOK = ("H9 has been looked at, so it can't be retrained: restore the exact bytes of the changed files "
+                      "(their SHA-256s are in the record); if that is impossible, §14's post-look rule applies "
+                      "(pending John)")
 DOC_PATHS = ("logs/decisions.md",)  # 5e: docs a merge may add between L and HEAD; never executed (coordinator)
 OUTPUT_ROOTS = ("models/n5_atlantic/", "results/n5_atlantic/", "logs/n5_atlantic/")
 NEVER_WRITTEN = ("best_model.pt", "models/baseline_9kt.pt", "results/heldout_predictions.csv", "models/storms/",
@@ -375,8 +379,9 @@ def preflight(root, git, main_root, check, cuda_ok, child_import):
     states = {(arm, s): run_state(root, arm, s, expected) for _, arm, s in schedule(A.SEEDS)}
     bad = [(arm, s) for (arm, s), st in states.items() if st == "bad_record"]
     if bad:
-        raise LaunchError(f"guard 4: training records that do not verify: {bad}; move each run aside with "
-                          "`run_n5.py abort-run ARM SEED --reason ...` (no H9 output may exist)")
+        raise LaunchError(f"guard 4: training records that do not verify: {bad}; " + (
+            RESTORE_AFTER_LOOK if looked(root, A.SEEDS) else
+            "move each run aside with `run_n5.py abort-run ARM SEED --reason ...` and launch again"))
     partial = [v for (arm, s), st in states.items() if st == "partial"
                for v in run_paths(arm, s).values() if (root / v).exists()]
     if partial:
@@ -396,7 +401,7 @@ def preflight(root, git, main_root, check, cuda_ok, child_import):
                           "with `run_n5.py abort-all --reason ...` and restart all 20 (§14, decided by John)")
     seen = looked(root, A.SEEDS)
     if seen and any(st == "fresh" for st in states.values()):
-        raise LaunchError(f"guard 4: H9 outputs exist while runs remain to be trained: {seen[:3]}; no training "
+        raise LaunchError(f"guard 4: H9 has been looked at while runs remain to be trained: {seen[:3]}; no training "
                           "may follow an H9 evaluation (2026-10-19 amendment, condition (b))")
     first_parent(git, ctx["commit"])
     return ctx
@@ -451,7 +456,7 @@ def train_one(order, arm, seed, ctx, root, main_root, hooks):
         raise LaunchError(f"refusing to overwrite {existing}")
     seen = looked(root, A.SEEDS)
     if seen:
-        raise LaunchError(f"phase 1: H9 outputs exist ({seen[:3]}); no training may follow an H9 evaluation")
+        raise LaunchError(f"phase 1: H9 has been looked at ({seen[:3]}); no training may follow an H9 evaluation")
     before = protected_now(main_root, ctx["expected"])
     if before != ctx["expected"]:
         raise LaunchError(f"protected hashes differ before {arm} seed {seed}")
@@ -511,6 +516,8 @@ def train_one(order, arm, seed, ctx, root, main_root, hooks):
         changed = sorted(k for k, v in ctx["expected"].items() if rec["protected_after"][k] != v)
         raise LaunchError(f"protected hashes changed during {arm} seed {seed}: {changed}")
     write_json_new(root / p["record"], rec)
+    for f in kept:  # an accidental write now fails instead of breaking the record's hash (item 16c)
+        os.chmod(root / f, stat.S_IREAD)
     print(f"order {order}: {arm} seed {seed} trained; selected epoch {rec['selected_epoch']} (native {native_epoch})"
           + (f"; tie rule fired {tie}" if rec.get("tie_rule") else ""), flush=True)
     return rec
@@ -561,8 +568,10 @@ def evaluate_phase(ctx, root, main_root, runner):
     states = {(arm, s): run_state(root, arm, s, ctx["expected"]) for _, arm, s in order}
     bad = [(arm, s) for (arm, s), st in states.items() if st == "bad_record"]
     if bad:
-        raise LaunchError(f"phase 2: training records that do not verify: {bad}; while no H9 output exists, move each "
-                          "run aside with `run_n5.py abort-run ARM SEED --reason ...` and launch again")
+        raise LaunchError(f"phase 2: training records that do not verify: {bad}; " + (
+            RESTORE_AFTER_LOOK if looked(root, A.SEEDS) else
+            "no H9 output exists yet, so move each run aside with `run_n5.py abort-run ARM SEED --reason ...` and "
+            "launch again"))
     unfinished = [(k, arm, s) for k, arm, s in order if states[(arm, s)] not in ("trained", "eval_partial", "evaluated")]
     if unfinished:
         raise LaunchError(f"phase 2: H9 evaluation refuses to start until all {len(order)} training runs have "
@@ -708,7 +717,7 @@ def abort_run(arm, seed, reason, root=ROOT):
             raise LaunchError(f"abort-run: unknown run {arm} seed {seed}, or no --reason")
         seen = looked(root, A.SEEDS)
         if seen:
-            raise LaunchError(f"abort-run: H9 outputs exist ({seen[:3]}); no run may be aborted after an H9 evaluation")
+            raise LaunchError(f"abort-run: H9 has been looked at ({seen[:3]}); no run may be aborted after an H9 evaluation")
         if run_state(root, arm, seed, A.PROTECTED) in ("trained", "eval_partial", "evaluated"):
             raise LaunchError(f"abort-run: {arm} seed {seed} has a training record that verifies; finished runs are "
                               "not aborted (abort-all restarts all 20, §14)")
@@ -726,7 +735,7 @@ def abort_all(reason, root=ROOT):
             raise LaunchError("abort-all: no --reason")
         seen = looked(root, A.SEEDS)
         if seen:
-            raise LaunchError(f"abort-all: H9 outputs exist ({seen[:3]}); no run may be aborted after an H9 evaluation")
+            raise LaunchError(f"abort-all: H9 has been looked at ({seen[:3]}); no run may be aborted after an H9 evaluation")
         done = []
         for _, arm, s in schedule(A.SEEDS):
             if run_state(root, arm, s, A.PROTECTED) != "fresh" or any(

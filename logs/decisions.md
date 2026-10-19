@@ -2374,3 +2374,14 @@ or evaluation.
   Blob: 8ff9c3f557d0a04c4d22d8fc277a963a7b04e362476de186344a8e3787ccea75
   [55249f82]. tests/test_n5_frame_list.py reproduces the committed
   frame list byte for byte from the main checkout's data.
+- hc-adversary item 16c follow-ups (the coordinator folded them into
+  part 2), in design.md section 14:
+  - phase2_started.json alone is a look, even with no H9 output;
+  - kept training files are read-only once their record is written,
+    and the abort moves still work;
+  - after a look, a record that no longer verifies asks for the exact
+    bytes back, never abort-run;
+  - a post-look bad record that can't be restored: N5 void, or the
+    seed's pair dropped as a named deviation, pending John.
+  design.md blob: 4335cc212c4e5497bd0746039f73b72790bca2bf9a462312dee9afd46edb330c
+  [f1b2839b].

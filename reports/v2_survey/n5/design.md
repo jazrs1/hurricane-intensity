@@ -469,13 +469,13 @@ This section amends §4, §8 and §9. The text above is unchanged; where they di
     - the protected hashes before and after;
     - `aborted_attempts`.
 
-    A run whose protected hashes change gets no record.
+    A run whose protected hashes change gets no record. Once the record is written, its kept files are made read-only, so an accidental write fails instead of breaking a hash. Moves by the abort commands still work.
   - Phase 1 refuses to train once H9 has been **looked at**. It checks at launch and again before each run. A look is any of:
     - a pinned H9 output (CSV, eval log or manifest);
     - any aborted H9 evaluation (`aborted/*_eval*/abort.json`);
     - the marker `logs/n5_atlantic/phase2_started.json`.
 
-    `abort-eval` moves pinned outputs aside, so the pinned paths alone can't show a look (hc-adversary item 16b).
+    `abort-eval` moves pinned outputs aside, so the pinned paths alone can't show a look (hc-adversary item 16b). The marker alone counts as a look, even with no H9 output: a crash between writing it and the first H9 step still forbids `abort-all` and any retraining. Every training-side check has passed by then, so no restart should be needed.
   - `launch` then **stops** and prints the 20 record paths.
 - **Between the phases:** the 20 records are committed and pushed to phase2-experiments. That pushed commit witnesses that all 20 trainings finished before any H9 look. Retraining after a look would then mean rewriting pushed history.
 - **Phase 2, `run_n5.py evaluate`, guard 5e.** It refuses unless:
@@ -511,7 +511,8 @@ An interrupted abort is resumed by running the same command again, and `launch` 
 1. **`abort-run ARM SEED --reason`:** for a run that failed (`TRAIN_FAILED`, a refused re-validation or weights check, a protected-hash change, a crash) or whose record no longer verifies. Its record is moved too. `launch` then trains it again with the **same seed, in the same order position**, at the pinned paths, which are empty again. Its record and manifest list `aborted_attempts`.
 2. **`abort-all --reason`, decided by John (his 2: option (i) of hc-adversary item 16).** The procedure for a relaunch from a fix commit. Only while no H9 output exists, it moves every run aside, finished ones included, and `launch` from the fix commit restarts all 20 in the §4 order with their seeds. Records already committed show up as deletions; commit the deletions through a PR before relaunch.
 3. **`abort-eval ARM SEED --reason`:** for a crashed H9 evaluation, or a manifest that `load_run` refuses (for example, a CSV changed after its manifest). It applies only to a run whose record verifies and which has H9 outputs without a manifest, or a manifest that `load_run` refuses. The outputs (and that manifest) are moved, never deleted. `evaluate` then evaluates the same recorded checkpoint again. The manifest lists `eval_attempts`. An eval abort is itself a look (above).
-4. **What is refused:**
+4. **Post-look bad record, pending John.** After any look, a kept file that no longer verifies cannot be fixed by retraining, because (b) forbids it. The driver's message asks for the exact bytes to be restored, and their SHA-256s are in the record. If that is impossible, John decides between: (i) N5 is void; or (ii) N5 is reported with that seed's pair dropped, as a named deviation.
+5. **What is refused:**
    - `abort-run` and `abort-all` once H9 has been looked at (above), so an abort can never follow a look at held-out results;
    - `abort-run` on a run whose record verifies (finished runs are not aborted one by one);
    - any abort with nothing to move.
