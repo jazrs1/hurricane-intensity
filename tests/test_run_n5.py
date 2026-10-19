@@ -991,11 +991,33 @@ def test_rule_a_completes_when_a_record_breaks_mid_phase2(tmp_path):
     assert res["n_pairs"] == 9 and res["joint"].startswith("NON-CONFIRMATORY")
 
 
+def test_rule_a_is_refused_before_any_look(tmp_path):
+    """Item 17b: with all 20 trained and nothing looked at, a damaged run is still retrainable (abort-run), which keeps
+    n = 10 and the verdict confirmatory, so a deviations file is refused and nothing is evaluated."""
+    root = fake_repo(tmp_path)
+    runner = train(root)
+    touch_kept(root / "models/n5_atlantic/control/seed0.pt", b"bit rot")
+    dev = write_deviations(root, [{"seed": 0, "reason": "seed0.pt changed"}])
+    assert R.looked(root, range(10)) == []
+    with pytest.raises(R.LaunchError, match="no H9 look yet: abort-run and retrain instead"):
+        ev(root, runner=runner, deviations=dev)
+    assert all(is_train(c) for c in runner.calls) and not (root / R.PHASE2_MARKER).exists()
+    R.abort_run("control", 0, "seed0.pt changed before any look", root)
+    runner = train(root)
+    assert train_calls(runner) == [("control", 0)]
+    (root / dev).unlink()
+    assert len(ev(root, runner=runner)[0]) == 20
+
+
 @pytest.mark.parametrize("case", ["healthy", "untracked", "differs", "other_path"])
 def test_evaluate_refuses_a_deviation_rule_a_does_not_cover(tmp_path, case):
     """Item 17, finding 2: only a pair with a run whose record fails, named in the committed file at its fixed path."""
     root = fake_repo(tmp_path)
     runner = train(root)
+    runner.eval_fail = {"results/n5_atlantic/control_seed0_h9.csv"}  # a look: phase 2 started, order 1 crashed
+    with pytest.raises(R.LaunchError, match="evaluation failed"):
+        ev(root, runner=runner)
+    calls = len(runner.calls)
     touch_kept(root / "models/n5_atlantic/control/seed0_epochs/epoch_13.pt", b"bit rot")
     dev = write_deviations(root, [{"seed": 3 if case == "healthy" else 0, "reason": "x"}])
     git = fake_git(root, untracked=(dev,) if case == "untracked" else (),
@@ -1009,7 +1031,7 @@ def test_evaluate_refuses_a_deviation_rule_a_does_not_cover(tmp_path, case):
              "other_path": "--deviations must be logs/n5_atlantic/deviations.json"}[case]
     with pytest.raises(R.LaunchError, match=match):
         ev(root, git=git, runner=runner, deviations=dev)
-    assert all(is_train(c) for c in runner.calls) and not (root / R.PHASE2_MARKER).exists()
+    assert len(runner.calls) == calls  # no further H9 step
 
 
 def test_abort_eval_takes_a_manifest_that_load_run_refuses(tmp_path):

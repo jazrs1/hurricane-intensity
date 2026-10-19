@@ -566,6 +566,8 @@ def deviations_in(root, git, A, path, states):
     record no longer verifies (hc-adversary item 17). Returns the left-out (arm, seed) runs."""
     if path is None:
         return set()
+    if not looked(root, A.SEEDS):  # §14: rule (A) applies only after a look (hc-adversary item 17b)
+        raise LaunchError("phase 2: no H9 look yet: abort-run and retrain instead; rule (A) applies only after a look")
     if Path(path).as_posix() != A.DEVIATIONS_PATH:
         raise LaunchError(f"--deviations must be {A.DEVIATIONS_PATH}, not {path}")
     if git(["ls-files", "--error-unmatch", A.DEVIATIONS_PATH], check=False).returncode != 0 or \
