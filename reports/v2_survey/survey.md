@@ -443,4 +443,4 @@ Run from the repo root.
    .venv\Scripts\python.exe -I -c "<inline: split both files into header+N-line blocks keyed by ATCF ID and compare>"
    ```
 
-The scripts are in the session scratchpad: `C:\Users\johnb\AppData\Local\Temp\claude\C--Users-johnb-Projects-hurricane-intensity\506a3b5b-9503-4971-9fd2-939a3bbd35e7\scratchpad\hurdat_diff.py` and `candidates_lib.py`. Nothing was written to `data/` and `--force-hurdat2-refresh` was not used. The new file stays in `_scratch/` pending a decision on whether to keep it or delete it, like the nepac text.
+The scripts are in the session scratchpad: `<scratchpad>\hurdat_diff.py` and `candidates_lib.py`. Nothing was written to `data/` and `--force-hurdat2-refresh` was not used. The new file stays in `_scratch/` pending a decision on whether to keep it or delete it, like the nepac text.
