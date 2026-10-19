@@ -148,25 +148,42 @@ def resolve_base(root):
     raise AssertionError(f"neither {BASE_REF} nor origin/{BASE_REF} resolves in {root}")
 
 
+def is_trust_file(path):
+    """A repo-root path that Windows (case-insensitive NTFS, trailing dots and spaces dropped) would open as one of
+    TRUST_FILES. Root only: the trusted copies live at the root; a nested x/coordinator.md replaces nothing."""
+    if "/" in path:
+        return False
+    return path.rstrip(". ").casefold() in {f.casefold() for f in TRUST_FILES}
+
+
+def git_paths(*args, cwd):
+    """Raw (-z, unquoted) paths from a git listing command."""
+    return [p for p in git(*args, "-z", cwd=cwd).stdout.split("\0") if p.strip()]
+
+
 def check_trust_files_untracked(main_root):
-    """COORDINATOR.md and FEATURES.md must never be in git. A PR that force-adds one (git add -f) would replace the
-    main checkout's trusted, gitignored copy on merge, pull or checkout, without a "would be overwritten" error."""
+    """COORDINATOR.md and FEATURES.md must never be in git, under any spelling Windows treats as the same file. A PR
+    that force-adds one (git add -f, e.g. as coordinator.md) would replace the main checkout's trusted, gitignored
+    copy on merge, pull or checkout, without a "would be overwritten" error.
+
+    Every path is listed in full and filtered with is_trust_file, rather than with a git pathspec, so case, trailing
+    dots and spaces are all caught by one rule."""
     problems = []
     for root in dict.fromkeys([CHECKOUT_ROOT, main_root]):
-        for f in TRUST_FILES:
-            if git("ls-files", "--error-unmatch", "--", f, cwd=root, check=False).returncode == 0:
-                problems.append(f"{f} is tracked in {root}")
-        history = git("log", "--all", "--format=%h", "--name-only", "--", *TRUST_FILES, cwd=root).stdout.split()
-        touched = sorted(set(TRUST_FILES) & set(history))
-        if touched:
-            problems.append(f"{touched} appear in git history of {root} (git log --all): {history[:6]}")
+        tracked = sorted({p for p in git_paths("ls-files", cwd=root) if is_trust_file(p)})
+        if tracked:
+            problems.append(f"{tracked} tracked in {root}")
+        history = sorted({p for p in git_paths("log", "--all", "--format=", "--name-only", cwd=root) if is_trust_file(p)})
+        if history:
+            problems.append(f"{history} appear in git history of {root} (git log --all)")
     base = resolve_base(CHECKOUT_ROOT)
-    changed = git("diff", "--name-only", f"{base}...HEAD", cwd=CHECKOUT_ROOT).stdout.split()
-    in_diff = sorted(set(TRUST_FILES) & set(changed))
+    in_diff = sorted({p for p in git_paths("diff", "--name-only", f"{base}...HEAD", cwd=CHECKOUT_ROOT)
+                      if is_trust_file(p)})
     if in_diff:
         problems.append(f"{in_diff} changed in {base}...HEAD of {CHECKOUT_ROOT}")
-    print(f"trust files {', '.join(TRUST_FILES)}: not tracked (ls-files), not in {base}...HEAD, "
-          f"not in git log --all; checked in {CHECKOUT_ROOT} and {main_root}" if not problems else "")
+    print(f"trust files {', '.join(TRUST_FILES)} (root level, case-insensitive, trailing dots/spaces ignored): "
+          f"not tracked (ls-files), not in {base}...HEAD, not in git log --all; checked in {CHECKOUT_ROOT} and "
+          f"{main_root}" if not problems else "")
     if problems:
         raise AssertionError("trust file in git:\n" + "\n".join(problems))
 
