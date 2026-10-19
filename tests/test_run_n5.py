@@ -423,6 +423,24 @@ def test_phase2_refuses_while_any_training_run_is_unfinished(tmp_path, fail):
     assert all(is_train(c) for c in runner.calls) and R.h9_outputs(root, range(10)) == []
 
 
+def test_phase2_refuses_a_file_changed_since_training_or_a_half_evaluated_run(tmp_path):
+    root = fake_repo(tmp_path)
+    ctx = R.preflight(root, fake_git(), root, CHECK, lambda: True)
+    runner = FakeRunner(root)
+    R.train_phase(ctx, root, root, runner, reval_from_curve, lambda: "gpu 40 C")
+    kept = root / "models/n5_atlantic/control/seed4_epochs/epoch_13.pt"
+    good = kept.read_bytes()
+    kept.write_bytes(b"swapped after training")
+    with pytest.raises(R.LaunchError, match=r"control_seed4.train.json: files missing or changed since training: "
+                                            r"\['models/n5_atlantic/control/seed4_epochs/epoch_13.pt'\]"):
+        R.evaluate_phase(ctx, root, root, runner)
+    kept.write_bytes(good)
+    (root / "results/n5_atlantic/atlantic_seed2_h9.csv").write_text("left by a crashed evaluation")
+    with pytest.raises(R.LaunchError, match=r"phase 2: H9 outputs without a manifest for \[\('atlantic', 2\)\]"):
+        R.evaluate_phase(ctx, root, root, runner)
+    assert all(is_train(c) for c in runner.calls)
+
+
 def test_training_never_follows_an_h9_output(tmp_path):
     root = fake_repo(tmp_path)
     with pytest.raises(R.LaunchError, match="training failed"):

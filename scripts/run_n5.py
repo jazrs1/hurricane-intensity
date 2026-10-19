@@ -411,7 +411,7 @@ def evaluate_phase(ctx, root, main_root, runner):
     """Condition (b): no H9 evaluation runs until every one of the 20 training runs has a verified record."""
     order = schedule(ctx["A"].SEEDS)
     states = {(arm, s): run_state(root, arm, s, ctx["expected"]) for _, arm, s in order}
-    unfinished = [(k, arm, s) for k, arm, s in order if states[(arm, s)] not in ("trained", "evaluated")]
+    unfinished = [(k, arm, s) for k, arm, s in order if states[(arm, s)] not in ("trained", "eval_partial", "evaluated")]
     if unfinished:
         raise LaunchError(f"phase 2: H9 evaluation refuses to start until all {len(order)} training runs have "
                           f"finished; unfinished: {unfinished}")
