@@ -2,7 +2,7 @@
 """One-command checks for the invariants in FEATURES.md (I1-I7).
 
     .venv\\Scripts\\python.exe scripts\\check.py            # F1: under 3 minutes, no network
-    .venv\\Scripts\\python.exe scripts\\check.py --e2e      # F2: downloads one GOES-16 scan
+    .venv\\Scripts\\python.exe scripts\\check.py --e2e      # F2/F3: downloads one GOES-16 and one GOES-18 scan
     .venv\\Scripts\\python.exe scripts\\check.py --gitignore-target <repo>   # only the gitignore section
 
 Protected files, data/ and models/ are gitignored and exist only in the main checkout, so they are
@@ -42,14 +42,27 @@ MUST_BE_IGNORED = [
     "data/processed/x",
 ]
 
-# F2: Michael AL142018, 2018-10-09 12:00 UTC. A training storm in every train list and in no
-# val/H9/2025 list; rebuilt byte for byte the same way on 2026-10-15 (logs/decisions.md, 23:05).
-E2E_STORM = "AL142018"
-E2E_TIME = "2018-10-09T12:00:00Z"
-E2E_CROP = "data/processed/AL142018/crops/AL142018_20181009T1200Z.npz"
-E2E_BUCKET = "noaa-goes16"
+# --e2e cases: one sample time each, built through run_pipeline into a temp dir. Each one is compared
+# either byte for byte with a crop on disk (`crop`) or with independently recorded numbers (`expect`).
+E2E_CASES = [
+    # F2: Michael, GOES-16. A training storm in every train list and in no val/H9/2025 list; rebuilt
+    # byte for byte the same way on 2026-10-15 (logs/decisions.md, 23:05).
+    dict(name="e2e GOES-16 Michael", storm="AL142018", time="2018-10-09T12:00:00Z", bucket="noaa-goes16",
+         hurdat2=None, crop="data/processed/AL142018/crops/AL142018_20181009T1200Z.npz"),
+    # F3: Dora, GOES-18, East Pacific, near GOES-18 nadir; training-only for v2. HURDAT2 comes from the
+    # nepac file, fetched into the temp dir: the pipeline's default cache path is the protected Atlantic
+    # file, so force_hurdat2_refresh or a nepac hurdat2_url would overwrite it (I7). Dora crosses the
+    # antimeridian and build_sample_grid interpolates lon linearly, so only the one exact fix is built.
+    # Expected numbers are hc-survey's read of the same scan.
+    dict(name="e2e GOES-18 Dora", storm="EP052023", time="2023-08-06T06:00:00Z", bucket="noaa-goes18",
+         hurdat2=("https://www.nhc.noaa.gov/data/hurdat/hurdat2-nepac-1949-2025-092926.txt",
+                  "caece626f7038db64a803a73f5985b563693f0130f3ff16b4b0a0a93c7aa0507"),
+         key="ABI-L2-CMIPF/2023/218/06/OR_ABI-L2-CMIPF-M6C13_G18_s20232180600203_e20232180609523_c20232180609587.nc",
+         expect=dict(shape=(285, 301), bt_min=197.96, bt_max=295.37, label=130.0)),
+]
 E2E_BT_MIN_RANGE = (180.0, 220.0)  # K: the coldest pixel of a hurricane crop
 E2E_BT_MAX_BELOW = 320.0  # K: the top of the training clamp
+E2E_BT_TOLERANCE_K = 0.01  # against recorded numbers, which are rounded to 0.01 K
 E2E_TOLERANCE_KT = 30.0
 MEMBERS_SHA = "results/ensemble/members_sha256.txt"
 
@@ -232,7 +245,20 @@ def snapshot(root):
     return out
 
 
-def check_e2e(main_root):
+def fetch_hurdat2(url, digest, dest):
+    """Download a HURDAT2 file into the temp dir (never into data/) and check its SHA-256."""
+    import requests
+
+    resp = requests.get(url, timeout=60)
+    resp.raise_for_status()
+    dest.write_bytes(resp.content)
+    got = sha256(dest)
+    if got != digest:
+        raise AssertionError(f"{url} has SHA-256 {got}, expected {digest}")
+    return dest
+
+
+def check_e2e(main_root, case):
     import logging
 
     import numpy as np
@@ -245,9 +271,10 @@ def check_e2e(main_root):
     from hurricane_intensity.dataset import TCDataset
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    target = pd.Timestamp(E2E_TIME)
-    on_disk = main_root / E2E_CROP
-    if not on_disk.is_file():
+    storm, bucket = case["storm"], case["bucket"]
+    target = pd.Timestamp(case["time"])
+    on_disk = main_root / case["crop"] if case.get("crop") else None
+    if on_disk is not None and not on_disk.is_file():
         raise FileNotFoundError(on_disk)
     if not config.HURDAT2_CACHE_PATH.is_file():
         raise FileNotFoundError(f"{config.HURDAT2_CACHE_PATH}: the pipeline would download it")
@@ -265,7 +292,7 @@ def check_e2e(main_root):
     def one_time_grid(fixes, interval):
         grid = orig_grid(fixes, interval)
         grid = grid[grid["time"] == target].reset_index(drop=True)
-        assert len(grid) == 1, f"{E2E_TIME} is not on the sample grid"
+        assert len(grid) == 1, f"{case['time']} is not on the sample grid"
         return grid
 
     def scan_to_tmp(s3_client, key, *a, **kw):
@@ -273,16 +300,25 @@ def check_e2e(main_root):
         calls["keys"].append(key)
         return functools.partial(orig_scan, scratch_path=scratch)(s3_client, key, *a, **kw)
 
-    def cached_hurdat2(url=None, force=False, **kw):
-        assert url is None and not force and not kw, "e2e must read the HURDAT2 cache, never refresh it"
-        return orig_h2()
-
     t0 = time.perf_counter()
     try:
+        # The pipeline is never given hurdat2_url or force_hurdat2_refresh: either would write the
+        # protected Atlantic cache. The stub serves the cache read-only, or a temp copy of another file.
+        if case["hurdat2"] is None:
+            hurdat2_path = config.HURDAT2_CACHE_PATH
+            def stub_hurdat2(url=None, force=False, **kw):
+                assert url is None and not force and not kw, "e2e must read the HURDAT2 cache, never refresh it"
+                return orig_h2()
+        else:
+            hurdat2_path = fetch_hurdat2(*case["hurdat2"], tmp / "hurdat2.txt")
+            def stub_hurdat2(url=None, force=False, **kw):
+                assert url is None and not force and not kw, "e2e must never refresh the HURDAT2 cache"
+                return hurdat2_path
+
         pipeline.build_sample_grid, crop.process_one_scan, hurdat2.download_hurdat2 = (
-            one_time_grid, scan_to_tmp, cached_hurdat2)
+            one_time_grid, scan_to_tmp, stub_hurdat2)
         try:
-            manifest_path = pipeline.run_pipeline(atcf_id=E2E_STORM, out_root=out_root, bucket=E2E_BUCKET)
+            manifest_path = pipeline.run_pipeline(atcf_id=storm, out_root=out_root, bucket=bucket)
         finally:
             pipeline.build_sample_grid, crop.process_one_scan, hurdat2.download_hurdat2 = (
                 orig_grid, orig_scan, orig_h2)
@@ -296,7 +332,7 @@ def check_e2e(main_root):
         assert calls["keys"] == [key]
         built = out_root / row["crop_path"]
 
-        _, fixes = hurdat2.parse_storm(E2E_STORM, config.HURDAT2_CACHE_PATH)
+        _, fixes = hurdat2.parse_storm(storm, hurdat2_path)
         fix = fixes[fixes["time"] == target]
         assert len(fix) == 1, "no exact HURDAT2 fix at the target time"
         label = float(fix["wind_kt"].iloc[0])
@@ -306,13 +342,11 @@ def check_e2e(main_root):
         bt = d["bt"]
         bt_min, bt_max = float(np.min(bt)), float(np.max(bt))
         nans = int(np.isnan(bt).sum())
-
-        same_bytes = built.read_bytes() == on_disk.read_bytes()
-        same_bt = bool(np.array_equal(bt, np.load(on_disk)["bt"]))
+        dqf_nonzero = int(np.count_nonzero(d["dqf"]))
 
         # Training preprocessing: TCDataset on the manifest run_pipeline wrote (clip 180-320, scale,
         # bilinear to 224, 3 channels; the expanded members were trained unmasked and unrotated).
-        ds = TCDataset(str(out_root), [E2E_STORM])
+        ds = TCDataset(str(out_root), [storm])
         assert len(ds) == 1
         image, ds_label = ds[0]
         assert abs(float(ds_label) * 185.0 - label) < 1e-3
@@ -334,26 +368,45 @@ def check_e2e(main_root):
         preds = np.array(preds)
         total_s = time.perf_counter() - t0
 
-        print(f"  S3 key:        s3://{E2E_BUCKET}/{key}")
+        print(f"  S3 key:        s3://{bucket}/{key}")
         print(f"  scan time:     {row['scan_time']}  (offset {row['offset_min']} min)")
-        print(f"  HURDAT2 label: {label:.1f} kt (exact fix, status {row['status']})")
+        print(f"  HURDAT2 label: {label:.1f} kt (exact fix, status {row['status']}, from {hurdat2_path.name})")
         print(f"  crop shape:    {bt.shape[0]}x{bt.shape[1]}  ({built.stat().st_size} bytes)")
-        print(f"  BT min/max:    {bt_min:.2f} / {bt_max:.2f} K  NaNs: {nans}")
-        print(f"  byte-identical to {E2E_CROP}: {same_bytes}  (bt arrays equal: {same_bt})")
+        print(f"  BT min/max:    {bt_min:.2f} / {bt_max:.2f} K  NaNs: {nans}  nonzero DQF: {dqf_nonzero}")
+
+        problems = []
+        if on_disk is not None:
+            same_bytes = built.read_bytes() == on_disk.read_bytes()
+            same_bt = bool(np.array_equal(bt, np.load(on_disk)["bt"]))
+            print(f"  byte-identical to {case['crop']}: {same_bytes}  (bt arrays equal: {same_bt})")
+            if not same_bytes:
+                problems.append(f"temp crop differs from {on_disk} (bt arrays equal: {same_bt})")
+        if "key" in case and key != case["key"]:
+            problems.append(f"matched {key}, expected {case['key']}")
+        if "expect" in case:
+            e = case["expect"]
+            print(f"  expected:      shape {e['shape'][0]}x{e['shape'][1]}, BT {e['bt_min']:.2f} / {e['bt_max']:.2f} K, "
+                  f"label {e['label']:.1f} kt (within {E2E_BT_TOLERANCE_K} K)")
+            if tuple(bt.shape) != tuple(e["shape"]):
+                problems.append(f"crop shape {bt.shape}, expected {e['shape']}")
+            for got, want, what in ((bt_min, e["bt_min"], "BT min"), (bt_max, e["bt_max"], "BT max")):
+                if abs(got - want) > E2E_BT_TOLERANCE_K:
+                    problems.append(f"{what} {got:.3f} K, expected {want} +- {E2E_BT_TOLERANCE_K}")
+            if label != e["label"]:
+                problems.append(f"label {label} kt, expected {e['label']}")
+            if dqf_nonzero:
+                problems.append(f"{dqf_nonzero} nonzero DQF pixels, expected none")
         print(f"  members:       {' '.join(f'{p:.1f}' for p in preds)}")
         print(f"  ensemble mean: {preds.mean():.2f} kt  error {preds.mean() - label:+.2f} kt")
         print(f"  member spread: sd {preds.std(ddof=1):.2f} kt, range {preds.min():.1f}-{preds.max():.1f} kt")
         print(f"  runtime:       build {build_s:.1f} s, total {total_s:.1f} s")
 
-        problems = []
         if nans:
             problems.append(f"{nans} NaNs in the crop")
         if not E2E_BT_MIN_RANGE[0] <= bt_min <= E2E_BT_MIN_RANGE[1]:
             problems.append(f"BT min {bt_min:.2f} K outside {E2E_BT_MIN_RANGE}")
         if not bt_max < E2E_BT_MAX_BELOW:
             problems.append(f"BT max {bt_max:.2f} K not below {E2E_BT_MAX_BELOW}")
-        if not same_bytes:
-            problems.append(f"temp crop differs from {on_disk} (bt arrays equal: {same_bt})")
         if abs(preds.mean() - label) > E2E_TOLERANCE_KT:
             problems.append(f"ensemble mean {preds.mean():.2f} kt is more than {E2E_TOLERANCE_KT} kt from {label}")
         if problems:
@@ -364,7 +417,7 @@ def check_e2e(main_root):
         if data_after != data_before:
             changed = sorted(set(data_after.items()) ^ set(data_before.items()))
             raise AssertionError(f"data/ changed during e2e: {changed[:10]}")
-    return f"Michael {E2E_TIME}: ensemble {preds.mean():.1f} kt vs label {label:.0f} kt; data/ unchanged"
+    return f"{storm} {case['time']}: ensemble {preds.mean():.1f} kt vs label {label:.0f} kt; data/ unchanged"
 
 
 def run_sections(sections):
@@ -395,7 +448,7 @@ def run_sections(sections):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--repo-root", help="main checkout holding data/, models/ and results/ (default: from git)")
-    p.add_argument("--e2e", action="store_true", help="F2 instead of F1: build Michael 2018-10-09 12:00 from S3")
+    p.add_argument("--e2e", action="store_true", help="instead of F1, run the E2E_CASES (Michael GOES-16, Dora GOES-18): download, build, predict")
     p.add_argument("--gitignore-target", help="run only the gitignore section, against this repo")
     args = p.parse_args()
 
@@ -410,8 +463,10 @@ def main():
         print(f"python:    {sys.executable}")
         hashes = ("hashes", lambda: check_hashes(main_root))
         if args.e2e:
-            sections = [hashes, ("e2e GOES-16 Michael", lambda: check_e2e(main_root)),
-                        ("hashes after e2e", lambda: check_hashes(main_root))]
+            sections = [hashes]
+            for case in E2E_CASES:
+                sections.append((case["name"], functools.partial(check_e2e, main_root, case)))
+                sections.append((f"hashes after {case['name'].split()[-1]}", lambda: check_hashes(main_root)))
         else:
             sections = [
                 hashes,
