@@ -14,6 +14,11 @@ import pytest
 CHECKOUT_ROOT = Path(__file__).resolve().parents[1]
 
 
+def pytest_report_header(config):
+    import hurricane_intensity
+    return f"hurricane_intensity: {hurricane_intensity.__file__}"
+
+
 def find_main_root():
     env = os.environ.get("HC_MAIN_ROOT")
     if env:

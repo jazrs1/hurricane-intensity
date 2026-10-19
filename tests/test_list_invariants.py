@@ -57,6 +57,21 @@ def test_training_set_is_disjoint(checkout_root, tmp_path, train_list):
         assert not overlap, f"training set of {train_list} overlaps {other}: {overlap}"
 
 
+def val_lists():
+    return sorted(p.name for p in Path(__file__).resolve().parents[1].glob("storms_val*.txt"))
+
+
+# I5 extension (approved by John 2026-10-18): a validation list, i.e. anything train.py's --val-list takes for
+# epoch/checkpoint selection, never includes an H9 or 2025 storm. load_splits takes the validation storms out
+# of the training set first, so the training-set test above can't see this: a held-out storm added to a val
+# list and to the train lists (Fiona AL092022 in the adversary's case) would pass it.
+@pytest.mark.parametrize("val_list", val_lists())
+def test_val_list_never_includes_h9_or_2025(checkout_root, val_list):
+    for other in ("storms_holdout_h9.txt", "storms_test_2025.txt"):
+        overlap = sorted(ids(checkout_root, val_list) & ids(checkout_root, other))
+        assert not overlap, f"{val_list} (checkpoint selection) includes {other} storms: {overlap}"
+
+
 def test_allowlist_is_still_accurate(checkout_root):
     """Each allowlisted storm is still in its list and still forbidden, so the allowlist can't go stale."""
     forbidden = set().union(*(ids(checkout_root, f) for f in FORBIDDEN_LISTS))
