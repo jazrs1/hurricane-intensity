@@ -1,0 +1,9 @@
+# H-EP: the East Pacific held-out evaluation set (reports/v2_survey/hep/protocol.md, approved
+# 2026-10-19; N1 Option A). Never in any training or validation list (I5). Built only into
+# data/hep_sealed/ and scored once, in the single pass.
+EP052025  # Erick
+EP062025  # Flossie
+EP112025  # Kiko
+EP162025  # Priscilla
+EP112023  # Jova
+EP182023  # Otis
