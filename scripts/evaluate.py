@@ -5,15 +5,15 @@ import numpy as np
 from torch.utils.data import DataLoader
 from torchvision.models import resnet18
 from hurricane_intensity.dataset import TCDataset
-from hurricane_intensity.splits import HOLDOUT_LIST, TRAIN_LIST, load_splits
+from hurricane_intensity.splits import load_splits
 from pathlib import Path
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--checkpoint", default="best_model.pt")
-parser.add_argument("--holdout-list", default=str(HOLDOUT_LIST), help="storm list to evaluate on")
-parser.add_argument("--train-list", default=str(TRAIN_LIST),
+parser.add_argument("--checkpoint", required=True)
+parser.add_argument("--holdout-list", required=True, help="storm list to evaluate on")
+parser.add_argument("--train-list", required=True,
                     help="list the checkpoint was trained on; evaluation refuses any held-out storm that appears in it")
-parser.add_argument("--out", default="results/heldout_predictions.csv", help="per-sample predictions CSV")
+parser.add_argument("--out", required=True, help="per-sample predictions CSV")
 parser.add_argument("--circular-mask", action="store_true", help="fill outside the inscribed circle with 300 K (no rotation)")
 args = parser.parse_args()
 

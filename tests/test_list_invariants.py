@@ -64,12 +64,23 @@ def val_lists():
 # I5 extension (approved by John 2026-10-18): a validation list, i.e. anything train.py's --val-list takes for
 # epoch/checkpoint selection, never includes an H9 or 2025 storm. load_splits takes the validation storms out
 # of the training set first, so the training-set test above can't see this: a held-out storm added to a val
-# list and to the train lists (Fiona AL092022 in the adversary's case) would pass it.
+# list and to the train lists (Fiona AL072022 in the adversary's case) would pass it.
+def held_out_in_val(root, val_path):
+    return {other: sorted(set(load_storm_list(val_path)) & ids(root, other))
+            for other in ("storms_holdout_h9.txt", "storms_test_2025.txt")}
+
+
 @pytest.mark.parametrize("val_list", val_lists())
 def test_val_list_never_includes_h9_or_2025(checkout_root, val_list):
-    for other in ("storms_holdout_h9.txt", "storms_test_2025.txt"):
-        overlap = sorted(ids(checkout_root, val_list) & ids(checkout_root, other))
+    for other, overlap in held_out_in_val(checkout_root, checkout_root / val_list).items():
         assert not overlap, f"{val_list} (checkpoint selection) includes {other} storms: {overlap}"
+
+
+def test_fiona_al072022_in_val_is_caught(checkout_root, tmp_path):
+    """Regression for the adversary's case: Fiona AL072022 (H9) added to a validation list."""
+    val = tmp_path / "storms_val_expanded.txt"
+    val.write_text((checkout_root / "storms_val_expanded.txt").read_text() + "AL072022\n")
+    assert held_out_in_val(checkout_root, val)["storms_holdout_h9.txt"] == ["AL072022"]
 
 
 def test_allowlist_is_still_accurate(checkout_root):
