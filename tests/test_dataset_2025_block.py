@@ -1,19 +1,19 @@
 """TCDataset refuses the six spent 2025 Atlantic test storms (the 2025 block in src/hurricane_intensity/dataset.py).
 
-Written before the block. The block tests are strict xfail, so they XPASS and fail once the block lands,
-and the markers have to be removed. Every storm here has a valid fixture manifest and crop in a temporary
-processed_root, so a ValueError can't come from a missing or empty file.
+Every storm here has a valid fixture manifest and crop in a temporary processed_root, so a ValueError can't
+come from a missing or empty file. The tests were written before the block (strict xfail) and the markers
+were removed when it landed.
 
 The block covers the six Atlantic IDs only (N1, Option A). Other 2025 storms must still load: the East Pacific
 ones are the future H-EP held-out set, and AL012025 is an Atlantic 2025 storm that was never a test storm.
 
-What the tests require of the block (hc-adversary items 5 and 6):
+What the tests require of the block (hc-adversary items 5, 6 and 6b):
 - a storm ID that is not exactly ^[A-Z]{2}[0-9]{6}$ (ASCII, no normalisation) is refused before any read;
 - a spent ID is refused before any read;
 - a manifest whose atcf_id or crop_path names a spent storm is refused, whatever directory it sits in;
 - __getitem__ refuses a row whose crop_path names a spent storm, even if df was replaced after construction;
-- the spent set is one module-level frozenset of exactly the six IDs, and nothing (environment, module or class
-  attribute, parameter) turns the block off.
+- the spent set is one module-level frozenset literal of exactly the six IDs, dataset.py holds no mutable
+  module-level container, and nothing (environment, module or class attribute, parameter) turns the block off.
 """
 import ast
 import inspect
@@ -33,17 +33,6 @@ SPENT_2025 = ["AL042025", "AL052025", "AL072025", "AL082025", "AL092025", "AL132
 LEGAL = "AL142018"    # Michael, a training storm
 EP_2025 = "EP052025"  # Erick, future H-EP
 AL_2025 = "AL012025"  # Andrea, Atlantic 2025 but never a test storm
-
-# raises= limits each expected failure to "DID NOT RAISE ValueError", so a broken fixture or a crash is a
-# real failure, not a hidden xfail.
-AWAITING = pytest.mark.xfail(strict=True, reason="awaiting the TCDataset 2025 block", raises=pytest.fail.Exception)
-# Today an ID with whitespace or a malformed ID finds no directory (FileNotFoundError, or OSError for a tab
-# or newline).
-AWAITING_PATH_ERROR = pytest.mark.xfail(strict=True, reason="awaiting the TCDataset 2025 block",
-                                        raises=(pytest.fail.Exception, OSError))
-# For the module checks, which assert on dataset's attributes rather than on a refusal.
-AWAITING_ASSERT = pytest.mark.xfail(strict=True, reason="awaiting the TCDataset 2025 block", raises=AssertionError)
-
 
 def case_insensitive_fs():
     with tempfile.TemporaryDirectory() as d:
@@ -108,7 +97,7 @@ def spent_row(root, storm_id="AL042025", crop_path=None):
 
 @pytest.mark.parametrize("storm_id", SPENT_2025)
 def test_fixture_is_valid(processed_root, storm_id):
-    """Not xfail: each 2025 fixture reads cleanly, so the block tests below can only pass on the block."""
+    """Each 2025 fixture reads cleanly, so the block tests below can only pass on the block."""
     df = pd.read_csv(processed_root / storm_id / "manifest.csv")
     assert len(df) == 2
     for p in df.crop_path:
@@ -118,33 +107,28 @@ def test_fixture_is_valid(processed_root, storm_id):
 
 # --- refused by ID, before any read ---------------------------------------------------------------------
 
-@AWAITING
 @pytest.mark.parametrize("storm_id", SPENT_2025)
 def test_2025_storm_refused(processed_root, storm_id):
     assert_refused(processed_root, [storm_id])
 
 
-@AWAITING
 @pytest.mark.parametrize("storm_ids", [[LEGAL, "AL092025"], ["AL092025", LEGAL]], ids=["legal-first", "2025-first"])
 def test_2025_storm_refused_when_mixed_with_legal(processed_root, storm_ids):
     assert_refused(processed_root, storm_ids)
 
 
 @needs_case_insensitive_fs
-@AWAITING
 def test_lowercase_2025_id_refused(processed_root):
     # On a case-insensitive filesystem (NTFS) the lowercase ID would load the real storm's crops.
     assert (processed_root / "al042025" / "manifest.csv").exists()
     assert_refused(processed_root, ["al042025"])
 
 
-@AWAITING_PATH_ERROR
 @pytest.mark.parametrize("storm_id", [" AL042025", "AL042025 ", "\tAL042025\n"], ids=["lead", "trail", "tab-nl"])
 def test_2025_id_with_whitespace_refused(processed_root, storm_id):
     assert_refused(processed_root, [storm_id])
 
 
-@AWAITING
 @pytest.mark.parametrize("alias", [
     pytest.param("AL042025.", marks=needs_windows, id="trailing-dot"),
     pytest.param("./AL042025", id="dot-slash"),
@@ -159,7 +143,6 @@ def test_path_alias_of_2025_storm_refused(processed_root, alias):
     assert_refused(processed_root, [alias])
 
 
-@AWAITING
 def test_refused_before_any_manifest_is_read(processed_root, read_spy):
     # The legal storm comes first, so a check made inside the manifest loop would read its manifest.
     assert_refused(processed_root, [LEGAL, "AL132025"])
@@ -172,7 +155,6 @@ MALFORMED = ["al142018", "Al142018", " AL142018", "AL142018 ", "AL142018\n", "AL
              "AL14201", "AL1420188", "", "A1142018", "AL١٤٢٠١٨", str(Path("x") / LEGAL)]
 
 
-@AWAITING_PATH_ERROR
 @pytest.mark.parametrize("storm_id", MALFORMED, ids=[repr(s) for s in MALFORMED])
 def test_malformed_id_refused_before_any_read(processed_root, read_spy, storm_id):
     assert_refused(processed_root, [LEGAL, storm_id])
@@ -181,7 +163,6 @@ def test_malformed_id_refused_before_any_read(processed_root, read_spy, storm_id
 
 # --- refused by manifest content ------------------------------------------------------------------------
 
-@AWAITING
 @pytest.mark.parametrize("case", ["copied-manifest", "crop-path-into-spent", "spent-atcf-id", "crop-path-parent-lower"])
 def test_manifest_naming_spent_storm_refused(processed_root, case):
     spent_crops = pd.read_csv(processed_root / "AL042025" / "manifest.csv").crop_path.tolist()
@@ -200,7 +181,6 @@ def test_manifest_naming_spent_storm_refused(processed_root, case):
 
 # --- __getitem__ guard ----------------------------------------------------------------------------------
 
-@AWAITING
 @pytest.mark.parametrize("prefix", ["AL042025/", "al042025\\", "./AL042025/", "../processed/AL042025/",
                                     pytest.param("AL042025./", marks=needs_windows)],
                          ids=["plain", "lower-backslash", "dot-slash", "parent", "trailing-dot"])
@@ -217,7 +197,7 @@ def test_getitem_refuses_spent_row_after_df_replaced(processed_root, prefix):
 # --- no way around it -----------------------------------------------------------------------------------
 
 def test_no_override_parameter():
-    """Not xfail: the signature stays exactly as it is now."""
+    """The signature stays exactly as it was before the block."""
     params = inspect.signature(TCDataset.__init__).parameters
     assert [(p.name, p.kind, p.default) for p in params.values()] == [
         ("self", inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.empty),
@@ -230,7 +210,7 @@ def test_no_override_parameter():
 
 
 def test_dataset_reads_no_environment():
-    """Not xfail: dataset.py never reads the environment, so no variable can switch the block off."""
+    """dataset.py never reads the environment, so no variable can switch the block off."""
     tree = ast.parse(Path(dataset.__file__).read_text(encoding="utf-8"))
     names = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
     names |= {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
@@ -238,7 +218,6 @@ def test_dataset_reads_no_environment():
     assert not names & {"environ", "environb", "getenv", "getenvb", "putenv"}
 
 
-@AWAITING_ASSERT
 def test_spent_set_is_one_module_frozenset_of_the_six():
     sets = {name: v for name, v in vars(dataset).items()
             if isinstance(v, (set, frozenset, list, tuple, dict)) and any(s in v for s in SPENT_2025)}
@@ -247,10 +226,30 @@ def test_spent_set_is_one_module_frozenset_of_the_six():
     assert type(value) is frozenset and value == frozenset(SPENT_2025)
 
 
-@AWAITING
+def test_spent_set_is_a_literal_of_the_six():
+    """The frozenset is written out in dataset.py as a literal of the six strings, not computed or read."""
+    tree = ast.parse(Path(dataset.__file__).read_text(encoding="utf-8"))
+    literals = []
+    for stmt in tree.body:
+        if isinstance(stmt, (ast.Assign, ast.AnnAssign)) and isinstance(stmt.value, ast.Call)                 and isinstance(stmt.value.func, ast.Name) and stmt.value.func.id == "frozenset":
+            (arg,) = stmt.value.args
+            assert isinstance(arg, (ast.Set, ast.List, ast.Tuple)), ast.dump(arg)
+            assert all(isinstance(e, ast.Constant) and type(e.value) is str for e in arg.elts), ast.dump(arg)
+            literals.append(sorted(e.value for e in arg.elts))
+    assert literals == [sorted(SPENT_2025)]
+
+
+def test_no_mutable_module_container():
+    """A module-level list, dict, set or bytearray could be edited at runtime to widen or empty the block."""
+    mutable = sorted(n for n, v in vars(dataset).items()
+                     if not n.startswith("__") and isinstance(v, (list, dict, set, bytearray)))
+    assert mutable == []
+
+
 def test_no_attribute_turns_the_block_off(processed_root, read_spy, monkeypatch):
     """Flip every simple module and class attribute: AL042025 must still be refused each time, before any read
-    (the manifest check alone would hide a flag that disables the ID check)."""
+    (the manifest check alone would hide a flag that disables the ID check). Any exception counts as a refusal
+    here, so flipping a pattern string to True (a TypeError in re) is fine."""
     targets = [(dataset, n, v) for n, v in vars(dataset).items()] + [(TCDataset, n, v) for n, v in vars(TCDataset).items()]
     simple = [(obj, n) for obj, n, v in targets
               if not n.startswith("__") and (v is None or type(v) in (bool, int, str))]
@@ -258,13 +257,14 @@ def test_no_attribute_turns_the_block_off(processed_root, read_spy, monkeypatch)
         for value in (True, False, None, 0, 1, "1", "yes"):
             with monkeypatch.context() as m:
                 m.setattr(obj, name, value)
-                assert_refused(processed_root, ["AL042025"])
+                with pytest.raises(Exception):
+                    TCDataset(str(processed_root), ["AL042025"])
                 assert read_spy == [], f"{name}={value!r} let the ID check through"
     assert_refused(processed_root, ["AL042025"])  # also with no attribute flipped (e.g. none exist)
     assert read_spy == []
 
 
-# --- positive controls (not xfail) ----------------------------------------------------------------------
+# --- positive controls ----------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("storm_id", [LEGAL, EP_2025, AL_2025], ids=["legal", "ep-2025", "al012025"])
 def test_non_spent_storm_still_loads(processed_root, storm_id):
