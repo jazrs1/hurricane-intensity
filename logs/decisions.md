@@ -2151,3 +2151,61 @@ Reading, descriptive as fixed:
   separated from the general Cat 5 underestimation.
 
 The 2025 set is now spent.
+
+2026-10-18, 23:21. Held-out storms in the epoch-budget choice; protocol
+fix. No training, no evaluation.
+- The 40-epoch budget (2026-10-13, night) was chosen from per-epoch and
+  per-budget held-out MAE on Ian AL092022, Nicole AL172022 and Claudette
+  AL032021, the original three held-out storms, all now in H9. No
+  list-membership check can catch that. Found in review on 2026-10-18.
+- Exposed: any held-out result that contains the original three and
+  comes from a model trained to 40 epochs or about 1640 steps. That
+  covers control (storms_train_control2.txt, 40 epochs) and expanded
+  (25 epochs, step-matched), so the ten ensemble members
+  (models/storms/expanded/) too. It also covers the variety-against-
+  volume runs (read on H9) and the imbalance, loss and rotation runs
+  (read on H3, H4 or H6, which contain the three). The traced
+  configuration was the nine-storm baseline, so any favour in the
+  more-distinct experiment goes to the control-like arm and can't
+  inflate expanded minus control.
+- The size can be bounded, and the bound is close to zero. The same
+  three runs logged validation MAE at every epoch
+  (results/epoch_traces_60/epoch_trace.csv). Ten-epoch window means,
+  validation / held-out:
+  - 11-20: 10.00 / 10.54
+  - 21-30: 9.52 / 10.15
+  - 31-40: 8.88 / 9.67
+  - 41-50: 8.80 / 9.64
+  - 51-60: 9.02 / 9.84
+  Validation alone shows the same shape and would have pointed to the
+  same budget.
+- Sam AL182021 was also evaluated per epoch (2026-10-14 00:30, imbalance
+  traces). No recorded choice used it.
+- The 2025 GOES-19 test result (2026-10-16, 00:29) is unaffected. H9 and
+  its traces informed the budget; no 2025 storm was used in any model,
+  budget or ensemble choice, and the 2025 set was built and evaluated
+  once, after the ensemble was frozen.
+  - Caveat for reading it: every comparison with H9 in that entry uses H9
+    as the reference (overall and band-mix MAE, Spearman, per-band
+    bias). The 2025 design already called H9 optimistic, because H9
+    picked the arm. The budget adds a second source, bounded near zero
+    above.
+  - Separately, the record contradicts itself on whether 2025
+    intensities were read before the test. The 2026-10-14
+    more-distinct-storms design lists their peaks, while the 10-15
+    design says no intensities were read.
+    The peaks were seen; no model choice used them.
+- From now on:
+  - H9 results are reported pooled and split into the original three
+    (Ian, Nicole, Claudette) and the six added later (Sam AL182021,
+    Beryl AL022024, Lee AL132023, Fiona AL072022, Kirk AL122024, Iota
+    AL312020).
+  - Per-epoch traces are computed on validation storms only. No
+    held-out storm is evaluated per epoch.
+  - The existing held-out traces (results/epoch_traces*/,
+    results/imbalance/epoch_trace.csv,
+    results/imbalance/heldout_predictions_by_epoch.csv.gz) are not
+    used for any further choice.
+  - The rule is procedural for now: epoch_trace_tag.py and
+    imbalance_epoch_trace.py still default to held-out lists.
+Recorded at the user's request, 2026-10-18.
