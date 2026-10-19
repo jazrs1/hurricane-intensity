@@ -5,6 +5,7 @@ Reads data/processed and the pinned Atlantic HURDAT2 in the main checkout; write
 """
 import hashlib
 import importlib.util
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -52,3 +53,11 @@ def test_never_overwrites_other_bytes(main_root, tmp_path, monkeypatch):
     with pytest.raises(SystemExit, match="exists with other bytes"):
         F.main(args(main_root, out))
     assert out.read_text() == "something else\n"
+
+
+def test_frame_list_bytes_survive_checkout():
+    """core.autocrlf=true would give the main checkout a CRLF copy whose SHA-256 is not FRAME_LIST_SHA256 (run_n5
+    guard 2 hashes the working file); .gitattributes marks it -text."""
+    r = subprocess.run(["git", "check-attr", "text", "--", "results/n5_atlantic/frame_list_atlantic.txt"],
+                       cwd=CHECKOUT, capture_output=True, text=True, check=True)
+    assert r.stdout.strip().endswith("text: unset"), r.stdout
