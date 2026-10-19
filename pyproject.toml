@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "hurricane-intensity"
 version = "0.1.0"
 description = "Data pipeline: GOES-16 ABI imagery matched to HURDAT2 best-track fixes"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 
 [tool.setuptools.packages.find]
 where = ["src"]
