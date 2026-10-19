@@ -793,6 +793,39 @@ def test_an_eval_abort_during_phase1_blocks_further_training(tmp_path):
         R.abort_all("start over", root)
 
 
+def test_the_phase2_marker_alone_is_a_look(tmp_path):
+    """Pinned H9 outputs deleted by hand (no abort-eval, no trace in aborted/): the marker still blocks every abort
+    and launch."""
+    root = fake_repo(tmp_path)
+    runner = train(root)
+    runner.eval_fail = {"results/n5_atlantic/control_seed0_native_h9.csv"}
+    with pytest.raises(R.LaunchError, match="evaluation failed"):
+        ev(root, runner=runner)
+    for rel in R.h9_outputs(root, range(10)):
+        (root / rel).unlink()
+    assert R.looked(root, range(10)) == [R.PHASE2_MARKER]
+    for stage, match in ((lambda: R.abort_all("start over", root), "abort-all: H9 outputs exist .*phase2_started"),
+                         (lambda: R.abort_run("atlantic", 3, "retrain", root), "abort-run: H9 outputs exist .*phase2_started")):
+        with pytest.raises(R.LaunchError, match=match):
+            stage()
+
+
+def test_an_eval_abort_appearing_mid_phase1_stops_training(tmp_path):
+    """The per-run phase-1 check counts every kind of look, not only the pinned H9 paths."""
+    root = fake_repo(tmp_path)
+
+    def plant(arm, seed):
+        if (arm, seed) == ("atlantic", 0):  # order 2: an H9 evaluation of control seed 0, aborted, leaves this
+            d = root / "logs/n5_atlantic/aborted/control_seed0_eval1"
+            d.mkdir(parents=True)
+            (d / "abort.json").write_text(json.dumps({"status": "complete", "moved": {}}), encoding="utf-8")
+
+    runner = FakeRunner(root, on_train=plant)
+    with pytest.raises(R.LaunchError, match="phase 1: H9 outputs exist .*control_seed0_eval1/abort.json"):
+        train(root, runner=runner)
+    assert train_calls(runner) == [("control", 0), ("atlantic", 0)]
+
+
 def test_a_pending_eval_abort_blocks_evaluate_and_resumes(tmp_path, monkeypatch):
     """Item 16b, finding 2: evaluate refuses an unfinished abort before any H9 step; re-running abort-eval
     finishes it."""
