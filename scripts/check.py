@@ -51,6 +51,9 @@ PROTECTED_PATHS = [
     "data/interim/hurdat2_atlantic.txt",
 ]
 HASH_HEADING = "## Protected hashes (check.py source of truth)"
+# Coordinator-owned, gitignored files that must never enter git (see check_trust_files_untracked).
+TRUST_FILES = ("COORDINATOR.md", "FEATURES.md")
+BASE_REF = "phase2-experiments"  # PRs target this branch; their diff is base...HEAD
 
 # Must be ignored in the main checkout: a root .pt (the existing one and a new one), an ensemble member,
 # and anything under models/ or data/. A missing trailing newline once turned `*.pt` into
@@ -138,7 +141,38 @@ def load_expected(coordinator_md):
     return expected
 
 
+def resolve_base(root):
+    for ref in (BASE_REF, f"origin/{BASE_REF}"):
+        if git("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}", cwd=root, check=False).returncode == 0:
+            return ref
+    raise AssertionError(f"neither {BASE_REF} nor origin/{BASE_REF} resolves in {root}")
+
+
+def check_trust_files_untracked(main_root):
+    """COORDINATOR.md and FEATURES.md must never be in git. A PR that force-adds one (git add -f) would replace the
+    main checkout's trusted, gitignored copy on merge, pull or checkout, without a "would be overwritten" error."""
+    problems = []
+    for root in dict.fromkeys([CHECKOUT_ROOT, main_root]):
+        for f in TRUST_FILES:
+            if git("ls-files", "--error-unmatch", "--", f, cwd=root, check=False).returncode == 0:
+                problems.append(f"{f} is tracked in {root}")
+        history = git("log", "--all", "--format=%h", "--name-only", "--", *TRUST_FILES, cwd=root).stdout.split()
+        touched = sorted(set(TRUST_FILES) & set(history))
+        if touched:
+            problems.append(f"{touched} appear in git history of {root} (git log --all): {history[:6]}")
+    base = resolve_base(CHECKOUT_ROOT)
+    changed = git("diff", "--name-only", f"{base}...HEAD", cwd=CHECKOUT_ROOT).stdout.split()
+    in_diff = sorted(set(TRUST_FILES) & set(changed))
+    if in_diff:
+        problems.append(f"{in_diff} changed in {base}...HEAD of {CHECKOUT_ROOT}")
+    print(f"trust files {', '.join(TRUST_FILES)}: not tracked (ls-files), not in {base}...HEAD, "
+          f"not in git log --all; checked in {CHECKOUT_ROOT} and {main_root}" if not problems else "")
+    if problems:
+        raise AssertionError("trust file in git:\n" + "\n".join(problems))
+
+
 def check_hashes(main_root, coordinator_md):
+    check_trust_files_untracked(main_root)
     print(f"expected hashes from: {coordinator_md}")
     expected = load_expected(coordinator_md)
     bad = []
