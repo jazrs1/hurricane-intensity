@@ -207,7 +207,7 @@ def build(name, kind="plateau", gain=None, val_fn=None, reval_fn=None, man_mutat
                 d.to_csv(root / p["csv"], index=False, lineterminator="\n")
                 write(root, p["eval_log"], eval_log(p["checkpoint"], p["csv"], d))
                 evals[str(e)] = {"csv_sha256": sha(root / p["csv"]), "eval_log_sha256": sha(root / p["eval_log"])}
-            man = dict(rec, evals=evals)
+            man = dict(rec, evals=evals, protected_after_eval=dict(FAKE_PROT))
             if man_mutate:
                 man = man_mutate(arm, s, man, root)
             write(root, f"logs/f31/runs/{arm}_seed{s}.train.json", json.dumps(rec, indent=1))
@@ -686,3 +686,15 @@ def test_refuses_wrong_order_and_other_train_py_at_commit():
         analyse(root, git=fake_git(train_bytes=b"lr = schedule(epochs)\n"))
     assert A.expected_order("control", 10) == 1 and A.expected_order("atlantic", 10) == 2
     assert A.expected_order("atlantic", 11) == 3 and A.expected_order("control", 29) == 40
+
+
+def test_protected_after_eval_allowed_only_when_equal():
+    root = copy_of("protafter")
+    analyse(root)  # every manifest carries protected_after_eval == PROTECTED; the records don't: accepted
+    rewrite_manifest(root, "control", 29, lambda m: {**m, "protected_after_eval": {**m["protected_after_eval"],
+                                                                                   "best_model.pt": "0" * 64}})
+    with pytest.raises(A.DesignError, match="protected_after_eval differs"):
+        analyse(root, out="results/f31/analysis_b")
+    rewrite_manifest(root, "control", 29, lambda m: {k: v for k, v in m.items() if k != "protected_after_eval"})
+    with pytest.raises(A.DesignError, match="protected_after_eval differs"):
+        analyse(root, out="results/f31/analysis_c")

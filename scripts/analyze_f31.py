@@ -32,7 +32,8 @@ The record/manifest contract run_f31.py must write (phase-1 record <arm>_seed<s>
   [epochs]}, files_sha256 {path: sha} (exactly the train log, seed<s>.pt and the slot epochs' files),
   deleted_epoch_sha256 {epoch: sha} (every other epoch; those files are gone), protected_before, protected_after,
   aborted_attempts, eval_attempts, and in the manifest evals {epoch: {csv_sha256, eval_log_sha256}} for exactly the
-  distinct slot epochs (paths: epoch_paths).
+  distinct slot epochs (paths: epoch_paths) and protected_after_eval (the protected hashes after the run's H9
+  evaluations, as run_n5.evaluate_one writes; must equal PROTECTED).
   Spelled out (hc-adversary item 23c):
   - run_f31.py evaluate applies analyze_f31.check_training to all 40 phase-1 records before the first H9 evaluation,
     so no training-side refusal can first appear after the look (N5 item 16).
@@ -44,8 +45,8 @@ The record/manifest contract run_f31.py must write (phase-1 record <arm>_seed<s>
     from 1 to 40); it is checked and reported.
   - Each train log has an "END " line and no TRAIN_FAILED; each attempt JSON named in aborted_attempts or
     eval_attempts exists with "status": "complete".
-  - The manifest equals its committed phase-1 record on every key except evals and eval_attempts (phase 2 adds
-    those), and the commit's scripts/train.py (git show) hashes to TRAIN_PY_SHA256.
+  - The manifest equals its committed phase-1 record on every key except evals, eval_attempts and
+    protected_after_eval (phase 2 adds those), and the commit's scripts/train.py (git show) hashes to TRAIN_PY_SHA256.
 
 --deviations (the dead-end rule (A), carried over from N5, design.md §8) is the committed, clean file
 logs/f31/deviations.json, {"dropped_runs": [{"arm": <arm>, "seed": <s>, "reason": "<why>"}, ...]}. It may name only a
@@ -430,11 +431,16 @@ def load_run(manifest_path, arm, seed, design, root):
     if not rec_path.is_file():
         raise DesignError(f"{manifest_path}: no phase-1 record {rec_path}")
     rec = json.loads(N5.read_text_strict(rec_path))
-    phase2 = {"evals", "eval_attempts"}
+    phase2 = {"evals", "eval_attempts", "protected_after_eval"}
     diff = sorted(k for k in (set(man) | set(rec)) - phase2 if man.get(k) != rec.get(k))
     if diff:
         raise DesignError(f"{manifest_path}: differs from its phase-1 record {rec_path.name} in {diff}; the slots and "
                           "every training-side field are fixed before the look")
+    after = man.get("protected_after_eval") or {}
+    bad = sorted(k for k, v in design["protected"].items() if after.get(k) != v)
+    if bad or set(after) != set(design["protected"]):
+        raise DesignError(f"{manifest_path}: protected_after_eval differs from the protected hashes: "
+                          f"{bad or sorted(set(after) ^ set(design['protected']))}")
     epochs = sorted(set(slots.values()))
     evals = man.get("evals") or {}
     if sorted(evals) != sorted(map(str, epochs)):
