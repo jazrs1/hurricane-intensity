@@ -11,6 +11,10 @@ their real committed blobs (read once at import), so the three pins are checked 
 
 HC_RUN_F31_UNDER_TEST=<path> loads another copy of the driver (reports/v2_survey/f31/run_f31_breakage.py uses it to
 show that every guard fails a test when disabled). It is not a PYTHON* variable, so -I does not drop it.
+
+Windows note: the abort tests move files under paths like <base>/repo/logs/f31/aborted/<arm>_seed<s>_attempt1/models/
+f31/<arm>/seed<s>_epochs/epoch_NN.pt. Run pytest with a base folder shallower than about 120 characters (for example
+--basetemp C:/t/f31), or those moves can exceed MAX_PATH (260) and fail with FileNotFoundError.
 """
 import hashlib
 import importlib.util
@@ -601,6 +605,36 @@ def test_protected_file_changed_during_a_run_stops(tmp_path):
     assert not (root / "logs/f31/runs/atlantic_seed10.train.json").exists()
 
 
+def test_protected_file_changed_during_revalidation_stops(tmp_path):
+    root = fake_repo(tmp_path)
+
+    def tamper(epoch_dir, epochs, train_list):
+        if "atlantic/seed10_" in Path(epoch_dir).as_posix():
+            (root / "best_model.pt").write_bytes(b"overwritten")
+        return reval_from_curve(epoch_dir, epochs, train_list)
+
+    with pytest.raises(R.LaunchError, match=r"protected hashes changed during atlantic seed 10 \(re-validation or "
+                                            r"deletion\): \['best_model.pt'\]"):
+        train(root, reval=tamper)
+    assert not (root / "logs/f31/runs/atlantic_seed10.train.json").exists()
+
+
+def test_protected_drift_before_a_run_stops_it_unstarted(tmp_path, monkeypatch):
+    root = fake_repo(tmp_path)
+    real, n = R.protected_now, []
+
+    def drift_second_call(main_root, paths):  # call 1 is guard 3; call 2 is the first run's before-run check
+        n.append(1)
+        got = real(main_root, paths)
+        return {**got, "best_model.pt": "0" * 64} if len(n) == 2 else got
+
+    monkeypatch.setattr(R, "protected_now", drift_second_call)
+    runner = FakeRunner(root)
+    with pytest.raises(R.LaunchError, match="protected hashes differ before control seed 10"):
+        train(root, runner=runner)
+    assert runner.calls == [] and not (root / "logs/f31/control_seed10.log").exists()
+
+
 def test_driver_refuses_an_output_that_appears_mid_launch(tmp_path):
     root = fake_repo(tmp_path)
 
@@ -672,7 +706,7 @@ def test_phase2_entry_applies_the_training_side_checks_before_any_h9(trained, ed
                                      differs=((COMMIT, "scripts/analyze_n5.py"),))], ids=["analysis", "analyze_n5"])
 def test_phase2_entry_runs_verify_self_at_the_launch_commit(trained, kw):
     runner = FakeRunner(trained)
-    with pytest.raises(R.LaunchError, match="phase 2 entry, before any H9 evaluation: .*differs from the launch commit"):
+    with pytest.raises(R.LaunchError, match="phase 2 entry, before this invocation's first H9 evaluation: .*differs from the launch commit"):
         ev(trained, git=fake_git(trained, **kw), runner=runner)
     assert runner.calls == []
 
@@ -946,6 +980,55 @@ def test_a_manifest_the_analysis_refuses_stops_phase2_at_that_run(trained):
     runner.eval_bad_log = set()
     R.abort_eval("atlantic", 11, "eval log disagreed with its CSV", trained)
     assert len(ev(trained, runner=runner)[0]) == 40
+
+
+def test_protected_file_changed_during_an_h9_step_stops_without_a_manifest(trained):
+    runner = FakeRunner(trained)
+    rec = record(trained, "atlantic", 10)  # order 2
+    target = A_REAL.epoch_paths("atlantic", 10, min(set(rec["slots"].values())))["csv"]
+    orig = runner.evaluate
+
+    def evaluate_and_tamper(a):
+        out = orig(a)
+        if a["--out"] == target:
+            (trained / "models/baseline_9kt.pt").write_bytes(b"overwritten")
+        return out
+
+    runner.evaluate = evaluate_and_tamper
+    with pytest.raises(R.LaunchError, match=r"protected hashes changed during the H9 evaluation of atlantic seed 10 at "
+                                            r"epoch \d+: \['models/baseline_9kt.pt'\]; no manifest written"):
+        ev(trained, runner=runner)
+    assert not (trained / "logs/f31/runs/atlantic_seed10.json").exists()
+    assert (trained / "logs/f31/runs/control_seed10.json").exists()  # order 1 was finished before
+
+
+def test_protected_drift_before_an_h9_step_stops_it_unrun(trained, monkeypatch):
+    real, n = R.protected_changed, []
+
+    def drift_first_call(main_root, ctx):  # the first call in phase 2 is the before-step check of order 1's first epoch
+        n.append(1)
+        return ["best_model.pt"] if len(n) == 1 else real(main_root, ctx)
+
+    monkeypatch.setattr(R, "protected_changed", drift_first_call)
+    runner = FakeRunner(trained)
+    with pytest.raises(R.LaunchError, match=r"protected hashes differ before the H9 evaluation of control seed 10 at "
+                                            r"epoch \d+: \['best_model.pt'\]"):
+        ev(trained, runner=runner)
+    assert runner.calls == []
+
+
+def test_a_tampered_run_n5_is_refused_before_import(tmp_path):
+    d = tmp_path / "scripts"
+    d.mkdir()
+    shutil.copy(Path(R.__file__), d / "run_f31.py")
+    marker = tmp_path / "executed"
+    good = (CHECKOUT / "scripts" / "run_n5.py").read_bytes()
+    (d / "run_n5.py").write_bytes(good + f"\nopen({str(marker)!r}, 'w').close()\n".encode())
+    with pytest.raises(SystemExit, match="not the pinned run_n5.py blob .*refused before import"):  # its own LaunchError
+        load("run_f31_tampered", d / "run_f31.py")
+    assert not marker.exists()  # never executed
+    (d / "run_n5.py").write_bytes(good.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))  # a CRLF working copy
+    assert load("run_f31_crlf", d / "run_f31.py").RN5.UPSTREAM == "origin/phase2-experiments"  # CRLF copy loads
 
 
 def test_abort_eval_takes_a_manifest_that_load_run_refuses(trained):

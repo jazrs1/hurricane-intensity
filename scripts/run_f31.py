@@ -49,8 +49,10 @@ them, then run evaluate.
 Phase 2 evaluates each distinct slot epoch of each run once, from its epoch file (never seed<s>.pt), writes the
 manifest = the record plus evals, eval_attempts and protected_after_eval (nothing else: analyze_f31.load_run
 requires manifest == record on every other key), and checks it with analyze_f31.load_run. The protected hashes are
-taken before and after every step; any mismatch stops the driver. One lock file (logs/f31/run_f31.lock) serialises
-every stage that writes.
+taken before and after every step: before each run, after its training step and after its re-validation and deletion
+step (phase 1); before and after each H9 evaluation step (phase 2). Any mismatch stops the driver. One lock file
+(logs/f31/run_f31.lock) serialises every stage that writes. run_n5.py is hashed before it is imported (refused
+unexecuted unless it is the pinned blob). Operator sequence: reports/v2_survey/f31/runbook.md.
 
 Aborts: each moves files, unchanged, to logs/f31/aborted/<arm>_seed<s>_<attempt|eval><k>/, after writing abort.json
 there with every file's SHA-256 and status "pending"; the status becomes "complete" once all are moved, and a pending
@@ -113,7 +115,18 @@ def load_module(name, path):
 # path, same_weights, the GPU snapshot, timestamps, the child env, binary log writes, JSON writes, one subprocess step,
 # validation-only re-validation (run_n5.revalidate: train.py's validation loop, no held-out storm), first_parent and
 # doc_path (the same upstream and decisions docs).
-RN5 = load_module("run_n5_for_f31", Path(__file__).resolve().parent / "run_n5.py")
+def load_pinned_run_n5(path):
+    """run_n5.py is hashed BEFORE it is imported (executed): its bytes, with CRLF read as LF (the working copy under
+    core.autocrlf), must be the pinned blob. Anything else is refused unexecuted."""
+    data = Path(path).read_bytes()
+    got = hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
+    if got != RUN_N5_BLOB_SHA256:
+        raise LaunchError(f"{path} hashes to {got[:12]}..., not the pinned run_n5.py blob {RUN_N5_BLOB_SHA256[:12]}...; "
+                          "refused before import")
+    return load_module("run_n5_for_f31", path)
+
+
+RN5 = load_pinned_run_n5(Path(__file__).resolve().parent / "run_n5.py")
 sha256_file, protected_now, real_git = RN5.sha256_file, RN5.protected_now, RN5.real_git
 cuda_available, child_package_path, same_weights = RN5.cuda_available, RN5.child_package_path, RN5.same_weights
 nvidia_snapshot, now_iso, child_env, write_line = RN5.nvidia_snapshot, RN5.now_iso, RN5.child_env, RN5.write_line
@@ -198,6 +211,12 @@ def aborted_attempts(root, arm, seed, kind="attempt"):
 def pending_aborts(root):
     return sorted(f.relative_to(root).as_posix() for f in Path(root).glob(f"{ABORTED}/*/abort.json")
                   if json.loads(f.read_text(encoding="utf-8")).get("status") != "complete")
+
+
+def protected_changed(main_root, ctx):
+    """The protected files whose hash now differs from the expected block (empty when all hold)."""
+    now = protected_now(main_root, ctx["expected"])
+    return sorted(k for k, v in ctx["expected"].items() if now[k] != v)
 
 
 def verify_record(root, A, arm, seed, expected):
@@ -379,6 +398,9 @@ def train_one(order, arm, seed, ctx, root, main_root, hooks):
     rc = run_step(hooks["runner"], train_cmd(py, A, arm, seed), log, root, header)
     with open(log, "ab") as f:
         write_line(f, f"TRAIN_FAILED rc={rc} {now_iso()}" if rc != 0 else f"END {now_iso()} | {hooks['snapshot']()}")
+    changed = protected_changed(main_root, ctx)  # after the training step
+    if changed:
+        raise LaunchError(f"protected hashes changed during {arm} seed {seed}: {changed}")
     if rc != 0:
         raise LaunchError(f"training failed: {p['train_log']}")
     try:
@@ -422,9 +444,9 @@ def train_one(order, arm, seed, ctx, root, main_root, hooks):
            "deleted_epoch_sha256": deleted, "protected_before": before,
            "protected_after": protected_now(main_root, ctx["expected"]),
            "aborted_attempts": aborted_attempts(root, arm, seed), "eval_attempts": []}
-    if rec["protected_after"] != ctx["expected"]:
+    if rec["protected_after"] != ctx["expected"]:  # after the re-validation and deletion step
         changed = sorted(k for k, v in ctx["expected"].items() if rec["protected_after"][k] != v)
-        raise LaunchError(f"protected hashes changed during {arm} seed {seed}: {changed}")
+        raise LaunchError(f"protected hashes changed during {arm} seed {seed} (re-validation or deletion): {changed}")
     write_json_new(root / p["record"], rec)
     for f in kept:  # an accidental write now fails instead of breaking the record's hash
         os.chmod(root / f, stat.S_IREAD)
@@ -523,7 +545,7 @@ def evaluate_phase(ctx, root, main_root, runner, deviations=None):
             if (arm, s) not in skip:
                 A.check_training(rec, arm, s, ctx["design"], root, run_paths(A, arm, s)["record"])
     except A.DesignError as e:
-        raise LaunchError(f"phase 2 entry, before any H9 evaluation: {e}") from None
+        raise LaunchError(f"phase 2 entry, before this invocation's first H9 evaluation: {e}") from None
     if not (root / PHASE2_MARKER).exists():
         write_json_new(root / PHASE2_MARKER, {"head": ctx["commit"], "launch_commit": launch_commit, "time": now_iso()})
     mans = []
@@ -552,18 +574,22 @@ def evaluate_one(order, arm, seed, ctx, root, main_root, runner):
         A.check_attempts({"eval_attempts": attempts}, root, p["record"])
     except A.DesignError as e:
         raise LaunchError(f"before the H9 evaluation of {arm} seed {seed}: {e}") from None
-    before = protected_now(main_root, ctx["expected"])
-    if before != ctx["expected"]:
-        raise LaunchError(f"protected hashes differ before the H9 evaluation of {arm} seed {seed}")
     evals = {}
     for e in sorted(set(rec["slots"].values())):
         ep = A.epoch_paths(arm, seed, e)
+        changed = protected_changed(main_root, ctx)  # before each H9 step
+        if changed:
+            raise LaunchError(f"protected hashes differ before the H9 evaluation of {arm} seed {seed} at epoch {e}: "
+                              f"{changed}")
         evaluate_step(runner, py, root, ep["checkpoint"], rec["train_list"], ep["csv"], ep["eval_log"])
+        changed = protected_changed(main_root, ctx)  # after it
+        if changed:
+            raise LaunchError(f"protected hashes changed during the H9 evaluation of {arm} seed {seed} at epoch {e}: "
+                              f"{changed}; no manifest written")
         evals[str(e)] = {"csv_sha256": sha256_file(root / ep["csv"]), "eval_log_sha256": sha256_file(root / ep["eval_log"])}
+    # Recorded, then checked by load_run below (protected_after_eval must equal PROTECTED).
     man = dict(rec, evals=evals, eval_attempts=attempts, protected_after_eval=protected_now(main_root, ctx["expected"]))
     write_json_new(root / p["manifest"], man)
-    if man["protected_after_eval"] != ctx["expected"]:
-        raise LaunchError(f"protected hashes changed during the H9 evaluation of {arm} seed {seed}")
     try:
         A.load_run(root / p["manifest"], arm, seed, design, root)  # the analysis's own linkage checks, now
     except A.DesignError as e:
