@@ -53,6 +53,12 @@ REAL_BLOBS = {rel: subprocess.run(["git", "-C", str(CHECKOUT), "show", f"HEAD:{r
 
 
 @pytest.fixture(autouse=True)
+def default_git_is_fake(monkeypatch):
+    """The abort stages resolve git themselves (real_git(root)); in these tests that is the fake git."""
+    monkeypatch.setattr(R, "real_git", lambda root: fake_git(root))
+
+
+@pytest.fixture(autouse=True)
 def no_real_subprocess(monkeypatch):
     def refuse(*a, **k):
         raise AssertionError(f"a real subprocess was started: {a[:1]}")
@@ -117,7 +123,8 @@ def fake_repo(tmp_path, frame_list_ok=True, protected_drift=False):
 
 
 def fake_git(root=None, dirty=False, dirty_paths=(), differs=(), fetch_rc=0, head=COMMIT, first_parent=(COMMIT,),
-             pushed=True, untracked=(), committed_differs=(), extra_changed=(), blobs=None):
+             pushed=True, untracked=(), committed_differs=(), extra_changed=(), blobs=None, branch_files=None,
+             unreadable=()):
     """git for the synthetic repo. The 40 training records and the deviations file count as committed at HEAD (their
     bytes on disk) unless named in `untracked` or `committed_differs`. differs: (rev, path) pairs or paths."""
     blobs = {**REAL_BLOBS, **(blobs or {})}
@@ -142,6 +149,12 @@ def fake_git(root=None, dirty=False, dirty_paths=(), differs=(), fetch_rc=0, hea
         if args[:4] == ["diff", "--no-renames", "-z", "--name-only"]:
             names = [R.run_paths(A_REAL, a, s)["record"] for _, a, s in R.schedule(A_REAL)] if args[4] != head else []
             return SimpleNamespace(stdout="\0".join(names + list(extra_changed)).encode() + b"\0", returncode=0)
+        if args[:4] == ["ls-tree", "-r", "-z", "--name-only"]:  # the branch trees looked() reads (default: empty)
+            ref = args[4]
+            assert ref in ("origin/phase2-experiments", "phase2-experiments")
+            if ref in unreadable:
+                return SimpleNamespace(stdout=b"", returncode=128)
+            return SimpleNamespace(stdout="\0".join((branch_files or {}).get(ref, ())).encode(), returncode=0)
         if args[0] == "ls-files":
             return SimpleNamespace(stdout=b"", returncode=1 if args[-1] in untracked else 0)
         if args[0] == "show":
@@ -1179,3 +1192,76 @@ def test_pins_match_the_committed_blobs():
     assert hashlib.sha256(REAL_BLOBS[R.RUN_N5]).hexdigest() == R.RUN_N5_BLOB_SHA256
     assert hashlib.sha256(REAL_BLOBS[R.ANALYZE_N5]).hexdigest() == A_REAL.N5_BLOB_SHA256
     assert hashlib.sha256(REAL_BLOBS[R.TRAIN_PY]).hexdigest() == A_REAL.TRAIN_PY_SHA256
+
+
+# ---- look evidence committed on the branch (tightening after PR #25) ---------------------------------------------
+RESULTS_ON_BRANCH = {"origin/phase2-experiments": [
+    "logs/decisions.md", "logs/f31/runs/control_seed10.train.json", "logs/f31/runs/control_seed10.json",
+    "logs/f31/phase2_started.json", "results/f31/control_seed10_e25_h9.csv"]}
+
+
+@pytest.mark.slow
+def test_a_merged_results_pr_is_a_look_even_with_a_clean_disk(trained, monkeypatch):
+    """Route (ii) after the results PR: `git checkout --detach L` removes the marker, CSVs and manifests from the
+    disk, but the branch still carries them. abort-run, abort-all and launch all refuse."""
+    git = fake_git(trained, branch_files=RESULTS_ON_BRANCH)
+    monkeypatch.setattr(R, "real_git", lambda root: git)
+    assert R.h9_outputs(trained, A_REAL) == [] and not (trained / R.PHASE2_MARKER).exists()  # the disk is clean
+    seen = R.looked(trained, A_REAL, git)
+    assert seen == ["origin/phase2-experiments:logs/f31/phase2_started.json",
+                    "origin/phase2-experiments:logs/f31/runs/control_seed10.json",
+                    "origin/phase2-experiments:results/f31/control_seed10_e25_h9.csv"]  # records and docs aren't looks
+    touch_kept(trained / next(f for f in record(trained, "control", 14)["files_sha256"] if "_epochs/" in f), b"x")
+    with pytest.raises(R.LaunchError, match="abort-run: H9 has been looked at .*origin/phase2-experiments:"):
+        R.abort_run("control", 14, "retrain after the results PR", trained)
+    with pytest.raises(R.LaunchError, match="abort-all: H9 has been looked at .*origin/phase2-experiments:"):
+        R.abort_all("start over", trained)
+    runner = FakeRunner(trained)
+    with pytest.raises(R.LaunchError, match="guard 4: training records that do not verify: .*restore the exact bytes"):
+        train(trained, git=git, runner=runner)
+    assert runner.calls == []
+    local = fake_git(trained, branch_files={"phase2-experiments": RESULTS_ON_BRANCH["origin/phase2-experiments"]})
+    assert R.looked(trained, A_REAL, local)  # the local ref alone counts too
+
+
+def test_unreadable_branch_refs_refuse(tmp_path, monkeypatch):
+    root = fake_repo(tmp_path)
+    git = fake_git(root, unreadable=("origin/phase2-experiments", "phase2-experiments"))
+    monkeypatch.setattr(R, "real_git", lambda r: git)
+    with pytest.raises(R.LaunchError, match="can't confirm no look"):
+        R.looked(root, A_REAL, git)
+    for stage in (lambda: R.abort_run("control", 10, "x", root), lambda: R.abort_all("x", root),
+                  lambda: train(root, git=git)):
+        with pytest.raises(R.LaunchError, match="can't confirm no look"):
+            stage()
+    one = fake_git(root, unreadable=("phase2-experiments",))
+    assert R.looked(root, A_REAL, one) == []  # one readable ref is enough
+
+
+@pytest.mark.slow
+def test_route_ii_before_any_look_still_retrains_one_run(trained, monkeypatch):
+    """Before any look, with the 40 records committed (only .train.json and docs on the branch), route (ii)'s abort-run
+    and launch retrain the one bad run."""
+    records = [R.run_paths(A_REAL, a, s)["record"] for _, a, s in R.schedule(A_REAL)] + ["logs/decisions.md"]
+    git = fake_git(trained, branch_files={"origin/phase2-experiments": records, "phase2-experiments": records})
+    monkeypatch.setattr(R, "real_git", lambda root: git)
+    assert R.looked(trained, A_REAL, git) == []
+    touch_kept(trained / next(f for f in record(trained, "control", 14)["files_sha256"] if "_epochs/" in f), b"x")
+    R.abort_run("control", 14, "kept epoch file changed", trained)
+    runner = train(trained, git=git)
+    assert train_calls(runner) == [("control", 14)]
+
+
+def test_the_looked_stage_prints_the_evidence_and_writes_nothing(tmp_path, capsys):
+    root = fake_repo(tmp_path)
+    def files():  # Python's own bytecode cache (check.py runs pytest without -B) is not a driver write
+        return sorted(p.relative_to(root).as_posix() for p in root.rglob("*") if "__pycache__" not in p.parts)
+
+    before = files()
+    assert R.print_looked(root, fake_git(root)) == []
+    assert "H9 LOOK EVIDENCE: none" in capsys.readouterr().out
+    found = R.print_looked(root, fake_git(root, branch_files=RESULTS_ON_BRANCH))
+    assert len(found) == 3 and "origin/phase2-experiments:logs/f31/phase2_started.json" in capsys.readouterr().out
+    assert files() == before
+    with pytest.raises(SystemExit):
+        R.main(["looked", "control", "10"])

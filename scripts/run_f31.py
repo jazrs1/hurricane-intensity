@@ -2,6 +2,7 @@
 (reports/v2_survey/f31/design.md, approved by John 2026-10-19 23:50; §8 and §10).
 
     python scripts/run_f31.py plan          # print every command of the 40 runs; runs nothing
+    python scripts/run_f31.py looked        # print any H9 look evidence, on disk or on the branch; writes nothing
     python scripts/run_f31.py launch        # phase 1: the 40 trainings; resumable; then stops
     python scripts/run_f31.py evaluate      # phase 2: H9, only once the 40 training records are committed and pushed
     python scripts/run_f31.py abort-run ARM SEED --reason TEXT    # move an unfinished training run aside
@@ -59,7 +60,8 @@ there with every file's SHA-256 and status "pending"; the status becomes "comple
 abort is resumed by running the same command again (every other stage refuses while one is pending). abort-run and
 abort-all refuse once H9 has been looked at: any H9 output or manifest, any aborted H9 evaluation, or
 logs/f31/phase2_started.json, which evaluate writes before its first H9 step and nothing moves; launch refuses while
-that marker exists. abort-run refuses a run whose record verifies. abort-eval only takes a run whose record verifies
+that marker exists. The same evidence committed on origin/phase2-experiments or the local phase2-experiments ref
+counts too (a checkout of L removes it from the disk), and if neither ref can be read the driver refuses. abort-run refuses a run whose record verifies. abort-eval only takes a run whose record verifies
 and whose H9 outputs exist without a manifest, or with a manifest load_run refuses; the same slot epochs are then
 evaluated again.
 
@@ -72,6 +74,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -197,11 +200,37 @@ def h9_outputs(root, A):
     return [f for _, arm, s in schedule(A) for f in h9_files(root, arm, s)]
 
 
-def looked(root, A):
-    """Evidence of an H9 look: any H9 output or manifest, any aborted H9 evaluation, or the phase-2 marker."""
+# Look evidence a branch can carry once the results PR is merged: the marker, H9 CSVs, manifests (not the .train.json
+# records) and eval aborts. A checkout of L removes them from the disk, so the disk alone can't say "no look".
+BRANCH_REFS = (UPSTREAM, "phase2-experiments")
+BRANCH_LOOK = (re.compile(re.escape(PHASE2_MARKER)), re.compile(r"results/f31/[^/]+_h9\.csv"),
+               re.compile(r"logs/f31/runs/[^/]+_seed\d+\.json"), re.compile(r"logs/f31/aborted/[^/]+_eval\d+/abort\.json"))
+
+
+def branch_looks(git):
+    """Look evidence committed on origin/phase2-experiments or the local phase2-experiments ref (after a fetch,
+    whose failure only leaves origin/ as last fetched). Refuses when neither ref can be read: never "no look" unseen."""
+    git(["fetch", "origin"], check=False)
+    found, readable = set(), []
+    for ref in BRANCH_REFS:
+        r = git(["ls-tree", "-r", "-z", "--name-only", ref], check=False)
+        if r.returncode != 0:
+            continue
+        readable.append(ref)
+        found |= {f"{ref}:{n}" for n in r.stdout.decode("utf-8", "replace").split("\0")
+                  if n and any(pat.fullmatch(n) for pat in BRANCH_LOOK)}
+    if not readable:
+        raise LaunchError(f"can't confirm no look: neither {' nor '.join(BRANCH_REFS)} can be read; refusing")
+    return sorted(found)
+
+
+def looked(root, A, git=None):
+    """Evidence of an H9 look: any H9 output or manifest, any aborted H9 evaluation, or the phase-2 marker, on the disk
+    or committed on the branch (branch_looks)."""
     found = h9_outputs(root, A)
     found += sorted(f.relative_to(root).as_posix() for f in Path(root).glob(f"{ABORTED}/*_eval*/abort.json"))
-    return found + ([PHASE2_MARKER] if (Path(root) / PHASE2_MARKER).exists() else [])
+    found += [PHASE2_MARKER] if (Path(root) / PHASE2_MARKER).exists() else []
+    return found + branch_looks(git or real_git(root))
 
 
 def abort_files(root, arm, seed, kind):
@@ -343,7 +372,7 @@ def preflight(root, git, main_root, check, cuda_ok, child_import):
     bad = [(arm, s) for (arm, s), st in states.items() if st == "bad_record"]
     if bad:
         raise LaunchError(f"guard 4: training records that do not verify: {bad}; " + (
-            RESTORE_AFTER_LOOK if looked(root, A) else
+            RESTORE_AFTER_LOOK if looked(root, A, git) else
             "move each run aside with `run_f31.py abort-run ARM SEED --reason ...` and launch again"))
     partial = [(arm, s) for (arm, s), st in states.items() if st == "partial"]
     if partial:
@@ -362,7 +391,7 @@ def preflight(root, git, main_root, check, cuda_ok, child_import):
         raise LaunchError(f"guard 4: runs recorded at another commit than HEAD {ctx['commit']}: {stale[:3]}; relaunch "
                           "only at their commit, or (before any H9 look) move every run aside with "
                           "`run_f31.py abort-all --reason ...` and restart all 40")
-    seen = looked(root, A)
+    seen = looked(root, A, git)
     if seen and any(st == "fresh" for st in states.values()):
         raise LaunchError(f"guard 4: H9 has been looked at while runs remain to be trained: {seen[:3]}; no training "
                           "may follow an H9 evaluation")
@@ -388,7 +417,7 @@ def train_one(order, arm, seed, ctx, root, main_root, hooks):
     existing = [v for k, v in p.items() if (root / v).exists()] + h9_files(root, arm, seed)
     if existing:
         raise LaunchError(f"refusing to overwrite {existing}")
-    seen = looked(root, A)
+    seen = looked(root, A, ctx["git"])
     if seen:
         raise LaunchError(f"phase 1: H9 has been looked at ({seen[:3]}); no training may follow an H9 evaluation")
     before = protected_now(main_root, ctx["expected"])
@@ -505,7 +534,7 @@ def deviations_in(root, git, A, design, path):
     (the analysis's own format, path and trigger). Returns the named (arm, seed) runs."""
     if path is None:
         return set()
-    if not looked(root, A):  # before a look a damaged run is retrained (abort-run), keeping n = 20 and confirmatory
+    if not looked(root, A, git):  # before a look a damaged run is retrained (abort-run), keeping n = 20 and confirmatory
         raise LaunchError("phase 2: no H9 look yet: abort-run and retrain instead; rule (A) applies only after a look")
     if Path(path).as_posix() != A.DEVIATIONS_PATH:
         raise LaunchError(f"--deviations must be {A.DEVIATIONS_PATH}, not {path}")
@@ -532,7 +561,7 @@ def evaluate_phase(ctx, root, main_root, runner, deviations=None):
     bad = [key for key, st in states.items() if st == "bad_record"]
     if bad:
         raise LaunchError(f"phase 2: training records that do not verify: {bad}; " + (
-            RESTORE_AFTER_LOOK if looked(root, A) else
+            RESTORE_AFTER_LOOK if looked(root, A, git) else
             "no H9 output exists yet, so move each run aside with `run_f31.py abort-run ARM SEED --reason ...` and "
             "launch again"))
     unfinished = [(k, arm, s) for k, arm, s in order if states[(arm, s)] not in ("trained", "eval_partial", "evaluated")]
@@ -767,9 +796,16 @@ def plan(root=ROOT):
         print("  manifest:", p["manifest"])
 
 
+def print_looked(root=ROOT, git=None):
+    """The look evidence, on the disk and on the branch (git fetch and ls-tree only). Writes nothing, takes no lock."""
+    found = looked(Path(root), analysis(root), git)
+    print("H9 LOOK EVIDENCE: " + ("none" if not found else ""), *found, sep="\n  ")
+    return found
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("stage", choices=["plan", "launch", "evaluate", "abort-run", "abort-all", "abort-eval"])
+    ap.add_argument("stage", choices=["plan", "looked", "launch", "evaluate", "abort-run", "abort-all", "abort-eval"])
     ap.add_argument("arm", nargs="?", choices=["control", "atlantic"], help="abort-run and abort-eval only")
     ap.add_argument("seed", nargs="?", type=int, help="abort-run and abort-eval only")
     ap.add_argument("--reason", help="abort stages only: why (recorded in abort.json)")
@@ -786,6 +822,8 @@ def main(argv=None):
     sys.path.insert(0, str(ROOT / "src"))
     if args.stage == "plan":
         plan()
+    elif args.stage == "looked":
+        print_looked()
     elif args.stage == "abort-run":
         abort_run(args.arm, args.seed, args.reason)
     elif args.stage == "abort-all":
