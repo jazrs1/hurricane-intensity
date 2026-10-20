@@ -93,6 +93,7 @@ def leftovers(tmpdir):
     return sorted(p.name for p in Path(tmpdir).glob("hc_e2e_*"))
 
 
+@pytest.mark.slow
 def test_success_leaves_no_temp_dir(env):
     main, tmpdir = env
     msg = CHECK.check_e2e(main, CASE)

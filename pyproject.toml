@@ -13,3 +13,6 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: 1 s or more; deselected by the default (FAST) scripts/check.py, run by check.py --full (F-34)",
+]
