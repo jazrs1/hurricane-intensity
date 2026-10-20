@@ -43,9 +43,10 @@ There are two routes:
 - **(i) abort-all.** Move every run aside (`run_f31.py abort-all --reason ...`). Commit the records' removal through a PR. Then relaunch all 40 from that merge commit. Every run retrains. This is N5's fix-commit route (John's decision 2, 2026-10-19 15:48).
 - **(ii) Retrain the one run at L, with the records restored untracked** (simulated by hc-adversary, item 25b). Needs John's yes at the time, like any abort.
   0. At H, confirm no look: `python scripts/run_f31.py looked` must print "H9 LOOK EVIDENCE: none".
-     - It reads the disk and, after a fetch, the trees of origin/phase2-experiments and the local phase2-experiments.
-     - Route (ii) exists only before any look. The driver enforces this: abort-run, abort-all and launch refuse when the branch carries look evidence (the phase-2 marker, an H9 CSV, a manifest or an eval abort), even after a checkout of L has cleared the disk.
-     - They also refuse when neither ref can be read.
+     - It reads the disk and, after a fetch, every path ever added under logs/f31 or results/f31 in any commit reachable from any ref (`git log --all`: local and remote branches, tags, stash), plus the trees of origin/phase2-experiments and the local phase2-experiments.
+     - Route (ii) exists only before any look. The driver enforces this: abort-run, abort-all and launch refuse when any such commit carries look evidence (the phase-2 marker, an H9 CSV, a manifest or an eval abort).
+     - That holds even if the evidence sits on an unmerged results-PR branch, was later removed, or the fetch failed, and even after a checkout of L has cleared the disk.
+     - They also refuse when the history read fails or neither ref can be read.
   1. In the main checkout: `git checkout --detach L`. L is on the first-parent chain, so guard 5 accepts it.
      - The 40 records are tracked at H, not at L, so this removes them from disk.
      - Without them, launch would see the 39 good runs as "partial" and refuse (guard 4).

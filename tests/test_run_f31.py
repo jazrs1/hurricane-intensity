@@ -124,7 +124,7 @@ def fake_repo(tmp_path, frame_list_ok=True, protected_drift=False):
 
 def fake_git(root=None, dirty=False, dirty_paths=(), differs=(), fetch_rc=0, head=COMMIT, first_parent=(COMMIT,),
              pushed=True, untracked=(), committed_differs=(), extra_changed=(), blobs=None, branch_files=None,
-             unreadable=()):
+             unreadable=(), history=(), log_rc=0):
     """git for the synthetic repo. The 40 training records and the deviations file count as committed at HEAD (their
     bytes on disk) unless named in `untracked` or `committed_differs`. differs: (rev, path) pairs or paths."""
     blobs = {**REAL_BLOBS, **(blobs or {})}
@@ -149,6 +149,11 @@ def fake_git(root=None, dirty=False, dirty_paths=(), differs=(), fetch_rc=0, hea
         if args[:4] == ["diff", "--no-renames", "-z", "--name-only"]:
             names = [R.run_paths(A_REAL, a, s)["record"] for _, a, s in R.schedule(A_REAL)] if args[4] != head else []
             return SimpleNamespace(stdout="\0".join(names + list(extra_changed)).encode() + b"\0", returncode=0)
+        if args[:2] == ["log", "--all"]:  # every path ever added under logs/f31 and results/f31 (default: none)
+            assert args == ["log", "--all", "--diff-filter=A", "--name-only", "-z", "--format=", "--", "logs/f31",
+                            "results/f31"]
+            return SimpleNamespace(stdout="\0".join(history).encode() + (b"\0" if history else b""),
+                                   returncode=log_rc)
         if args[:4] == ["ls-tree", "-r", "-z", "--name-only"]:  # the branch trees looked() reads (default: empty)
             ref = args[4]
             assert ref in ("origin/phase2-experiments", "phase2-experiments")
@@ -1265,3 +1270,41 @@ def test_the_looked_stage_prints_the_evidence_and_writes_nothing(tmp_path, capsy
     assert files() == before
     with pytest.raises(SystemExit):
         R.main(["looked", "control", "10"])
+
+
+# ---- look evidence anywhere in history (hc-adversary item 27, cases A-E) -------------------------------------------
+RESULTS = ["logs/f31/phase2_started.json", "results/f31/control_seed10_e25_h9.csv", "logs/f31/runs/control_seed10.json"]
+RECORDS_ONLY = ["logs/f31/runs/control_seed10.train.json", "logs/f31/runs/atlantic_seed10.train.json"]
+
+
+@pytest.mark.parametrize("case, kw, look", [
+    ("A_merged", dict(branch_files={"origin/phase2-experiments": RESULTS, "phase2-experiments": RESULTS},
+                      history=RECORDS_ONLY + RESULTS), True),
+    ("B_unmerged_branch", dict(history=RECORDS_ONLY + RESULTS), True),  # tips carry nothing; a pushed PR branch does
+    ("C_added_then_removed", dict(history=RECORDS_ONLY + RESULTS[:1]), True),  # tips carry nothing any more
+    ("D_B_with_failed_fetch", dict(history=RECORDS_ONLY + RESULTS, fetch_rc=1), True),
+    ("E_no_look", dict(branch_files={"origin/phase2-experiments": RECORDS_ONLY}, history=RECORDS_ONLY), False),
+], ids=["A", "B", "C", "D", "E"])
+def test_a_look_anywhere_in_history_counts(tmp_path, monkeypatch, case, kw, look):
+    root = fake_repo(tmp_path)
+    git = fake_git(root, **kw)
+    monkeypatch.setattr(R, "real_git", lambda r: git)
+    seen = R.looked(root, A_REAL, git)
+    assert bool(seen) is look, seen
+    if case != "A_merged" and look:  # the history read alone finds it
+        assert seen and all(x.startswith("history:") for x in seen)
+    if look:
+        with pytest.raises(R.LaunchError, match="abort-run: H9 has been looked at .*history:"):
+            R.abort_run("control", 10, "route (ii) after a look", root)
+        with pytest.raises(R.LaunchError, match="abort-all: H9 has been looked at"):
+            R.abort_all("start over", root)
+
+
+def test_a_failing_history_read_refuses(tmp_path, monkeypatch):
+    root = fake_repo(tmp_path)
+    git = fake_git(root, log_rc=128)
+    monkeypatch.setattr(R, "real_git", lambda r: git)
+    for stage in (lambda: R.looked(root, A_REAL, git), lambda: R.abort_run("control", 10, "x", root),
+                  lambda: R.abort_all("x", root), lambda: train(root, git=git)):
+        with pytest.raises(R.LaunchError, match="can't confirm no look: `git log --all`"):
+            stage()

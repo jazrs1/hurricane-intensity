@@ -208,10 +208,20 @@ BRANCH_LOOK = (re.compile(re.escape(PHASE2_MARKER)), re.compile(r"results/f31/[^
 
 
 def branch_looks(git):
-    """Look evidence committed on origin/phase2-experiments or the local phase2-experiments ref (after a fetch,
-    whose failure only leaves origin/ as last fetched). Refuses when neither ref can be read: never "no look" unseen."""
+    """Look evidence committed in git, after a fetch (whose failure only leaves origin/ as last fetched):
+    - every path ever ADDED under logs/f31 or results/f31 in any commit reachable from any ref (git log --all: local
+      and remote branches, tags, stash), reported "history:<path>". This covers results committed on an unmerged
+      results-PR branch, results added and later removed, and a failed fetch (hc-adversary item 27);
+    - the trees of origin/phase2-experiments and the local phase2-experiments, reported "<ref>:<path>".
+    Refuses when git log fails, or when neither ref can be read: never "no look" unseen."""
     git(["fetch", "origin"], check=False)
-    found, readable = set(), []
+    log = git(["log", "--all", "--diff-filter=A", "--name-only", "-z", "--format=", "--", "logs/f31", "results/f31"],
+              check=False)
+    if log.returncode != 0:
+        raise LaunchError("can't confirm no look: `git log --all` over logs/f31 and results/f31 failed; refusing")
+    found = {f"history:{n.strip()}" for n in log.stdout.decode("utf-8", "replace").split("\0")
+             if n.strip() and any(pat.fullmatch(n.strip()) for pat in BRANCH_LOOK)}
+    readable = []
     for ref in BRANCH_REFS:
         r = git(["ls-tree", "-r", "-z", "--name-only", ref], check=False)
         if r.returncode != 0:
