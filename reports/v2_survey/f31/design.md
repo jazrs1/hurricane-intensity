@@ -1,4 +1,4 @@
-# F-31: budget study, design (DRAFT r2, not approved, nothing run)
+# F-31: budget study, design (r2, approved 2026-10-19 (John); nothing run)
 
 Drafted 2026-10-19 by hc-survey for the coordinator. It goes to hc-adversary, then John. **No compute until John approves this design.**
 
@@ -63,6 +63,9 @@ All three share the rest of the recipe: ResNet-18 IMAGENET1K_V1, Adam lr 1e-4, b
 
 **Nesting.** Each run trains once to the longest budget, with `--epoch-dir`, and is read at three nested budgets.
 - **Why this is legitimate:** `train.py` has no learning-rate schedule (constant Adam 1e-4, `train.py:88`), and nothing in its loop depends on `--epochs` except the loop count. So the first E epochs of a 99-epoch run *are* an E-epoch run with that seed and data order. That is exact, not approximate.
+- **This equivalence depends on `train.py`'s learning rate (and schedule) being independent of the total epoch count** (John, 2026-10-19 23:50). Any schedule change reopens it.
+  - Guard, for the launch PR (§8, §10): `run_f31.py launch` refuses unless the SHA-256 of `git show <launch commit>:scripts/train.py` equals a pinned constant. At c4c4cff that is `afceb4b19ea7d8c732c6f26b7d52e4b3b6d313d58153e2d0518887a3a6db231f` (blob `500bbc1e`).
+  - If `train.py` changes before launch, the pin moves only in a reviewed PR that re-checks this property.
 - **It is not a reproduction of N5's runs:** cuDNN is non-deterministic (decisions.md 2026-10-13, "Groundwork": seed 0 run twice diverges inside the first epoch). Different seeds make that moot anyway (§5).
 - **Consequence:** the budget contrasts are **paired within a run**. The 1× checkpoint and the 4× checkpoint come from one trajectory.
 
@@ -325,6 +328,7 @@ The launch-safety design was closed by John after N5 (decisions.md 2026-10-19 17
 | Records read-only once written; `phase2_started.json` (exclusive create) marks the look; launch refuses while it exists | unchanged (under `logs/f31/`) |
 | abort-run / abort-all (only before any look) / abort-eval; `abort.json` pending → moved → complete; one lock | unchanged |
 | Dead-end rule (A), `deviations.json` | unchanged in form. **Differs:** a bad record drops only that run from P1/P2 (within-run contrasts), and that seed pair from S1/S2. |
+| **New guard (John's 23:50 rule):** `train.py`'s blob SHA-256 equals the pinned constant (§2) | **differs:** added, checked at launch and recorded in each training record |
 | Guards: first-parent chain after a fetch, main checkout, child imports `hurricane_intensity` from ROOT/src, CUDA available, epoch dir inside ROOT, refuse existing outputs, protected hashes before/after every run | unchanged |
 | `seed<s>.pt` equals `epoch_<native>.pt` | unchanged, at 4×. **Differs:** at 1×/2× the evaluated file is the epoch file. |
 | Re-validation of every epoch; argmin == `train.py`'s pick; tie rule TIE_KT; odd-grid near ties kept as the first minimum | **differs:** applied at three nested budgets, against the last `saved` ≤ E_k (§3), and both arms carry `--epoch-dir` |
@@ -430,18 +434,22 @@ analysis:         [PY, scripts/analyze_f31.py, --manifest-dir, logs/f31/runs, --
 
 No `--circular-mask` or `--rotate`. The 99 and 52 come from `epochs_for(frames, 4 * 1640)`.
 
-**`scripts/run_f31.py`:** `run_n5.py`'s phases, guards and abort commands, with F-31's paths, epochs and seeds, `--epoch-dir` for both arms, and the nested re-selection. The same rule applies: import what is not N5-bound, pin `run_n5.py`'s blob if imported, and never edit `run_n5.py`.
+**`scripts/run_f31.py`:** `run_n5.py`'s phases, guards and abort commands, plus the pinned `train.py` blob check (§2), with F-31's paths, epochs and seeds, `--epoch-dir` for both arms, and the nested re-selection. The same rule applies: import what is not N5-bound, pin `run_n5.py`'s blob if imported, and never edit `run_n5.py`.
 
 **An alternative to re-validating from files** (not recommended): add an unrounded per-epoch validation line to `train.py`. That is a training-code change between N5 and F-31, and re-validation is cheap (about 3 min per seed).
 
-## 11. Open items for John (recommendation first)
+## 11. Decided by John, 2026-10-19 23:50
 
-1. **Seeds: 20 per arm (recommended) or 10.** n = 10 halves phase 1 (about 2.9 h). The cost is power: at the observed sd of 1.12 kt, a 0.9 kt budget effect has about 45% power at n = 10, against 87% at n = 20.
-2. **Primaries: the two within-configuration budget effects (recommended), or three** (add atlantic − control at 4× as P3, each at α 0.0167). Making the N5 contrast primary on the same H9, right after N5's look, reads as a second attempt at N5's question. As a secondary it is reported in full, beside N5's verdict.
-3. **Epoch sensitivity: validation-only plus the per-budget and per-rule H9 slots (recommended).** The alternative, H9 at the neighbours of each pick (±1 epoch), would show the adjacent-epoch swing directly. But it is a held-out per-epoch trace, which the 2026-10-18 rule forbids. It would need John to lift that rule for F-31, and I don't recommend it. Note that the slots already read H9 on adjacent epochs in some runs (native and matched, or smoothed, at 4×; §3). That is fixed before the look and feeds no selection.
-4. **Disk: keep only the selected epoch files, about 10 GB (recommended), or all of them until the results entry, about 137 GB.**
-5. **Evaluation set: H9 as in §4 (recommended; the only usable set).** Option D (a future 2026-season set) would be a separate protocol.
-6. **Matched slots at 1× and 2× (dropped in r2, coordinator's decision).** John can restore them if he wants native vs matched at every budget. The cost is up to 40 more H9 evaluations (2 per control run). They would stay descriptive, with no atlantic − control test at 1× or 2×.
+John, verbatim (relayed by the coordinator): "2. §11 choices: all six as you recommend. 20 seeds; two primaries (4× vs 1× within each arm); validation-based picks plus the fixed H9 checkpoints, with no ±1-epoch H9 reads; keep only selected and H9-evaluated checkpoints; H9 as the evaluation set; matched-grid checkpoints at 1× and 2× left dropped."
+
+1. **Seeds:** 20 seeds per arm (10–29).
+2. **Primaries:** two primaries, 4× vs 1× within each arm (P1, P2). Atlantic − control at 4× stays secondary.
+3. **Epoch sensitivity:** validation-based picks plus the fixed H9 checkpoints, with no ±1-epoch H9 reads.
+4. **Disk:** keep only selected and H9-evaluated checkpoints.
+5. **Evaluation set:** H9.
+6. **Matched slots:** matched-grid checkpoints at 1× and 2× left dropped.
+
+Also John, verbatim: "Record in the design that the read-at-1×/2×/4× equivalence depends on train.py's learning rate being independent of total epochs; any schedule change reopens it." Recorded in §2.
 
 ## 12. Known limits
 
