@@ -228,7 +228,7 @@ Every S1/S2 line in `report.txt` carries N5's verdict beside it, verbatim, with 
 - **0.85:** N5's planning case.
 - **1.12:** N5's observed atlantic − control sd.
 - **Planning value: 1.12.**
-- **Caveat on the planning value:** 1.12 kt is a between-arm figure. The primaries are within-run. N5's per-run sds of H9 overall MAE (control on the matched grid 0.57, atlantic 0.79) suggest a within-run 4× − 1× sd of at most about 0.81 (control) and 1.11 (atlantic), if the within-run correlation ρ ≥ 0, from √(2σ²(1 − ρ)). With the native control picks (sd 0.20) it would be about 0.28. **That is an inference, not a bound:** the two budgets' sds can differ, and ρ is unmeasured.
+- **Caveat on the planning value:** 1.12 kt is a between-arm figure. The primaries are within-run. N5's per-run sds of H9 overall MAE (control on the matched grid 0.57, atlantic 0.79) suggest a within-run 4× − 1× sd of at most about 0.81 (control) and 1.11 (atlantic), if the within-run correlation ρ ≥ 0, from √(2σ²(1 − ρ)). With the native control picks (sd 0.20) it would be about 0.28. That figure is **not a planning input**: it sits below the observed within-run 0.54, and the planning value stays 1.12. **That is an inference, not a bound:** the two budgets' sds can differ, and ρ is unmeasured.
 
 **P1/P2, overall MAE, 4× − 1× within one configuration (α 0.025): at n = 20, 87–100% power to detect a 0.9 kt difference (plan on 87%). At n = 10: 45–98% (plan on 45%).**
 
@@ -269,7 +269,13 @@ Notes:
 - **The normal model is an approximation.** N5's per-seed differences were not normal (seed 4's +1.7 kt swing). The power figures are planning ranges, not guarantees.
 - **The S1/S2 rows assume N5's 1× sd also holds at 4×.** No data says whether a longer budget shrinks or widens it.
 
-## 6. Descriptive outputs (labelled; paired sign-flip p printed where paired, not tests)
+## 6. Descriptive outputs (labelled, not tests)
+
+**The only paired tests anywhere in F-31:**
+- the within-arm budget pairs: P1, P2 and their stated within-arm sensitivities (2×, and smoothed at 4×, §5);
+- S1/S2 (atlantic − control) at 4×.
+
+No atlantic − control p or CI is printed at 1× or 2×. Nothing below is tested.
 
 - **Budget curve per arm and rule:** mean H9 overall MAE, > 96 kt MAE and bias, fixes-only MAE, and per-band MAE/bias at 1×, 2× and 4×.
 - **The frozen-ensemble layer (control arm):**
