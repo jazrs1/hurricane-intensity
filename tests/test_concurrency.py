@@ -78,6 +78,7 @@ def test_marco_laura_reproduces_the_design_estimate(atlantic):
                                                   "2020-08-25T18Z"]
 
 
+@pytest.mark.slow
 def test_n5_training_storms_overlap_no_protected_storm_except_marco_laura(checkout_root, atlantic):
     """F-10 run against the first v2 train list: every N5 training storm (hourly grid) against every validation,
     H9 and 2025-test storm. Marco/Laura is the only pair, and its frames are dropped by the frame list (PR B).

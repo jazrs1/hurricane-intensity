@@ -400,6 +400,7 @@ def test_a_held_lock_refuses_every_writing_stage(tmp_path):
 
 
 # ---- the runs -----------------------------------------------------------------------------------------------
+@pytest.mark.slow
 def test_launch_end_to_end_and_the_analysis_accepts_it(tmp_path, capsys):
     root = fake_repo(tmp_path)
     runner = train(root)
@@ -544,6 +545,7 @@ def test_phase2_refuses_while_any_training_run_is_unfinished(tmp_path, fail):
      r"guard 5e: HEAD differs from the launch commit .* in more than the 20 records and the decisions docs: "
      r"\['scripts/train.py'\]"),
 ], ids=["untracked", "differs", "not_pushed", "launch_not_first_parent", "code_changed"])
+@pytest.mark.slow
 def test_phase2_requires_the_committed_records_as_evidence(tmp_path, kw, match):
     """Item 16, finding 3: the 20 records committed and pushed before phase 2 witness that all trainings finished
     before any H9 look. HEAD may be a later commit, but only by those records."""
@@ -563,6 +565,7 @@ def test_phase2_requires_the_committed_records_as_evidence(tmp_path, kw, match):
     (lambda r: r.update(selected_epoch=r["selected_epoch"] + 2), "selected checkpoint is not the validation minimum"),
     (lambda r: r.update(odd_grid_near_ties=[25]), "odd_grid_near_ties .* does not match"),
 ], ids=["no_tie_rule", "two_commits", "other_blob", "wrong_selection", "near_ties"])
+@pytest.mark.slow
 def test_phase2_entry_applies_the_training_side_checks_before_any_h9(tmp_path, edit, match):
     """Item 16, finding 1(c): a record the analysis would refuse is refused before the first H9 evaluation."""
     root = fake_repo(tmp_path)
@@ -576,6 +579,7 @@ def test_phase2_entry_applies_the_training_side_checks_before_any_h9(tmp_path, e
     assert all(is_train(c) for c in runner.calls) and R.h9_outputs(root, range(10)) == []
 
 
+@pytest.mark.slow
 def test_phase2_entry_runs_verify_self_at_the_launch_commit(tmp_path):
     root = fake_repo(tmp_path)
     runner = train(root)
@@ -584,6 +588,7 @@ def test_phase2_entry_runs_verify_self_at_the_launch_commit(tmp_path):
     assert all(is_train(c) for c in runner.calls)
 
 
+@pytest.mark.slow
 def test_relaunch_at_another_commit_is_refused_until_abort_all(tmp_path):
     """Item 16, finding 1(a)/(b): records from commit c0ffee... and HEAD at a fix commit. launch refuses; abort-all
     (before any H9 output) moves every run aside, finished ones included, and all 20 restart in the same order."""
@@ -638,6 +643,7 @@ def test_an_h9_output_planted_mid_phase1_stops_training(tmp_path):
 
 
 # ---- condition (b): aborts ---------------------------------------------------------------------------------------
+@pytest.mark.slow
 def test_abort_then_restart_keeps_seed_and_order_and_records_the_attempt(tmp_path):
     root = fake_repo(tmp_path)
     with pytest.raises(R.LaunchError, match="training failed: logs/n5_atlantic/atlantic_seed1.log"):
@@ -679,6 +685,7 @@ def test_abort_run_refusals(tmp_path):
     assert not (root / R.LOCK).exists()
 
 
+@pytest.mark.slow
 def test_a_record_that_fails_verification_can_be_aborted_and_retrained(tmp_path):
     """Item 16, finding 4(a): a kept file touched after training. Phase 2 refuses; abort-run takes the run (and its
     record); relaunch retrains it alone; phase 2 then runs."""
@@ -706,6 +713,7 @@ def touch_kept(path, data):
     path.write_bytes(data)
 
 
+@pytest.mark.slow
 def test_kept_files_are_read_only_and_abort_all_still_moves_them(tmp_path):
     """Item 16c: once a record is written its kept files are read-only; abort-all moves them on Windows anyway."""
     root = fake_repo(tmp_path)
@@ -722,6 +730,7 @@ def test_kept_files_are_read_only_and_abort_all_still_moves_them(tmp_path):
     assert len(go(root)[0]) == 20
 
 
+@pytest.mark.slow
 def test_after_a_look_a_bad_record_asks_for_the_bytes_back(tmp_path):
     """Item 16c, finding 6: after a look a run can't be retrained, so the message asks for the exact bytes, not for
     abort-run; abort-run is refused; restoring the bytes lets phase 2 resume."""
@@ -747,6 +756,7 @@ def test_after_a_look_a_bad_record_asks_for_the_bytes_back(tmp_path):
     assert len(ev(root, runner=runner)[0]) == 20
 
 
+@pytest.mark.slow
 def test_launch_after_a_phase1_look_asks_for_the_bytes_back(tmp_path):
     """No marker yet, but an eval abort during phase 1 is a look: launch's bad-record message must not offer abort-run."""
     root = fake_repo(tmp_path)
@@ -758,6 +768,7 @@ def test_launch_after_a_phase1_look_asks_for_the_bytes_back(tmp_path):
         train(root)
     assert "abort-run" not in str(e.value)
 
+@pytest.mark.slow
 def test_a_crashed_evaluation_is_moved_aside_and_the_same_checkpoint_re_evaluated(tmp_path):
     """Item 16, finding 4(b)."""
     root = fake_repo(tmp_path)
@@ -783,6 +794,7 @@ def test_a_crashed_evaluation_is_moved_aside_and_the_same_checkpoint_re_evaluate
     assert "aborted H9 evaluation attempts (same checkpoint re-evaluated): {'atlantic seed 2': [" in report
 
 
+@pytest.mark.slow
 def test_an_interrupted_abort_is_pending_blocks_launch_and_resumes(tmp_path, monkeypatch):
     """Item 16, finding 5: abort.json (pending, every file hashed) is written before any move."""
     root = fake_repo(tmp_path)
@@ -812,6 +824,7 @@ def test_an_interrupted_abort_is_pending_blocks_launch_and_resumes(tmp_path, mon
 
 
 # ---- item 16b: a look survives abort-eval; pending aborts; 5e paths -----------------------------------------------
+@pytest.mark.slow
 def test_abort_eval_cannot_launder_an_h9_look(tmp_path):
     """hc-adversary item 16b, finding 1, its exact sequence: control seed 0's native evaluation crashes after its
     selected evaluation logged an MAE. abort-eval empties the pinned H9 paths, yet abort-all, abort-run and launch
@@ -859,6 +872,7 @@ def test_an_eval_abort_during_phase1_blocks_further_training(tmp_path):
         R.abort_all("start over", root)
 
 
+@pytest.mark.slow
 def test_the_phase2_marker_alone_is_a_look(tmp_path):
     """Pinned H9 outputs deleted by hand (no abort-eval, no trace in aborted/): the marker still blocks every abort
     and launch."""
@@ -892,6 +906,7 @@ def test_an_eval_abort_appearing_mid_phase1_stops_training(tmp_path):
     assert train_calls(runner) == [("control", 0), ("atlantic", 0)]
 
 
+@pytest.mark.slow
 def test_a_pending_eval_abort_blocks_evaluate_and_resumes(tmp_path, monkeypatch):
     """Item 16b, finding 2: evaluate refuses an unfinished abort before any H9 step; re-running abort-eval
     finishes it."""
@@ -921,6 +936,7 @@ def test_a_pending_eval_abort_blocks_evaluate_and_resumes(tmp_path, monkeypatch)
     assert mans[0]["eval_attempts"] == ["logs/n5_atlantic/aborted/control_seed0_eval1/abort.json"]
 
 
+@pytest.mark.slow
 def test_evaluate_one_checks_its_eval_attempts_before_the_h9_step(tmp_path, monkeypatch):
     """Item 16b, finding 2, second half: even past the stage guard, no H9 step runs for a run whose recorded eval
     attempt is incomplete."""
@@ -944,6 +960,7 @@ def test_evaluate_one_checks_its_eval_attempts_before_the_h9_step(tmp_path, monk
     (("scripts/a b.py",), False),
 ], ids=["decisions_md", "decision_records", "deviations_file", "code_with_decisions", "nested_doc",
         "path_with_space"])
+@pytest.mark.slow
 def test_phase2_allows_decisions_docs_between_l_and_head(tmp_path, extra, ok):
     """Item 16b, finding 3: `git diff --no-renames -z` (the fake git asserts those flags); docs may change between L
     and HEAD, code may not, and a path with a space is one path."""
@@ -965,6 +982,7 @@ def write_deviations(root, rows):
     return A_REAL.DEVIATIONS_PATH
 
 
+@pytest.mark.slow
 def test_rule_a_completes_when_a_record_breaks_mid_phase2(tmp_path):
     """Item 17, finding 1, the adversary's sequence: phase 2 stops at order 7; control seed 0 (already evaluated) then
     loses a kept file. Without a deviations file evaluate refuses everything; with the committed file naming seed 0,
@@ -991,6 +1009,7 @@ def test_rule_a_completes_when_a_record_breaks_mid_phase2(tmp_path):
     assert res["n_pairs"] == 9 and res["joint"].startswith("NON-CONFIRMATORY")
 
 
+@pytest.mark.slow
 def test_rule_a_is_refused_before_any_look(tmp_path):
     """Item 17b: with all 20 trained and nothing looked at, a damaged run is still retrainable (abort-run), which keeps
     n = 10 and the verdict confirmatory, so a deviations file is refused and nothing is evaluated."""
@@ -1010,6 +1029,7 @@ def test_rule_a_is_refused_before_any_look(tmp_path):
 
 
 @pytest.mark.parametrize("case", ["healthy", "untracked", "differs", "other_path"])
+@pytest.mark.slow
 def test_evaluate_refuses_a_deviation_rule_a_does_not_cover(tmp_path, case):
     """Item 17, finding 2: only a pair with a run whose record fails, named in the committed file at its fixed path."""
     root = fake_repo(tmp_path)
@@ -1034,6 +1054,7 @@ def test_evaluate_refuses_a_deviation_rule_a_does_not_cover(tmp_path, case):
     assert len(runner.calls) == calls  # no further H9 step
 
 
+@pytest.mark.slow
 def test_abort_eval_takes_a_manifest_that_load_run_refuses(tmp_path):
     """Item 16b, finding 4: an H9 CSV changed after its manifest. evaluate refuses with the remedy; abort-eval moves
     the outputs and the manifest; evaluate re-evaluates the same recorded checkpoint, that run only."""
@@ -1057,6 +1078,7 @@ def test_abort_eval_takes_a_manifest_that_load_run_refuses(tmp_path):
 # ---- condition (a): the tie rule ---------------------------------------------------------------------------------
 @pytest.mark.parametrize("native, other", [(14, 16), (13, 15), (14, 13), (13, 14)],
                          ids=["even_even", "odd_odd", "even_native_odd_argmin", "odd_native_even_argmin"])
+@pytest.mark.slow
 def test_tie_rule_evaluates_the_checkpoint_train_py_saved(tmp_path, monkeypatch, native, other):
     """train.py saved `native` (logged 8.00); re-validation puts `other` (also 8.00) 5e-5 kt below it, inside the
     tie window. For every seed the evaluated checkpoint is train.py's own seed<s>.pt. odd_odd: the matched grid's
@@ -1084,6 +1106,7 @@ def test_tie_rule_evaluates_the_checkpoint_train_py_saved(tmp_path, monkeypatch,
         == (native % 2 == 0)
 
 
+@pytest.mark.slow
 def test_odd_grid_near_tie_is_recorded_and_the_first_minimum_stands(tmp_path, monkeypatch):
     """No disagreement with train.py (its pick, 14, is the re-validated argmin), but odd epochs 13 and 15 are within
     TIE_KT of each other. train.py never chose between them, so the pre-registered first minimum over the odd grid

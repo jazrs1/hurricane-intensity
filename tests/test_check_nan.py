@@ -394,6 +394,7 @@ def test_removal_refused_under_second_root(repo, check_nan, capsys):
 
 
 @pytest.mark.parametrize("existing", [None, "same"], ids=["no-file", "rerun"])
+@pytest.mark.slow
 def test_output_matches_old_script(repo, checkout_root, existing, tmp_path_factory):
     """The old script (before this change) and the new one write the same bytes on the same fixture."""
     old_src = subprocess.run(["git", "show", f"{OLD_SCRIPT_COMMIT}:check_nan.py"], cwd=checkout_root,

@@ -213,6 +213,7 @@ def prim(res, name):
 
 
 # ---- outcomes ------------------------------------------------------------------------------------------------
+@pytest.mark.slow
 def test_planted_mae_gain_detected(request):
     res = analyse(build(request.node.name, arm_scale=0.9))
     p = prim(res, "overall MAE")
@@ -223,6 +224,7 @@ def test_planted_mae_gain_detected(request):
     assert "H3 MAE" in report and "added6 MAE" in report and "97.5% CI" in report and "Sam (AL182021)" in report
 
 
+@pytest.mark.slow
 def test_planted_trade_off(request):
     res = analyse(build(request.node.name, arm_scale=0.7, arm_hi=-11.0))  # MAE better, bias ~4 kt more negative
     b = prim(res, ">96 bias")
@@ -231,24 +233,28 @@ def test_planted_trade_off(request):
     assert res["joint"].startswith("TRADE-OFF: overall MAE better, >96 kt bias worse")
 
 
+@pytest.mark.slow
 def test_planted_reverse_trade_off(request):
     res = analyse(build(request.node.name, arm_scale=1.3, arm_hi=-3.0))
     assert prim(res, ">96 bias").verdict == "BETTER"
     assert res["joint"].startswith("REVERSE TRADE-OFF")
 
 
+@pytest.mark.slow
 def test_sign_crossing_uses_absolute_bias(request):
     res = analyse(build(request.node.name, arm_hi=+2.0, ctl_hi=-7.0))
     b = prim(res, ">96 bias")
     assert b.branch.startswith("sign crossing") and b.mean_diff < 0 and b.direction == "better"
 
 
+@pytest.mark.slow
 def test_significant_but_below_sesoi(request):
     res = analyse(build(request.node.name, arm_scale=0.96, seed_sd=0.003, bias_sd=0.05))  # ~ -0.35 kt, tiny noise
     p = prim(res, "overall MAE")
     assert p.p_signflip < 0.025 and p.verdict.startswith("SIGNIFICANT BUT BELOW SESOI (better")
 
 
+@pytest.mark.slow
 def test_informative_null(request):
     res = analyse(build(request.node.name, seed_sd=0.02, bias_sd=0.3))
     assert prim(res, "overall MAE").verdict.startswith("NULL (informative")
@@ -256,12 +262,14 @@ def test_informative_null(request):
     assert res["joint"] == "NO SIGNIFICANT DIFFERENCE on either primary"
 
 
+@pytest.mark.slow
 def test_inconclusive_null(request):
     res = analyse(build(request.node.name, seed_sd=0.15, bias_sd=4.0))
     assert prim(res, "overall MAE").verdict.startswith("NULL (inconclusive")
     assert prim(res, ">96 bias").verdict.startswith("NULL (inconclusive")
 
 
+@pytest.mark.slow
 def test_budget_limited_flag(request):
     res = analyse(build(request.node.name, val_min_frac=1.2))  # validation still falling: last epochs selected
     assert "BUDGET-LIMITED" in res["joint"]
@@ -269,6 +277,7 @@ def test_budget_limited_flag(request):
     assert pr[pr.arm == "atlantic"].undertrain_flag.sum() >= 5
 
 
+@pytest.mark.slow
 def test_sensitivity_and_frozen_reported(request):
     root = build(request.node.name, arm_scale=0.9)
     fz = root / "frozen"
@@ -282,6 +291,7 @@ def test_sensitivity_and_frozen_reported(request):
     assert (root / "out" / "frozen_vs_control.csv").exists()
 
 
+@pytest.mark.slow
 def test_per_storm_rule(request):
     root = build(request.node.name)
     analyse(root)
@@ -291,6 +301,7 @@ def test_per_storm_rule(request):
         assert np.isnan(ps.loc[f"{s} >96 bias", "control"]) == (n < 10)
 
 
+@pytest.mark.slow
 def test_deterministic_outputs(request):
     root = build(request.node.name, arm_scale=0.95)
     analyse(root, "out1")
@@ -302,6 +313,7 @@ def test_deterministic_outputs(request):
             assert b"\r" not in b1
 
 
+@pytest.mark.slow
 def test_refuses_overwrite(request):
     root = build(request.node.name)
     analyse(root)
@@ -310,6 +322,7 @@ def test_refuses_overwrite(request):
 
 
 # ---- the adversary's attack (item 5, finding 1) and linkage ----------------------------------------------------
+@pytest.mark.slow
 def test_adversary_attack_same_csvs_and_ep_training_storms_refused(request):
     ep_ids = [f"EP{i:02d}2023" for i in range(1, 32)]
 
@@ -327,6 +340,7 @@ def test_adversary_attack_same_csvs_and_ep_training_storms_refused(request):
         analyse(root)
 
 
+@pytest.mark.slow
 def test_adversary_attack_ep_training_storms_alone_refused(request):
     ep_ids = [f"EP{i:02d}2023" for i in range(1, 32)]
     log = lambda arm, s, t: t.replace(str(A.ARM_IDS), str(A.CONTROL_IDS + ep_ids)) if arm == "atlantic" else t  # noqa
@@ -334,6 +348,7 @@ def test_adversary_attack_ep_training_storms_alone_refused(request):
         analyse(build(request.node.name, log_mutate=log))
 
 
+@pytest.mark.slow
 def test_attack_csv_contents_swapped_between_arms_refused(request):
     """Item 7 A1: each seed's control and atlantic CSV contents swapped, manifests rehashed consistently."""
     root = build(request.node.name, arm_scale=0.9)
@@ -352,6 +367,7 @@ def test_attack_csv_contents_swapped_between_arms_refused(request):
         analyse(root)
 
 
+@pytest.mark.slow
 def test_attack_atlantic_csv_points_at_control_native_refused(request):
     def man(arm, s, m, root):
         if arm == "atlantic":
@@ -362,6 +378,7 @@ def test_attack_atlantic_csv_points_at_control_native_refused(request):
         analyse(build(request.node.name, man_mutate=man))
 
 
+@pytest.mark.slow
 def test_attack_eval_log_at_arbitrary_path_refused(request):
     def man(arm, s, m, root):
         if (arm, s) == ("atlantic", 2):
@@ -376,6 +393,7 @@ def test_attack_eval_log_at_arbitrary_path_refused(request):
         analyse(build(request.node.name, man_mutate=man))
 
 
+@pytest.mark.slow
 def test_native_vectors_in_identity_check(request):
     def man(arm, s, m, root):  # an atlantic CSV whose content equals a control native CSV, log made consistent
         if (arm, s) == ("atlantic", 4):
@@ -391,6 +409,7 @@ def test_native_vectors_in_identity_check(request):
         analyse(build(request.node.name, man_mutate=man))
 
 
+@pytest.mark.slow
 def test_identical_prediction_vectors_refused(request):
     def man(arm, s, m, root):  # control content copied into the atlantic CSV at its pinned path, log consistent
         if arm == "atlantic":
@@ -412,12 +431,14 @@ def test_checkpoint_path_in_train_log_checked(request):
         analyse(build(request.node.name, log_mutate=log))
 
 
+@pytest.mark.slow
 def test_eval_log_checkpoint_checked(request):
     ev = lambda arm, s, t: t.replace("seed3.pt", "seed2.pt") if (arm, s) == ("atlantic", 3) else t  # noqa: E731
     with pytest.raises(A.DesignError, match="evaluated checkpoint"):
         analyse(build(request.node.name, eval_mutate=ev))
 
 
+@pytest.mark.slow
 def test_file_changed_after_manifest_refused(request):
     root = build(request.node.name)
     p = root / "results/n5_atlantic/atlantic_seed6_h9.csv"
@@ -426,6 +447,7 @@ def test_file_changed_after_manifest_refused(request):
         analyse(root)
 
 
+@pytest.mark.slow
 def test_frame_list_sha_checked(request):
     def man(arm, s, m, root):
         if arm == "atlantic" and s == 0:
@@ -435,6 +457,7 @@ def test_frame_list_sha_checked(request):
         analyse(build(request.node.name, man_mutate=man))
 
 
+@pytest.mark.slow
 def test_mixed_commits_refused(request):
     def man(arm, s, m, root):
         if s == 7:
@@ -444,6 +467,7 @@ def test_mixed_commits_refused(request):
         analyse(build(request.node.name, man_mutate=man))
 
 
+@pytest.mark.slow
 def test_protected_hash_change_refused(request):
     def man(arm, s, m, root):
         if (arm, s) == ("control", 1):
@@ -453,6 +477,7 @@ def test_protected_hash_change_refused(request):
         analyse(build(request.node.name, man_mutate=man))
 
 
+@pytest.mark.slow
 def test_control_grid_selection_checked(request):
     def man(arm, s, m, root):
         if (arm, s) == ("control", 5):
@@ -518,6 +543,7 @@ def failing_record(root, arm, seed):
           json.dumps({"files_sha256": {f"models/n5_atlantic/{arm}/seed{seed}.pt": "0" * 64}}))
 
 
+@pytest.mark.slow
 def test_rule_a_drops_a_named_pair_and_says_so(request):
     """A pair is dropped only when the deviations file names it; the report labels the verdict NON-CONFIRMATORY and
     states the reduced n and both primaries' power at it."""
@@ -555,12 +581,14 @@ def test_rule_a_drops_a_named_pair_and_says_so(request):
     ([{"seed": "3", "reason": "x"}], "distinct seed"),
     ([{"seed": s, "reason": "x"} for s in range(9)], "fewer than 2 would remain"),
 ], ids=["empty", "unknown_seed", "no_reason", "duplicate", "string_seed", "too_many"])
+@pytest.mark.slow
 def test_rule_a_refuses_a_malformed_deviations_file(request, rows, msg):
     root = build(request.node.name)
     with pytest.raises(A.DesignError, match=msg):
         analyse(root, deviations=deviations(root, rows))
 
 
+@pytest.mark.slow
 def test_rule_a_drops_only_a_failing_pair_from_the_committed_file(request):
     """hc-adversary item 17, finding 2: a healthy pair can't be dropped; the file must be the committed, clean one at
     its fixed path."""
@@ -583,6 +611,7 @@ def test_rule_a_drops_only_a_failing_pair_from_the_committed_file(request):
     assert analyse(root, "f", deviations=dev)["n_pairs"] == 9
 
 
+@pytest.mark.slow
 def test_rule_a_power_uses_the_design_method():
     """The n = 10 column is design §5's table, quoted. The simulation (power.py's method) reproduces it within the
     table's own Monte Carlo error (§5 used 2000 reps, SE ~0.01; the 2.44 bias cell, 0.83, is ~2 SE low), and a
@@ -632,6 +661,7 @@ def plant_tie(delta, record=True, select_native=True):
     return man
 
 
+@pytest.mark.slow
 def test_tie_rule_accepts_train_py_checkpoint_inside_the_window(request):
     res = analyse(build(request.node.name, man_mutate=plant_tie(5e-5)))
     row = res["per_run"].set_index(["arm", "seed"]).loc[("control", 0)]
@@ -645,11 +675,13 @@ def test_tie_rule_accepts_train_py_checkpoint_inside_the_window(request):
     (dict(delta=5e-5, select_native=False), "train.py's own saved checkpoint"),  # fired, but the grid pick evaluated
     (dict(delta=5e-5, select_native="epoch_only"), "train.py's own saved checkpoint"),  # right epoch, other file
 ], ids=["outside_window", "not_recorded", "grid_pick_evaluated", "other_checkpoint_file"])
+@pytest.mark.slow
 def test_tie_rule_refusals(request, kw, msg):
     with pytest.raises(A.DesignError, match=msg):
         analyse(build(request.node.name, man_mutate=plant_tie(**kw)))
 
 
+@pytest.mark.slow
 def test_tie_rule_recorded_when_it_did_not_fire_or_field_missing(request):
     def recorded(arm, s, m, root):
         if (arm, s) == ("control", 4):
@@ -712,6 +744,7 @@ def test_control_selection_values():
     assert A.TIE_KT == 1e-4
 
 
+@pytest.mark.slow
 def test_self_check_dirty_or_different(request):
     root = build(request.node.name)
     with pytest.raises(A.DesignError, match="uncommitted"):
@@ -734,6 +767,7 @@ def _swap(sid_new):
 
 @pytest.mark.parametrize("sid,msg", [("AL082025", "2025-or-later"), ("AL012026", "2025-or-later"),
                                      ("AL132020", "outside H9")])
+@pytest.mark.slow
 def test_refuses_bad_storm_ids(request, sid, msg):
     with pytest.raises(A.DesignError, match=msg):
         analyse(build(request.node.name, csv_mutate=_swap(sid)))
@@ -764,12 +798,14 @@ def test_refuses_changed_label_via_pin(request):
     (lambda a, s, t: t.replace("rotate: False", "rotate: True") if s == 1 else t, "loss/mask/rotation"),
     (lambda a, s, t: t.replace("END ", "TRAIN_FAILED ") if s == 8 else t, "TRAIN_FAILED"),
 ])
+@pytest.mark.slow
 def test_refuses_train_log_off_design(request, mut, msg):
     with pytest.raises(A.DesignError, match=msg):
         analyse(build(request.node.name, log_mutate=mut))
 
 
 @pytest.mark.parametrize("enc,msg", [("utf-16", "UTF-16"), ("utf-8-sig", "BOM")])
+@pytest.mark.slow
 def test_refuses_log_encoding(request, enc, msg):
     root = build(request.node.name)
     p = root / "logs/n5_atlantic/atlantic_seed0.log"
@@ -804,6 +840,7 @@ def test_budget_rule_and_signflip_values():
 
 
 # ---- item 7b: odd native epochs -------------------------------------------------------------------------------
+@pytest.mark.slow
 def test_odd_native_epoch_passes(request):
     root = build(request.node.name, arm_scale=0.9)
     res = analyse(root)
@@ -813,6 +850,7 @@ def test_odd_native_epoch_passes(request):
     assert prim(res, "overall MAE").verdict == "BETTER"
 
 
+@pytest.mark.slow
 def test_odd_native_epoch_with_differing_vectors_refused(request):
     with pytest.raises(A.DesignError, match="must be identical"):
         analyse(build(request.node.name, native_differs=True))
