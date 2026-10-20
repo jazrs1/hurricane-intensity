@@ -57,3 +57,8 @@ This follows the earlier experiments, whose logs/ and results/ are tracked. The 
 - **F-31 (from you):** longer training for both arms, as a future separately pre-registered experiment.
 - **F-23 to F-30:** carried from earlier.
 - **F-32:** the confidence-interval grid edge (note a).
+
+## Decided (John, 2026-10-19)
+
+1. **Results PR:** yes, through hc-adversary and then John (item 20: OK).
+2. **Checkpoints (revised at 21:05, after item 20 note 5):** keep the 10 primary-evaluated control checkpoints and the 20 final models. Delete the other 120 after PR #16 merges. The results entry says why the 10 were kept and lists all 130 hashes, each marked KEPT or DELETED.
