@@ -454,6 +454,7 @@ def test_a_held_lock_refuses_every_writing_stage(tmp_path):
 
 
 # ---- the runs -----------------------------------------------------------------------------------------------
+@pytest.mark.slow
 def test_end_to_end_records_manifests_and_the_analysis_accepts_them(tmp_path, capsys):
     root = fake_repo(tmp_path)
     runner = train(root)
@@ -517,6 +518,7 @@ def test_revalidation_that_misses_train_py_pick_stops_and_deletes_nothing(tmp_pa
     assert not (root / "logs/f31/runs/control_seed10.train.json").exists()
 
 
+@pytest.mark.slow
 def test_revalidation_below_tie_kt_keeps_train_py_pick(tmp_path):
     root = fake_repo(tmp_path)
     train(root, runner=FakeRunner(root, curve=dip_curve), reval=dip_reval(0.5e-4))
@@ -647,6 +649,7 @@ def test_driver_refuses_an_output_that_appears_mid_launch(tmp_path):
 
 
 # ---- the phase split ---------------------------------------------------------------------------------------------
+@pytest.mark.slow
 @pytest.mark.parametrize("fail", [("atlantic", 11), ("control", 29)], ids=["order3", "order40"])
 def test_phase2_refuses_while_any_training_run_is_unfinished(tmp_path, fail):
     root = fake_repo(tmp_path)
@@ -659,6 +662,7 @@ def test_phase2_refuses_while_any_training_run_is_unfinished(tmp_path, fail):
     assert all(is_train(c) for c in runner.calls) and R.h9_outputs(root, A_REAL) == []
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("kw, match", [
     (dict(untracked=("logs/f31/runs/atlantic_seed14.train.json",)), "guard 5e: .*atlantic_seed14.train.json is not tracked"),
     (dict(committed_differs=("logs/f31/runs/control_seed12.train.json",)),
@@ -675,6 +679,7 @@ def test_phase2_requires_the_committed_records_as_evidence(trained, kw, match):
     assert R.h9_outputs(trained, A_REAL) == [] and not (trained / R.PHASE2_MARKER).exists()
 
 
+@pytest.mark.slow
 def test_phase2_accepts_records_one_commit_later_with_docs(trained):
     git = fake_git(trained, head="d" * 40, first_parent=(COMMIT, "d" * 40),
                    extra_changed=("logs/decisions.md", "reports/decisions/F31.md"))
@@ -682,6 +687,7 @@ def test_phase2_accepts_records_one_commit_later_with_docs(trained):
     assert len(mans) == 40 and {m["commit"] for m in mans} == {COMMIT}
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("edit, match", [
     (lambda r: r.update(slots={**r["slots"], "native_4x": 1}), "validation-only selections"),
     (lambda r: r.update(train_py_sha256="0" * 64), "train.py blob"),
@@ -701,6 +707,7 @@ def test_phase2_entry_applies_the_training_side_checks_before_any_h9(trained, ed
     assert runner.calls == [] and R.h9_outputs(trained, A_REAL) == []
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("kw", [dict(differs=((COMMIT, "scripts/analyze_f31.py"),)),
                                 dict(blobs={f"scripts/train.py": REAL_BLOBS["scripts/train.py"]},
                                      differs=((COMMIT, "scripts/analyze_n5.py"),))], ids=["analysis", "analyze_n5"])
@@ -711,6 +718,7 @@ def test_phase2_entry_runs_verify_self_at_the_launch_commit(trained, kw):
     assert runner.calls == []
 
 
+@pytest.mark.slow
 def test_relaunch_at_another_commit_is_refused_until_abort_all(tmp_path):
     root = fake_repo(tmp_path)
     with pytest.raises(R.LaunchError, match="training failed"):
@@ -729,6 +737,7 @@ def test_relaunch_at_another_commit_is_refused_until_abort_all(tmp_path):
     assert len(record(root, "atlantic", 11)["aborted_attempts"]) == 1
 
 
+@pytest.mark.slow
 def test_abort_all_refuses_after_an_h9_output(trained):
     (trained / "results/f31/control_seed10_e05_h9.csv").write_text("looked")
     with pytest.raises(R.LaunchError, match="abort-all: H9 has been looked at"):
@@ -760,6 +769,7 @@ def test_an_h9_output_planted_mid_phase1_stops_training(tmp_path):
 
 
 # ---- aborts -------------------------------------------------------------------------------------------------------
+@pytest.mark.slow
 def test_abort_then_restart_keeps_seed_and_order_and_records_the_attempt(tmp_path):
     root = fake_repo(tmp_path)
     with pytest.raises(R.LaunchError, match="training failed: logs/f31/atlantic_seed11.log"):
@@ -796,6 +806,7 @@ def test_abort_run_refusals(tmp_path):
     assert (root / "logs/f31/atlantic_seed11.log").exists() and not (root / R.ABORTED).exists()
 
 
+@pytest.mark.slow
 def test_a_record_that_fails_verification_can_be_aborted_and_retrained(trained):
     rec = record(trained, "control", 14)
     kept = next(f for f in rec["files_sha256"] if "_epochs/" in f)
@@ -812,6 +823,7 @@ def test_a_record_that_fails_verification_can_be_aborted_and_retrained(trained):
     assert len(ev(trained, runner=runner)[0]) == 40
 
 
+@pytest.mark.slow
 def test_kept_files_are_read_only_and_abort_all_still_moves_them(trained):
     rec = record(trained, "control", 12)
     moved = R.abort_all("read-only files", trained)
@@ -821,6 +833,7 @@ def test_kept_files_are_read_only_and_abort_all_still_moves_them(trained):
         assert not (trained / f).exists() and (dest / f).is_file() and not os.access(dest / f, os.W_OK)
 
 
+@pytest.mark.slow
 def test_after_a_look_a_bad_record_asks_for_the_bytes_back(trained):
     runner = FakeRunner(trained)
     rec = record(trained, "atlantic", 12)
@@ -845,6 +858,7 @@ def test_after_a_look_a_bad_record_asks_for_the_bytes_back(trained):
     assert len(ev(trained, runner=runner)[0]) == 40
 
 
+@pytest.mark.slow
 def test_a_crashed_evaluation_is_moved_aside_and_the_same_slots_re_evaluated(trained):
     with pytest.raises(R.LaunchError, match="abort-eval: atlantic seed 12 is trained"):
         R.abort_eval("atlantic", 12, "nothing to move", trained)
@@ -896,6 +910,7 @@ def test_an_interrupted_abort_is_pending_blocks_launch_and_resumes(tmp_path, mon
     assert ab["status"] == "complete" and all((root / v["to"]).is_file() for v in ab["moved"].values())
 
 
+@pytest.mark.slow
 def test_abort_eval_cannot_launder_an_h9_look(trained):
     runner = FakeRunner(trained)
     rec = record(trained, "control", 10)
@@ -917,6 +932,7 @@ def test_abort_eval_cannot_launder_an_h9_look(trained):
     assert mans[0]["eval_attempts"] == ["logs/f31/aborted/control_seed10_eval1/abort.json"] and len(mans) == 40
 
 
+@pytest.mark.slow
 def test_the_phase2_marker_alone_is_a_look(trained):
     runner = FakeRunner(trained)
     rec = record(trained, "control", 10)
@@ -930,6 +946,7 @@ def test_the_phase2_marker_alone_is_a_look(trained):
         R.abort_all("start over", trained)
 
 
+@pytest.mark.slow
 def test_a_pending_eval_abort_blocks_evaluate_and_resumes(trained, monkeypatch):
     runner = FakeRunner(trained)
     rec = record(trained, "control", 10)
@@ -957,6 +974,7 @@ def test_a_pending_eval_abort_blocks_evaluate_and_resumes(trained, monkeypatch):
     assert mans[0]["eval_attempts"] == ["logs/f31/aborted/control_seed10_eval1/abort.json"]
 
 
+@pytest.mark.slow
 def test_evaluate_one_checks_its_eval_attempts_before_the_h9_step(trained, monkeypatch):
     d = trained / "logs/f31/aborted/control_seed10_eval1"
     d.mkdir(parents=True)
@@ -968,6 +986,7 @@ def test_evaluate_one_checks_its_eval_attempts_before_the_h9_step(trained, monke
     assert runner.calls == []
 
 
+@pytest.mark.slow
 def test_a_manifest_the_analysis_refuses_stops_phase2_at_that_run(trained):
     """The driver applies analyze_f31.load_run to each manifest right after writing it: an eval log whose MAE is not
     its CSV's (log and CSV not from one evaluation) stops phase 2 at that run, with abort-eval as the remedy."""
@@ -982,6 +1001,7 @@ def test_a_manifest_the_analysis_refuses_stops_phase2_at_that_run(trained):
     assert len(ev(trained, runner=runner)[0]) == 40
 
 
+@pytest.mark.slow
 def test_protected_file_changed_during_an_h9_step_stops_without_a_manifest(trained):
     runner = FakeRunner(trained)
     rec = record(trained, "atlantic", 10)  # order 2
@@ -1002,6 +1022,7 @@ def test_protected_file_changed_during_an_h9_step_stops_without_a_manifest(train
     assert (trained / "logs/f31/runs/control_seed10.json").exists()  # order 1 was finished before
 
 
+@pytest.mark.slow
 def test_protected_drift_before_an_h9_step_stops_it_unrun(trained, monkeypatch):
     real, n = R.protected_changed, []
 
@@ -1031,6 +1052,7 @@ def test_a_tampered_run_n5_is_refused_before_import(tmp_path):
     assert load("run_f31_crlf", d / "run_f31.py").RN5.UPSTREAM == "origin/phase2-experiments"  # CRLF copy loads
 
 
+@pytest.mark.slow
 def test_abort_eval_takes_a_manifest_that_load_run_refuses(trained):
     mans, runner = ev(trained)
     with pytest.raises(R.LaunchError, match="abort-eval: atlantic seed 13 is evaluated"):
@@ -1055,6 +1077,7 @@ def write_deviations(root, rows):
     return A_REAL.DEVIATIONS_PATH
 
 
+@pytest.mark.slow
 def test_rule_a_completes_when_a_record_breaks_mid_phase2(trained):
     runner = FakeRunner(trained)
     rec = record(trained, "atlantic", 13)  # order 7
@@ -1077,6 +1100,7 @@ def test_rule_a_completes_when_a_record_breaks_mid_phase2(trained):
     assert res["primary"][0]["verdict"].startswith("NON-CONFIRMATORY") and "DEVIATION (rule (A)" in report
 
 
+@pytest.mark.slow
 def test_rule_a_is_refused_before_any_look(trained):
     touch_kept(trained / "models/f31/control/seed10.pt", b"bit rot")
     dev = write_deviations(trained, [{"arm": "control", "seed": 10, "reason": "seed10.pt changed"}])
@@ -1087,6 +1111,7 @@ def test_rule_a_is_refused_before_any_look(trained):
     assert runner.calls == [] and not (trained / R.PHASE2_MARKER).exists()
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("case", ["healthy", "untracked", "differs", "other_path", "restorable"])
 def test_evaluate_refuses_a_deviation_rule_a_does_not_cover(trained, case):
     runner = FakeRunner(trained)
