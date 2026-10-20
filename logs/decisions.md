@@ -2700,3 +2700,35 @@ SENSITIVITY (pre-registered; control at its native 25-epoch selection; does not 
     of N5.
   - F-32: the CI grid puts each edge up to about 0.002 kt inward
     (cosmetic; no edge is near a threshold).
+
+2026-10-19, 23:50. F-31 budget study: design approved (John). No training,
+evaluation or H9 read.
+- PR #18 merged as c4c4cff (parents fbe0da9 + d83ff06).
+- John's decision, verbatim (relayed by the coordinator): "1. PR #18:
+  yes, merge pinned to d83ff06 (design.md 475f1e44…). 2. §11 choices:
+  all six as you recommend. 20 seeds; two primaries (4× vs 1× within
+  each arm); validation-based picks plus the fixed H9 checkpoints, with
+  no ±1-epoch H9 reads; keep only selected and H9-evaluated
+  checkpoints; H9 as the evaluation set; matched-grid checkpoints at 1×
+  and 2× left dropped. Record in the design that the read-at-1×/2×/4×
+  equivalence depends on train.py's learning rate being independent of
+  total epochs; any schedule change reopens it."
+- This PR changes reports/v2_survey/f31/design.md only as follows:
+  - the title line now reads approved;
+  - section 11 now records the six decisions;
+  - section 2 now carries John's equivalence rule, with a launch guard:
+    run_f31.py refuses unless scripts/train.py's blob SHA-256 equals a
+    pinned constant (at c4c4cff afceb4b19ea7d8c732c6f26b7d52e4b3b6d313d58153e2d0518887a3a6db231f,
+    blob 500bbc1e);
+  - section 8 and section 10 name that guard.
+- Hashes, as SHA-256 of `git show <commit>:<path>` bytes [blob id]:
+  - reports/v2_survey/f31/design.md: 475f1e44dda61c539ed0624d9244c1423422797f632ae8dbb5e224757dddc61e
+    [9f73e1ce] (d83ff06, approved) ->
+    7e1ef4c10c3866dfc2addffcf6605c69b955131dcdd6911b5d56f05f9c1f215e (this PR).
+  - reports/v2_survey/f31/power.py: aaf738ab4b0deb7c30fbab0b035e58b5eaee7aeed98e38191d83954dc679246f
+    [c0ee034e], unchanged.
+  - reports/v2_survey/f31/power_output.txt: a2baf27c53ecf0735d12fd6be2acd7ab83ff8102920c3eee6cba06b04a6f504a
+    [b7269885], unchanged.
+- Next: launch PR A (scripts/analyze_f31.py and its synthetic tests),
+  then the driver. Each goes to hc-adversary and John before anything
+  runs.
