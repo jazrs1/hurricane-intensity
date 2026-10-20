@@ -14,8 +14,8 @@ validation values. Also read, both pinned:
     quoted, unpaired.
 
 Reused from scripts/analyze_n5.py, whose blob is pinned (N5_BLOB_SHA256), pure functions and constants only:
-epochs_for, signflip_p and signflip_ci (n always passed explicitly), load_csv, read_text_strict, check_eval_log,
-metrics, per_storm, the trivial helpers sha256_file and ids_in, DesignError, and the design constants (H9 and its pin,
+epochs_for, signflip_p and signflip_ci (n always passed explicitly), sign_matrix (rule (A)'s power only), load_csv,
+read_text_strict, check_eval_log, metrics, per_storm, the trivial helpers sha256_file and ids_in, DesignError, and the design constants (H9 and its pin,
 the training and validation IDs, frame counts, the frame-list SHA-256, TIE_KT, PROTECTED). Rewritten here, not
 imported: verify_self, the deviations rule, the train-log parser, pinned paths and everything bound to N5's
 SELF_PATH, SEEDS or DEVIATIONS_PATH. analyze_n5.py itself is never modified.
@@ -33,11 +33,26 @@ The record/manifest contract run_f31.py must write (phase-1 record <arm>_seed<s>
   deleted_epoch_sha256 {epoch: sha} (every other epoch; those files are gone), protected_before, protected_after,
   aborted_attempts, eval_attempts, and in the manifest evals {epoch: {csv_sha256, eval_log_sha256}} for exactly the
   distinct slot epochs (paths: epoch_paths).
+  Spelled out (hc-adversary item 23c):
+  - run_f31.py evaluate applies analyze_f31.check_training to all 40 phase-1 records before the first H9 evaluation,
+    so no training-side refusal can first appear after the look (N5 item 16).
+  - Every H9 evaluation, the native 4x slot included, evaluates the epoch file epoch_paths(...)["checkpoint"], never
+    seed<s>.pt. seed<s>.pt is kept only for native_same_weights.
+  - near_ties has exactly the keys {"matched_4x", "smoothed_4x"} for the control and {"smoothed_4x"} for the atlantic
+    arm; tie_rule exactly {"1x", "2x", "4x"}.
+  - order is the run's position in the schedule (expected_order: round-robin by seed, arm order alternating C/A, A/C,
+    from 1 to 40); it is checked and reported.
+  - Each train log has an "END " line and no TRAIN_FAILED; each attempt JSON named in aborted_attempts or
+    eval_attempts exists with "status": "complete".
+  - The manifest equals its committed phase-1 record on every key except evals and eval_attempts (phase 2 adds
+    those), and the commit's scripts/train.py (git show) hashes to TRAIN_PY_SHA256.
 
 --deviations (the dead-end rule (A), carried over from N5, design.md §8) is the committed, clean file
 logs/f31/deviations.json, {"dropped_runs": [{"arm": <arm>, "seed": <s>, "reason": "<why>"}, ...]}. It may name only a
 run whose training record no longer verifies. That run leaves P1/P2 (within-run), and its seed pair leaves S1/S2. The
-report labels every verdict NON-CONFIRMATORY and gives the file's blob SHA-256.
+report labels every verdict NON-CONFIRMATORY, gives the file's blob SHA-256, states each test's reduced n and its
+effect on power (design §5's n = 20 values, quoted, against power.py's method at the reduced n), and prints the
+pre-look BUDGET-LIMITED counts from all 40 records beside the adjusted ones.
 
 Writes into --out-dir (a new directory under results/f31/; refuses to overwrite): primary_tests.csv,
 sensitivity.csv, secondary.csv, selection.csv, per_run.csv, budget_curve.csv, ensemble.csv, per_storm.csv,
@@ -93,6 +108,15 @@ N5_REPORT_SHA256 = "fde430de92bab775977dfc84bef9eeb7a46907ae7abfb06cb2907db2d172
 FROZEN_METRICS = "results/ensemble/expanded10_h9_metrics.csv"
 FROZEN_ENSEMBLE = {"overall MAE": 8.570941059931508, ">96 MAE": 10.815341209800918, ">96 bias": -7.715010003062787}
 DEVIATIONS_PATH = "logs/f31/deviations.json"
+TRAIN_PY = "scripts/train.py"
+# Rule (A)'s power statement (John, 2026-10-19 17:03: "state the reduced n and its effect on power in the report").
+# design §5's tables at n = 20 and the SESOI, quoted, not re-simulated: {sd_diff: power}
+POWER_N20 = {"P1/P2": dict(alpha=0.025, sesoi=0.9, cells={0.54: 1.00, 0.85: 0.99, 1.12: 0.87}),
+             "S1": dict(alpha=0.05, sesoi=0.9, cells={0.85: 0.99, 1.12: 0.92, 1.40: 0.76}),
+             "S2": dict(alpha=0.05, sesoi=3.0, cells={2.84: 0.99, 4.79: 0.76, 6.00: 0.57})}
+POWER_SEED = 20261019  # power.py's seed; one fresh generator per cell, as N5's rule-(A) power_at
+POWER_REPS = 2000  # power.py's reps per cell: SE <= sqrt(0.25 / 2000) = 0.011
+POWER_CHUNK = 16  # reps per sign-matrix product: 2^19 x 16 doubles = 67 MB at n = 19 (N5's unchunked form: 84 GB)
 SELF_PATH = "scripts/analyze_f31.py"
 # ------------------------------------------------------------------------------------------------------------
 
@@ -118,7 +142,8 @@ def design_constants(**override):
     d = dict(h9=N5.H9, h9_frames=N5.H9_FRAMES, h9_pin=N5.H9_PIN, val_ids=N5.VAL_IDS, val_frames=N5.VAL_FRAMES,
              ids={"control": N5.CONTROL_IDS, "atlantic": N5.ARM_IDS}, train_lists=N5.TRAIN_LISTS, frames=FRAMES,
              frame_list_sha={"control": None, "atlantic": N5.FRAME_LIST_SHA256}, protected=N5.PROTECTED,
-             train_py_sha=TRAIN_PY_SHA256, n5_report_sha=N5_REPORT_SHA256, frozen=FROZEN_ENSEMBLE, ci_grid=CI_GRID)
+             train_py_sha=TRAIN_PY_SHA256, n5_report_sha=N5_REPORT_SHA256, frozen=FROZEN_ENSEMBLE, ci_grid=CI_GRID,
+             power_reps=POWER_REPS)
     d.update(override)
     return d
 
@@ -243,6 +268,27 @@ def bias_contrast(new, old):
     return np.abs(new) - np.abs(old), -1, "sign crossing: d = |bias_new| - |bias_ref|, d < 0 better"
 
 
+def power_reduced(n, delta, sd, alpha, reps):
+    """power.py's method at a reduced n: reps normal draws of n paired differences (one fresh generator seeded
+    POWER_SEED), each tested by the two-sided exact sign-flip over all 2^n assignments; the share with p < alpha. The
+    sign-matrix product is chunked, POWER_CHUNK reps at a time."""
+    d = np.random.default_rng(POWER_SEED).normal(delta, sd, (reps, n))
+    signs = N5.sign_matrix(n)
+    hits = 0
+    for i in range(0, reps, POWER_CHUNK):
+        c = d[i:i + POWER_CHUNK]
+        p = (np.abs(signs @ c.T) / n >= np.abs(c.mean(axis=1)) - 1e-12).mean(axis=0)
+        hits += int((p < alpha).sum())
+    return hits / reps
+
+
+def expected_order(arm, seed):
+    """Schedule position 1..40: round-robin by seed, arm order alternating (C/A for the 1st seed, A/C for the 2nd)."""
+    i = SEEDS.index(seed)
+    first = ARMS[i % 2]
+    return 2 * i + (1 if arm == first else 2)
+
+
 # ---- input checks ------------------------------------------------------------------------------------------
 def pinned_paths(arm, seed):
     return {"train_log": f"logs/f31/{arm}_seed{seed}.log",
@@ -323,6 +369,8 @@ def check_training(man, arm, seed, design, root, where):
     if man.get("train_py_sha256") != design["train_py_sha"]:
         raise DesignError(f"{where}: train.py blob {man.get('train_py_sha256')} is not the pinned one; the nested "
                           "read-at-1x/2x/4x equivalence holds only for it (John, 2026-10-19 23:50)")
+    if man.get("order") != expected_order(arm, seed):
+        raise DesignError(f"{where}: order {man.get('order')} is not the schedule's {expected_order(arm, seed)}")
     if man.get("native_same_weights") is not True:
         raise DesignError(f"{where}: native_same_weights must be true (seed<s>.pt == the native 4x epoch file)")
     for when in ("protected_before", "protected_after"):
@@ -378,6 +426,15 @@ def load_run(manifest_path, arm, seed, design, root):
     root = Path(root)
     man = json.loads(N5.read_text_strict(manifest_path))
     ep, saved, slots = check_training(man, arm, seed, design, root, manifest_path)
+    rec_path = Path(manifest_path).with_name(f"{arm}_seed{seed}.train.json")
+    if not rec_path.is_file():
+        raise DesignError(f"{manifest_path}: no phase-1 record {rec_path}")
+    rec = json.loads(N5.read_text_strict(rec_path))
+    phase2 = {"evals", "eval_attempts"}
+    diff = sorted(k for k in (set(man) | set(rec)) - phase2 if man.get(k) != rec.get(k))
+    if diff:
+        raise DesignError(f"{manifest_path}: differs from its phase-1 record {rec_path.name} in {diff}; the slots and "
+                          "every training-side field are fixed before the look")
     epochs = sorted(set(slots.values()))
     evals = man.get("evals") or {}
     if sorted(evals) != sorted(map(str, epochs)):
@@ -409,6 +466,12 @@ def single_commit(mans):
     return commits.pop()
 
 
+def record_fails(rec_path, root):
+    """N5's trigger, per run: a file the record hashed in files_sha256 is missing or changed."""
+    files = json.loads(N5.read_text_strict(rec_path)).get("files_sha256") or {}
+    return any(not (Path(root) / f).is_file() or N5.sha256_file(Path(root) / f) != h for f, h in files.items())
+
+
 def load_deviations(path, root, manifest_dir, git, design):
     """Rule (A): {(arm, seed): reason} from the committed, clean DEVIATIONS_PATH, naming only runs whose training
     record no longer verifies. Returns (dropped, the file's blob SHA-256 at HEAD)."""
@@ -437,14 +500,12 @@ def load_deviations(path, root, manifest_dir, git, design):
         if not rec.is_file():  # as N5: a run with no record is not "kept files that can't be restored"
             raise DesignError(f"{DEVIATIONS_PATH}: {arm} seed {s} has no training record {rec}; rule (A) drops only "
                               "a run whose record exists and fails")
-        try:
-            check_training(json.loads(N5.read_text_strict(rec)), arm, s, design, root, rec)
+        if not record_fails(rec, root):
             healthy.append((arm, s))
-        except (DesignError, OSError, ValueError):
-            pass
     if healthy:
-        raise DesignError(f"{DEVIATIONS_PATH}: {healthy} have a training record that still verifies; rule (A) drops "
-                          "only a run whose record fails")
+        raise DesignError(f"{DEVIATIONS_PATH}: {healthy}: every file their record hashed is present and unchanged; "
+                          "rule (A) drops only a run whose kept files can't be restored (anything else is fixed, "
+                          "not dropped)")
     return out, hashlib.sha256(git(["show", f"HEAD:{DEVIATIONS_PATH}"]).stdout).hexdigest()
 
 
@@ -467,6 +528,13 @@ def verify_self(commit, root, git, check_path=True):
     if out[N5_PATH][0] != N5_BLOB_SHA256:
         raise DesignError(f"{N5_PATH} at {commit} is not N5's pinned blob {N5_BLOB_SHA256[:12]}...")
     return out
+
+
+def check_train_py(commit, git, design):
+    """The launch commit's scripts/train.py must be the pinned blob (John, 2026-10-19 23:50), not only as recorded."""
+    got = hashlib.sha256(git(["show", f"{commit}:{TRAIN_PY}"]).stdout).hexdigest()
+    if got != design["train_py_sha"]:
+        raise DesignError(f"{TRAIN_PY} at {commit} hashes to {got[:12]}..., not the pinned {design['train_py_sha'][:12]}...")
 
 
 def real_git(root):
@@ -520,6 +588,7 @@ def run(manifest_dir, out_dir, root=None, design=None, git=None, deviations=None
             runs[(arm, s)] = load_run(p, arm, s, design, root)
     commit = single_commit([r["man"] for r in runs.values()])
     blobs = verify_self(commit, root, g, check_path=git is None)
+    check_train_py(commit, g, design)
 
     ref = next(iter(runs.values()))["preds"]
     ref = ref[min(ref)]
@@ -541,13 +610,15 @@ def run(manifest_dir, out_dir, root=None, design=None, git=None, deviations=None
         for slot, e in r["slots"].items():
             k = int(slot.split("_")[1][:-1])
             e_k = EPOCHS[arm][k]
-            sel_rows.append({"arm": arm, "seed": s, "slot": slot, "epoch": e, "budget_epochs": e_k,
+            sel_rows.append({"arm": arm, "seed": s, "order": r["man"]["order"], "slot": slot, "epoch": e,
+                             "budget_epochs": e_k,
                              "selected_step": e * BATCHES[arm], "budget_steps": e_k * BATCHES[arm],
                              "flagged": flagged(e, e_k),
                              "tie_rule": json.dumps(r["man"]["tie_rule"].get(f"{k}x")) if slot.startswith("native")
                              else "", "near_ties": " ".join(map(str, r["man"]["near_ties"].get(slot, []))),
                              **val_stability(reval, e, e_k)})
-            run_rows.append({"arm": arm, "seed": s, "slot": slot, "epoch": e, **met[(arm, s, e)]})
+            run_rows.append({"arm": arm, "seed": s, "order": r["man"]["order"], "slot": slot, "epoch": e,
+                             **met[(arm, s, e)]})
             storm_rows.append({"arm": arm, "slot": slot, **N5.per_storm(r["preds"][e])})
         traces += [{"arm": arm, "seed": s, "epoch": e, "train_mae": tr, "val_mae": va} for e, tr, va in r["ep"]]
     selection = pd.DataFrame(sel_rows)
@@ -616,11 +687,11 @@ def run(manifest_dir, out_dir, root=None, design=None, git=None, deviations=None
     s1n = vals("atlantic", "native_4x", "overall MAE", ps) - vals("control", "native_4x", "overall MAE", ps)
     sens.append(paired_test("S1 sensitivity, atlantic - control at 4x: control at its native 4x pick", s1n, SECONDARY_ALPHA, -1, SESOI_MAE,
                             "d = MAE_atl(native_4x) - MAE_ctl(native_4x), d < 0 better", ci))
-    for r in sec:
+    for r in sec + sens:
         r["verdict"] = tag + r["verdict"]
 
     # Descriptive. No atlantic - control difference, p or CI at 1x or 2x: F-31 is not a rerun of N5.
-    curve = per_run.drop(columns=["seed", "epoch"]).groupby(["arm", "slot"]).agg(["mean", "std"])
+    curve = per_run.drop(columns=["seed", "order", "epoch"]).groupby(["arm", "slot"]).agg(["mean", "std"])
     curve.columns = [f"{m} {s}" for m, s in curve.columns]
     curve = curve.reset_index()
     truth = ref["truth"].to_numpy()
@@ -681,6 +752,40 @@ def run(manifest_dir, out_dir, root=None, design=None, git=None, deviations=None
                 for k in ("aborted_attempts", "eval_attempts")}
     zeros = {arm: int(sum(runs[(arm, s)]["slots"]["native_4x"] == runs[(arm, s)]["slots"]["native_1x"]
                           for s in seeds_of[arm])) for arm in ARMS}
+    deviation = []
+    if dropped:
+        # Pre-look counts from all 40 phase-1 records (what decisions.md recorded before the look), beside these.
+        pre = {}
+        for arm in ARMS:
+            for k in BUDGETS:
+                recs = [json.loads(N5.read_text_strict(Path(manifest_dir) / f"{arm}_seed{s}.train.json"))
+                        for s in SEEDS]
+                pre[(arm, k)] = sum(flagged(rr["slots"][f"native_{k}x"], EPOCHS[arm][k]) for rr in recs)
+        reps = design["power_reps"]
+        sizes = {"P1/P2": [("P1 control", len(seeds_of["control"])), ("P2 atlantic", len(seeds_of["atlantic"]))],
+                 "S1": [("S1", len(paired_seeds))], "S2": [("S2", len(paired_seeds))]}
+        deviation = [
+            "DEVIATION (rule (A), John 2026-10-19 17:03): runs dropped: "
+            + "; ".join(f"{a} seed {s}: {why}" for (a, s), why in sorted(dropped.items())),
+            f"  Every verdict is NON-CONFIRMATORY. {DEVIATIONS_PATH} blob sha256 {dev_sha}.",
+            f"  Reduced n and power at the SESOI (n = {len(SEEDS)}: design §5's table, quoted; reduced n: two-sided exact "
+            f"sign-flip, normal model, {reps} reps per cell, seed {POWER_SEED}, as power.py; SE <= "
+            f"{math.sqrt(0.25 / reps):.3f}):"]
+        for key, spec in POWER_N20.items():
+            for lab, n_red in sizes[key]:
+                cells = ", ".join(
+                    f"sd_diff {sd:.2f}: {pw:.2f} -> "
+                    + (f"{pw:.2f} (n unchanged)" if n_red == len(SEEDS) else
+                       f"{power_reduced(n_red, spec['sesoi'], sd, spec['alpha'], reps):.2f}")
+                    for sd, pw in spec["cells"].items())
+                deviation.append(f"    {lab} (alpha {spec['alpha']}, {spec['sesoi']} kt), n {len(SEEDS)} -> {n_red}: "
+                                 f"{cells}")
+        deviation.append("  BUDGET-LIMITED before the look (all 40 phase-1 records, >= 10/20) vs after the drop "
+                         "(>= half the remaining runs):")
+        deviation += [f"    {arm} {k}x: pre-look {pre[(arm, k)]}/{len(SEEDS)}"
+                      f"{' -> BUDGET-LIMITED' if pre[(arm, k)] >= len(SEEDS) // 2 else ''}; adjusted "
+                      f"{flag_counts[(arm, f'native_{k}x')]}/{len(seeds_of[arm])}"
+                      f"{' -> BUDGET-LIMITED' if qual[(arm, k)] else ''}" for arm in ARMS for k in BUDGETS]
     lines = [
         "F-31 budget study: each arm read at 1x, 2x and 4x x 1640 steps inside one run per seed, H9 pooled. "
         "Pre-registered analysis output, unedited.",
@@ -689,10 +794,7 @@ def run(manifest_dir, out_dir, root=None, design=None, git=None, deviations=None
         f"{blobs[N5_PATH][0]} (blob id {blobs[N5_PATH][1]}); commit {commit}",
         "F-31 is a new experiment, not a rerun or rescue of N5. N5's verdict stands whatever F-31 finds.",
     ]
-    if dropped:
-        lines += [f"DEVIATION (rule (A)): runs dropped: " + "; ".join(f"{a} seed {s}: {why}"
-                                                                      for (a, s), why in sorted(dropped.items())),
-                  f"  Every verdict is NON-CONFIRMATORY. {DEVIATIONS_PATH} blob sha256 {dev_sha}. n per test below."]
+    lines += deviation
     lines += [
         f"PRIMARIES (Bonferroni, alpha {ALPHA} each, two-sided exact sign-flip, native selection; SESOI {SESOI_MAE} kt, "
         "N5's, for comparability):",

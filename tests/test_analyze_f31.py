@@ -40,14 +40,18 @@ COMMIT = "c0ffee" * 6 + "abcd"
 
 
 @lru_cache(maxsize=None)
-def n5_blob():
-    out = subprocess.run(["git", "-C", str(REPO), "show", f"HEAD:{A.N5_PATH}"], capture_output=True)
+def committed(rel):
+    out = subprocess.run(["git", "-C", str(REPO), "show", f"HEAD:{rel}"], capture_output=True)
     if out.returncode != 0:
-        pytest.skip("needs the repo's git to read the committed analyze_n5.py blob")
+        pytest.skip(f"needs the repo's git to read the committed {rel}")
     return out.stdout
 
 
-def fake_git(dirty=None, differs=None, n5_bytes=None, untracked=()):
+def n5_blob():
+    return committed(A.N5_PATH)
+
+
+def fake_git(dirty=None, differs=None, n5_bytes=None, train_bytes=None, untracked=()):
     def git(args, check=True):
         if args[0] == "ls-files":
             return SimpleNamespace(stdout=b"", returncode=1 if args[-1] in untracked else 0)
@@ -58,6 +62,9 @@ def fake_git(dirty=None, differs=None, n5_bytes=None, untracked=()):
         if args[0] == "show":
             if args[1].endswith(A.N5_PATH):
                 return SimpleNamespace(stdout=n5_blob() if n5_bytes is None else n5_bytes, returncode=0)
+            if args[1].endswith(A.TRAIN_PY):
+                return SimpleNamespace(stdout=committed(A.TRAIN_PY) if train_bytes is None else train_bytes,
+                                       returncode=0)
             return SimpleNamespace(stdout=b"blob bytes\n", returncode=0)
         if args[0] == "rev-parse":
             return SimpleNamespace(stdout=b"1234abcd\n", returncode=0)
@@ -82,7 +89,7 @@ def base_frames():
 BASE = base_frames()
 PIN = N5.h9_pin(BASE.assign(truth=BASE.wind_kt).sort_values("crop_path"))
 DESIGN = A.design_constants(h9_pin=PIN, frame_list_sha={"control": None, "atlantic": FRAME_SHA}, protected=FAKE_PROT,
-                            ci_grid=101)
+                            ci_grid=101, power_reps=48)
 
 
 def sha(p):
@@ -550,6 +557,9 @@ def test_refuses_unpinned_analyze_n5_and_dirty_self():
 def test_refuses_mixed_commits_and_protected_change():
     root = copy_of("commits")
     rewrite_manifest(root, "atlantic", 20, lambda m: {**m, "commit": "f" * 40})
+    rp = root / "logs/f31/runs/atlantic_seed20.train.json"  # the record too, so only the commit check can catch it
+    rp.write_text(json.dumps({**json.loads(rp.read_text(encoding="utf-8")), "commit": "f" * 40}, indent=1),
+                  encoding="utf-8", newline="\n")
     with pytest.raises(A.DesignError, match="more than one commit"):
         analyse(root)
     root = copy_of("protected")
@@ -572,7 +582,7 @@ def test_deviation_drops_only_a_failing_run():
     root = copy_of("dev", "improving", (("atlantic", 0.12),))
     dev = root / A.DEVIATIONS_PATH
     write(root, A.DEVIATIONS_PATH, json.dumps({"dropped_runs": [{"arm": "control", "seed": 22, "reason": "x"}]}))
-    with pytest.raises(A.DesignError, match="still verifies"):
+    with pytest.raises(A.DesignError, match="can't be restored"):
         analyse(root, deviations=dev)
     (root / A.pinned_paths("control", 22)["native_checkpoint"]).write_bytes(b"corrupted")
     out = analyse(root, deviations=dev)
@@ -580,7 +590,50 @@ def test_deviation_drops_only_a_failing_run():
     assert p1["n"] == 19 and p2["n"] == 20 and p1["verdict"].startswith("NON-CONFIRMATORY")
     s1 = out["secondary"][0]
     assert s1["n"] == 19 and s1["verdict"].startswith("NON-CONFIRMATORY")
-    assert "DEVIATION (rule (A))" in "\n".join(out["report"])
+    assert all(r["verdict"].startswith("NON-CONFIRMATORY") for r in out["sensitivity"])
+    rep = "\n".join(out["report"])
+    assert "DEVIATION (rule (A)" in rep and "P1 control (alpha 0.025, 0.9 kt), n 20 -> 19" in rep
+    assert "P2 atlantic (alpha 0.025, 0.9 kt), n 20 -> 20: sd_diff 0.54: 1.00 -> 1.00 (n unchanged)" in rep
+    assert "pre-look" in rep and "SE <= 0.072" in rep  # 48 test reps: sqrt(0.25 / 48)
+
+
+def test_deviation_one_run_in_each_arm():
+    root = copy_of("dev2", "improving", (("atlantic", 0.12),))
+    write(root, A.DEVIATIONS_PATH, json.dumps({"dropped_runs": [{"arm": "control", "seed": 24, "reason": "x"},
+                                                                {"arm": "atlantic", "seed": 25, "reason": "y"}]}))
+    (root / A.pinned_paths("control", 24)["train_log"]).write_text("gone", encoding="utf-8")
+    man = json.loads((root / "logs/f31/runs/atlantic_seed25.json").read_text(encoding="utf-8"))
+    (root / A.epoch_paths("atlantic", 25, man["slots"]["native_1x"])["checkpoint"]).unlink()
+    out = analyse(root, deviations=root / A.DEVIATIONS_PATH)
+    p1, p2 = out["primary"]
+    assert (p1["n"], p2["n"], out["secondary"][0]["n"], out["secondary"][1]["n"]) == (19, 19, 18, 18)
+    rep = "\n".join(out["report"])
+    for lab, n in (("P1 control", 19), ("P2 atlantic", 19), ("S1", 18), ("S2", 18)):
+        assert f"{lab} (alpha" in rep and f"n 20 -> {n}:" in rep
+    assert "(n unchanged)" not in rep
+
+
+def test_power_reduced_is_chunk_invariant_and_tracks_n():
+    a = A.power_reduced(8, 0.9, 1.12, 0.025, 64)
+    old = A.POWER_CHUNK
+    try:
+        A.POWER_CHUNK = 64
+        assert A.power_reduced(8, 0.9, 1.12, 0.025, 64) == a
+    finally:
+        A.POWER_CHUNK = old
+    assert A.power_reduced(19, 0.9, 0.54, 0.025, 32) == 1.0  # design §5: 1.00 at n = 20
+    assert A.power_reduced(6, 0.0, 1.0, 0.025, 64) == 0.0  # m = 6: the p floor 2^-5 > 0.025
+
+
+def test_deviation_refuses_a_restorable_run():
+    # hc-adversary item 23 probe: a stray non-slot epoch file makes check_training fail, but deleting it restores the
+    # run, so rule (A) must refuse to drop it (N5's record_fails: only a hashed file missing or changed).
+    root = copy_of("devstray")
+    e, _ = first_nonslot(root, "control", 12)
+    write(root, A.epoch_paths("control", 12, e)["checkpoint"], b"stray")
+    write(root, A.DEVIATIONS_PATH, json.dumps({"dropped_runs": [{"arm": "control", "seed": 12, "reason": "x"}]}))
+    with pytest.raises(A.DesignError, match="can't be restored"):
+        analyse(root, deviations=root / A.DEVIATIONS_PATH)
 
 
 def test_deviation_refuses_a_run_with_no_record():
@@ -603,3 +656,33 @@ def test_main_out_dir_must_be_under_results_f31(tmp_path):
         A.main(["--manifest-dir", str(tmp_path), "--out-dir", str(tmp_path / "x")])
     with pytest.raises(SystemExit):
         A.main(["--manifest-dir", str(tmp_path), "--out-dir", str(REPO / "results/n5_atlantic/again")])
+
+
+def test_refuses_manifest_differing_from_its_record():
+    root = copy_of("recdiff")
+    p = root / "logs/f31/runs/control_seed26.train.json"
+    rec = json.loads(p.read_text(encoding="utf-8"))
+    rec["slots"] = {**rec["slots"], "smoothed_4x": rec["slots"]["native_1x"]}
+    p.write_text(json.dumps(rec, indent=1), encoding="utf-8", newline="\n")
+    with pytest.raises(A.DesignError, match="differs from its phase-1 record"):
+        analyse(root)
+
+
+def test_eval_attempts_may_differ_from_the_record():
+    root = copy_of("evalatt")
+    write(root, "logs/f31/aborted/control_seed27_eval1.json", json.dumps({"status": "complete"}))
+    rewrite_manifest(root, "control", 27, lambda m: {**m, "eval_attempts": ["logs/f31/aborted/control_seed27_eval1.json"]})
+    out = analyse(root)
+    assert "control seed 27" in "\n".join(out["report"])
+
+
+def test_refuses_wrong_order_and_other_train_py_at_commit():
+    root = copy_of("order")
+    rewrite_manifest(root, "atlantic", 28, lambda m: {**m, "order": 1})
+    with pytest.raises(A.DesignError, match="schedule"):
+        analyse(root)
+    root = copy_of("trainpy_commit")
+    with pytest.raises(A.DesignError, match="scripts/train.py at"):
+        analyse(root, git=fake_git(train_bytes=b"lr = schedule(epochs)\n"))
+    assert A.expected_order("control", 10) == 1 and A.expected_order("atlantic", 10) == 2
+    assert A.expected_order("atlantic", 11) == 3 and A.expected_order("control", 29) == 40
