@@ -287,6 +287,15 @@ def test_flag_thresholds():
     assert not A.flagged(44, 52) and A.flagged(45, 52)
 
 
+def test_val_stability_hand_computed():
+    val = {e: float(e) for e in range(1, 21)}
+    st = A.val_stability(val, 1, 20)
+    assert st["val_at_pick"] == 1 and st["val_neighbours_min"] == 2 and st["val_neighbours_max"] == 3
+    assert st["val_sd_last15"] == pytest.approx(np.std([18.0, 19.0, 20.0], ddof=1))  # epochs > 17: 18, 19, 20
+    st = A.val_stability(val, 10, 20)
+    assert (st["val_neighbours_min"], st["val_neighbours_max"]) == (8, 12)
+
+
 # ---- statistics ----------------------------------------------------------------------------------------------
 def test_signflip_n20_matches_brute_force_and_floor():
     d = np.full(20, -0.5)
@@ -379,6 +388,9 @@ def test_slots_read_on_h9_are_exactly_the_slots():
     assert set(sel[sel.arm == "atlantic"].slot) == set(A.SLOTS["atlantic"])
     n_csv = len(list((root / "results/f31").glob("*_h9.csv")))
     assert n_csv == sel.groupby(["arm", "seed"]).epoch.nunique().sum() <= 180
+    for c in ("val_at_pick", "val_neighbours_min", "val_neighbours_max", "val_sd_last15"):
+        assert sel[c].notna().all()
+    assert "H9 SPLIT" in "\n".join(out["report"])
 
 
 # ---- refusals ------------------------------------------------------------------------------------------------
@@ -569,6 +581,14 @@ def test_deviation_drops_only_a_failing_run():
     s1 = out["secondary"][0]
     assert s1["n"] == 19 and s1["verdict"].startswith("NON-CONFIRMATORY")
     assert "DEVIATION (rule (A))" in "\n".join(out["report"])
+
+
+def test_deviation_refuses_a_run_with_no_record():
+    root = copy_of("devmissing")
+    (root / "logs/f31/runs/atlantic_seed23.train.json").unlink()
+    write(root, A.DEVIATIONS_PATH, json.dumps({"dropped_runs": [{"arm": "atlantic", "seed": 23, "reason": "x"}]}))
+    with pytest.raises(A.DesignError, match="has no training record"):
+        analyse(root, deviations=root / A.DEVIATIONS_PATH)
 
 
 def test_deviation_file_must_be_committed():

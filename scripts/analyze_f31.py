@@ -184,6 +184,16 @@ def flagged(epoch, e_k):
     return epoch > UNDERTRAIN_FRACTION * e_k
 
 
+def val_stability(reval, epoch, e_k):
+    """Design §3's validation-only stability figures for one pick: val MAE at the pick, the min/max over its +-2-epoch
+    neighbours within the budget, and the sd of val MAE over the budget's last 15% (the flagged epochs)."""
+    nb = [reval[j] for j in range(max(1, epoch - 2), min(e_k, epoch + 2) + 1) if j != epoch]
+    tail = [reval[j] for j in range(1, e_k + 1) if flagged(j, e_k)]
+    return {"val_at_pick": reval[epoch], "val_neighbours_min": min(nb) if nb else np.nan,
+            "val_neighbours_max": max(nb) if nb else np.nan,
+            "val_sd_last15": float(np.std(tail, ddof=1)) if len(tail) > 1 else np.nan}
+
+
 # ---- statistics --------------------------------------------------------------------------------------------
 def p_floor(d):
     """The smallest two-sided p the exact sign-flip test can give: 2^(1-m) with m non-zero differences."""
@@ -424,6 +434,9 @@ def load_deviations(path, root, manifest_dir, git, design):
     healthy = []
     for arm, s in out:
         rec = Path(manifest_dir) / f"{arm}_seed{s}.train.json"
+        if not rec.is_file():  # as N5: a run with no record is not "kept files that can't be restored"
+            raise DesignError(f"{DEVIATIONS_PATH}: {arm} seed {s} has no training record {rec}; rule (A) drops only "
+                              "a run whose record exists and fails")
         try:
             check_training(json.loads(N5.read_text_strict(rec)), arm, s, design, root, rec)
             healthy.append((arm, s))
@@ -524,6 +537,7 @@ def run(manifest_dir, out_dir, root=None, design=None, git=None, deviations=None
     met = {(arm, s, e): N5.metrics(d) for (arm, s), r in runs.items() for e, d in r["preds"].items()}
     sel_rows, run_rows, storm_rows, traces = [], [], [], []
     for (arm, s), r in runs.items():
+        reval = {int(k): float(v) for k, v in r["man"]["val_mae_revalidated"].items()}
         for slot, e in r["slots"].items():
             k = int(slot.split("_")[1][:-1])
             e_k = EPOCHS[arm][k]
@@ -531,7 +545,8 @@ def run(manifest_dir, out_dir, root=None, design=None, git=None, deviations=None
                              "selected_step": e * BATCHES[arm], "budget_steps": e_k * BATCHES[arm],
                              "flagged": flagged(e, e_k),
                              "tie_rule": json.dumps(r["man"]["tie_rule"].get(f"{k}x")) if slot.startswith("native")
-                             else "", "near_ties": " ".join(map(str, r["man"]["near_ties"].get(slot, [])))})
+                             else "", "near_ties": " ".join(map(str, r["man"]["near_ties"].get(slot, []))),
+                             **val_stability(reval, e, e_k)})
             run_rows.append({"arm": arm, "seed": s, "slot": slot, "epoch": e, **met[(arm, s, e)]})
             storm_rows.append({"arm": arm, "slot": slot, **N5.per_storm(r["preds"][e])})
         traces += [{"arm": arm, "seed": s, "epoch": e, "train_mae": tr, "val_mae": va} for e, tr, va in r["ep"]]
@@ -700,6 +715,12 @@ def run(manifest_dir, out_dir, root=None, design=None, git=None, deviations=None
         "NO atlantic - control test at 1x or 2x (F-31 is not a rerun of N5). Arm means, side by side, descriptive:",
         *[f"  {k}x native: control {mean_of('control', f'native_{k}x'):.3f}, atlantic "
           f"{mean_of('atlantic', f'native_{k}x'):.3f}" for k in (1, 2)],
+        "H9 SPLIT (descriptive): original three (Ian, Nicole, Claudette) vs the six added later, mean overall MAE:",
+        *[f"  {arm} {slot}: H3 {per_run[(per_run.arm == arm) & (per_run.slot == slot)]['H3 MAE'].mean():.3f}, added6 "
+          f"{per_run[(per_run.arm == arm) & (per_run.slot == slot)]['added6 MAE'].mean():.3f}"
+          for arm in ARMS for slot in ("native_1x", "native_4x")],
+        "VALIDATION STABILITY (descriptive, validation only): val at each pick vs its +-2-epoch neighbours, and the sd "
+        "over each budget's last 15%: selection.csv",
         "FROZEN ENSEMBLE (committed H9 figures, results/ensemble; unpaired: different seeds, an older code version, the "
         "same H9; not a test): " + ", ".join(f"{k} {v:.3f}" for k, v in frozen.items()),
         "  F-31 ensembles of the control arm (= the frozen recipe) by budget: ensemble.csv",
