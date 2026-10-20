@@ -2500,10 +2500,12 @@ SENSITIVITY (pre-registered; control at its native 25-epoch selection; does not 
   - the 20 manifests, the 20 training logs, the 30 eval logs and
     phase2_started.json;
   - reports/decisions/PR10-PR14.md and N5-result.md.
-  All are byte-identical to the main checkout. The logs and CSVs are
-  stored -text (.gitattributes), because train.py and evaluate.py
-  wrote CRLF and the driver wrote LF, so their manifest SHA-256s
-  verify on any checkout.
+  All are byte-identical to the main checkout, and all are stored
+  -text (.gitattributes): train.py and evaluate.py wrote CRLF, the
+  driver wrote LF, and the recorded SHA-256s (manifests, the outputs
+  above) must verify on any checkout, core.autocrlf or not. The
+  pattern logs/n5_atlantic/runs/*.json also covers the 20 training
+  records (PR #14), whose blobs were already LF.
 - hc-adversary item 19: OK.
   - An independent recompute reproduces every number in report.txt.
   - No post-hoc checkpoint choice: every evaluated checkpoint is the
