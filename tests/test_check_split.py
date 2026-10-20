@@ -1,7 +1,8 @@
 """F-34: scripts/check.py's FAST default and --full.
 
-FULL must collect exactly what F1 ran before the split (`pytest tests`, no deselection), FAST must be FULL
-minus the tests marked slow, and the protected hashes must run in both modes. The collection tests run
+FULL's pytest command must collect exactly what F1's pre-split command (`pytest tests`, no deselection)
+collects on the same checkout, FAST must be FULL minus the tests marked slow, and the protected hashes
+must run in both modes. The collection tests run
 pytest --collect-only in a subprocess on this checkout, so they are slow themselves and run under --full.
 """
 import importlib.util
@@ -78,7 +79,10 @@ def collect(cmd, *extra):
 
 
 @pytest.mark.slow
-def test_full_collects_exactly_the_pre_split_ids_and_markers_are_registered():
+def test_full_command_collects_same_ids_as_pre_split_command_and_markers_registered():
+    """On this checkout, --full's pytest command selects exactly what F1's pre-split command selects (no
+    deselection), and --strict-markers is clean. It does not compare against another commit: the
+    cross-commit proof (482a501: 490 ids -> this branch: 499, nothing dropped) is evidence in PR #24."""
     full = collect(check.pytest_command(True), "--strict-markers")
     assert full == collect(PRE_SPLIT)
     assert len(full) > 400
