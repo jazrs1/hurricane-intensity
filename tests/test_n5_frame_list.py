@@ -25,6 +25,7 @@ def args(main_root, out):
             "--hurdat2", str(main_root / "data" / "interim" / "hurdat2_atlantic.txt"), "--out", str(out)]
 
 
+@pytest.mark.slow
 def test_frame_list_reproduces_the_committed_file(main_root, tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(CHECKOUT)  # TCDataset reads ./excluded_crops.txt; load_splits reads the lists
     out = tmp_path / "frame_list_atlantic.txt"
@@ -38,6 +39,7 @@ def test_frame_list_reproduces_the_committed_file(main_root, tmp_path, monkeypat
     assert {p.split("\\")[0] for p in frames} == set(A.ARM_IDS)
 
 
+@pytest.mark.slow
 def test_a_different_marco_drop_writes_nothing(main_root, tmp_path, monkeypatch):
     monkeypatch.chdir(CHECKOUT)
     monkeypatch.setattr(F, "DESIGN_DROPS", F.DESIGN_DROPS[:3])
@@ -47,6 +49,7 @@ def test_a_different_marco_drop_writes_nothing(main_root, tmp_path, monkeypatch)
     assert not out.exists()
 
 
+@pytest.mark.slow
 def test_never_overwrites_other_bytes(main_root, tmp_path, monkeypatch):
     monkeypatch.chdir(CHECKOUT)
     out = tmp_path / "frame_list_atlantic.txt"
@@ -86,6 +89,7 @@ def test_refuses_an_other_basin_storm_from_marcos_year(main_root, tmp_path, monk
         F.main(args(main_root, tmp_path / "out.txt"))
 
 
+@pytest.mark.slow
 def test_exclusions_keep_the_pinned_counts(main_root, monkeypatch):
     """The regenerated excluded_crops.txt added entries for the 31 new storms only: the control, validation and H9
     frame sets the analysis pins are unchanged."""

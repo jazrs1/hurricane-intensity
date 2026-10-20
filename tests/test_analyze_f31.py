@@ -313,6 +313,7 @@ def test_signflip_n20_matches_brute_force_and_floor():
     assert N5.signflip_p(x, n=6) == pytest.approx(brute)
 
 
+@pytest.mark.slow
 def test_zero_seeds_set_the_p_floor():
     d = np.zeros(20)
     d[:6] = -2.0  # six non-zero seeds, all better: p = 2^(1-6) = 0.03125, not < 0.025
@@ -340,6 +341,7 @@ def test_bias_branch():
 
 
 # ---- full runs -------------------------------------------------------------------------------------------------
+@pytest.mark.slow
 def test_planted_gain_in_atlantic_only():
     root = copy_of("gain", "improving", (("atlantic", 0.12),))
     out = analyse(root)
@@ -361,6 +363,7 @@ def test_planted_gain_in_atlantic_only():
         assert b"\r" not in (root / "results/f31/analysis" / f).read_bytes()
 
 
+@pytest.mark.slow
 def test_improving_curves_fire_budget_limited_at_4x():
     root = copy_of("limited", "improving", (("atlantic", 0.12),))
     out = analyse(root)
@@ -369,6 +372,7 @@ def test_improving_curves_fire_budget_limited_at_4x():
     assert "-> BUDGET-LIMITED" in "\n".join(out["report"])
 
 
+@pytest.mark.slow
 def test_plateau_null_and_deterministic_outputs():
     root = copy_of("null", "plateau")
     out = analyse(root)
@@ -380,6 +384,7 @@ def test_plateau_null_and_deterministic_outputs():
         assert (root / "results/f31/analysis2" / f).read_bytes() == first[f]
 
 
+@pytest.mark.slow
 def test_refuses_overwrite():
     root = copy_of("overwrite")
     analyse(root)
@@ -387,6 +392,7 @@ def test_refuses_overwrite():
         analyse(root)
 
 
+@pytest.mark.slow
 def test_slots_read_on_h9_are_exactly_the_slots():
     root = copy_of("slots")
     out = analyse(root)
@@ -423,6 +429,7 @@ def test_refuses_slots_not_the_validation_selection():
         analyse(root)
 
 
+@pytest.mark.slow
 def test_refuses_other_train_py():
     root = copy_of("trainpy")
     rewrite_manifest(root, "atlantic", 11, lambda m: {**m, "train_py_sha256": "0" * 64})
@@ -442,6 +449,7 @@ def test_refuses_kept_nonslot_file_and_leftover_epoch_files():
         analyse(root)
 
 
+@pytest.mark.slow
 def test_refuses_deleted_hashes_incomplete():
     root = copy_of("deleted")
     def drop_one(m):
@@ -461,6 +469,7 @@ def dip(arm, s):
     return v
 
 
+@pytest.mark.slow
 def test_refuses_revalidation_not_reproducing_training():
     def reval_fn(arm, s, v):
         return {**v, 6: 7.0025} if (arm, s) == ("control", 14) else v  # 0.0015 below train.py's pick: > TIE_KT
@@ -473,6 +482,7 @@ def test_refuses_revalidation_not_reproducing_training():
         analyse(root)
 
 
+@pytest.mark.slow
 def test_tie_rule_fires_and_trains_pick_is_evaluated():
     def reval_fn(arm, s, v):
         return {**v, 6: 7.004 - 0.5e-4} if (arm, s) == ("control", 14) else v  # below train.py's pick by < TIE_KT
@@ -501,6 +511,7 @@ def test_refuses_csv_swapped_against_its_eval_log():
         analyse(root)
 
 
+@pytest.mark.slow
 def test_refuses_identical_vectors_across_runs():
     root = copy_of("ident")
     a = json.loads((root / "logs/f31/runs/control_seed17.json").read_text(encoding="utf-8"))
@@ -517,6 +528,7 @@ def test_refuses_identical_vectors_across_runs():
 
 
 @pytest.mark.parametrize("bad_id", ["AL052025", "EP112023", "AL192020"])
+@pytest.mark.slow
 def test_refuses_spent_sealed_and_validation_ids(bad_id):
     root = copy_of(f"id_{bad_id}")
     man = json.loads((root / "logs/f31/runs/atlantic_seed19.json").read_text(encoding="utf-8"))
@@ -544,6 +556,7 @@ def test_refuses_altered_n5_report_and_frozen_metrics():
         analyse(root)
 
 
+@pytest.mark.slow
 def test_refuses_unpinned_analyze_n5_and_dirty_self():
     root = copy_of("selfcheck")
     with pytest.raises(A.DesignError, match="not N5's pinned blob"):
@@ -554,6 +567,7 @@ def test_refuses_unpinned_analyze_n5_and_dirty_self():
         analyse(root, git=fake_git(differs=A.N5_PATH))
 
 
+@pytest.mark.slow
 def test_refuses_mixed_commits_and_protected_change():
     root = copy_of("commits")
     rewrite_manifest(root, "atlantic", 20, lambda m: {**m, "commit": "f" * 40})
@@ -569,6 +583,7 @@ def test_refuses_mixed_commits_and_protected_change():
         analyse(root)
 
 
+@pytest.mark.slow
 def test_refuses_utf16_train_log():
     root = copy_of("utf16")
     p = root / A.pinned_paths("control", 21)["train_log"]
@@ -578,6 +593,7 @@ def test_refuses_utf16_train_log():
 
 
 # ---- rule (A) --------------------------------------------------------------------------------------------------
+@pytest.mark.slow
 def test_deviation_drops_only_a_failing_run():
     root = copy_of("dev", "improving", (("atlantic", 0.12),))
     dev = root / A.DEVIATIONS_PATH
@@ -597,6 +613,7 @@ def test_deviation_drops_only_a_failing_run():
     assert "pre-look" in rep and "SE <= 0.072" in rep  # 48 test reps: sqrt(0.25 / 48)
 
 
+@pytest.mark.slow
 def test_deviation_one_run_in_each_arm():
     root = copy_of("dev2", "improving", (("atlantic", 0.12),))
     write(root, A.DEVIATIONS_PATH, json.dumps({"dropped_runs": [{"arm": "control", "seed": 24, "reason": "x"},
@@ -658,6 +675,7 @@ def test_main_out_dir_must_be_under_results_f31(tmp_path):
         A.main(["--manifest-dir", str(tmp_path), "--out-dir", str(REPO / "results/n5_atlantic/again")])
 
 
+@pytest.mark.slow
 def test_refuses_manifest_differing_from_its_record():
     root = copy_of("recdiff")
     p = root / "logs/f31/runs/control_seed26.train.json"
@@ -668,6 +686,7 @@ def test_refuses_manifest_differing_from_its_record():
         analyse(root)
 
 
+@pytest.mark.slow
 def test_eval_attempts_may_differ_from_the_record():
     root = copy_of("evalatt")
     write(root, "logs/f31/aborted/control_seed27_eval1.json", json.dumps({"status": "complete"}))
@@ -676,6 +695,7 @@ def test_eval_attempts_may_differ_from_the_record():
     assert "control seed 27" in "\n".join(out["report"])
 
 
+@pytest.mark.slow
 def test_refuses_wrong_order_and_other_train_py_at_commit():
     root = copy_of("order")
     rewrite_manifest(root, "atlantic", 28, lambda m: {**m, "order": 1})
@@ -688,6 +708,7 @@ def test_refuses_wrong_order_and_other_train_py_at_commit():
     assert A.expected_order("atlantic", 11) == 3 and A.expected_order("control", 29) == 40
 
 
+@pytest.mark.slow
 def test_protected_after_eval_allowed_only_when_equal():
     root = copy_of("protafter")
     analyse(root)  # every manifest carries protected_after_eval == PROTECTED; the records don't: accepted

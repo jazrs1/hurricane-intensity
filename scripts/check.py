@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 """One-command checks for the invariants in FEATURES.md (I1-I7).
 
-    .venv\\Scripts\\python.exe scripts\\check.py            # F1: under 3 minutes, no network
+    .venv\\Scripts\\python.exe scripts\\check.py            # F1 FAST: under 3 minutes, no network (workers)
+    .venv\\Scripts\\python.exe scripts\\check.py --full     # F1 FULL: every test, and the smoke run (merges)
     .venv\\Scripts\\python.exe scripts\\check.py --e2e      # F2/F3: downloads one GOES-16 and one GOES-18 scan
     .venv\\Scripts\\python.exe scripts\\check.py --gitignore-target <repo>   # only the gitignore section
 
@@ -22,6 +23,14 @@ that changes src/ is tested with its own code. --e2e stays on the main install, 
 config.PROJECT_ROOT ties the package location to data/ (the HURDAT2 cache, data/processed) and
 check_e2e refuses to run if the two differ. Each section prints the src it imported.
 
+FAST (the default) runs the protected hashes, the tests not marked `slow` (pyproject.toml: the list
+invariants and the unit tests), git I3/I6 and the gitignore check. --full runs everything F1 ran before
+the split: every test, slow ones included, the evaluate.py smoke run and the hashes again after it. The
+last line names the mode (FAST, FULL, E2E or GITIGNORE), so a fast run can't pass for the merge check.
+A test is marked slow if it took 1 s or more on the reference machine (F-34). --full prints a WARNING
+(it never fails) naming any unmarked test of 1.5 s or more (WARN_S, above the 1 s rule so that jitter
+at the threshold stays quiet), from pytest's --durations.
+
 Nothing here writes outside a tempfile.mkdtemp() directory, which is removed at the end.
 """
 from __future__ import annotations
@@ -30,6 +39,7 @@ import argparse
 import functools
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -216,16 +226,53 @@ def checkout_env(**extra):
     return env
 
 
-def check_pytest(main_root):
+def pytest_command(full):
+    """FULL runs every test under tests/; FAST deselects the ones marked slow (pyproject.toml)."""
+    return [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests",
+            *([] if full else ["-m", "not slow"])]
+
+
+# Tests of 1 s or more (call, setup or teardown) are marked @pytest.mark.slow. --full warns only from WARN_S, so
+# timing jitter around 1 s does not make the warning noise people learn to ignore.
+WARN_S = 1.5
+DURATION_RE = re.compile(r"^(\d+(?:\.\d+)?)s (?:call|setup|teardown)\s+(\S.*\S)\s*$")
+
+
+def unmarked_slow(durations_stdout, slow_ids):
+    """{test id: seconds} for the tests in pytest's --durations output that took WARN_S or more but are not
+    in slow_ids (the ids `-m slow` collects). Used by --full to warn, never to fail."""
+    out = {}
+    for line in durations_stdout.splitlines():
+        m = DURATION_RE.match(line.strip())
+        if m and float(m.group(1)) >= WARN_S and m.group(2) not in slow_ids:
+            out[m.group(2)] = max(out.get(m.group(2), 0.0), float(m.group(1)))
+    return out
+
+
+def check_pytest(main_root, full):
     env = checkout_env(HC_MAIN_ROOT=str(main_root))
-    r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests"],
-                       cwd=CHECKOUT_ROOT, env=env, capture_output=True, text=True)
+    # FULL also asks for every duration of WARN_S or more, to warn about tests FAST runs but shouldn't.
+    extra = ["--durations=0", f"--durations-min={WARN_S}"] if full else []
+    r = subprocess.run(pytest_command(full) + extra, cwd=CHECKOUT_ROOT, env=env, capture_output=True, text=True)
     print(r.stdout.rstrip())
     if r.stderr.strip():
         print(r.stderr.rstrip())
     if r.returncode != 0:
         raise AssertionError(f"pytest exited {r.returncode}")
-    return r.stdout.strip().splitlines()[-1]
+    result = r.stdout.strip().splitlines()[-1]
+    if full:
+        c = subprocess.run(pytest_command(True) + ["-m", "slow", "--collect-only"], cwd=CHECKOUT_ROOT, env=env,
+                           capture_output=True, text=True)
+        slow_ids = {line.strip() for line in c.stdout.splitlines() if "::" in line}
+        late = unmarked_slow(r.stdout, slow_ids)
+        if c.returncode != 0 or not slow_ids:
+            print(f"WARNING: could not collect the slow-marked tests (pytest exited {c.returncode})")
+            result += "; WARNING: slow-marker check did not run"
+        elif late:
+            print(f"WARNING: {len(late)} test(s) of {WARN_S:g} s or more not marked slow, so FAST runs them; "
+                  "add @pytest.mark.slow: " + ", ".join(f"{t} ({s:.2f} s)" for t, s in sorted(late.items())))
+            result += f"; WARNING: {len(late)} unmarked test(s) of {WARN_S:g} s or more"
+    return result
 
 
 def make_fixture(tmp):
@@ -610,15 +657,29 @@ def run_sections(sections):
     return failed
 
 
+def f1_sections(main_root, coordinator_md, full):
+    """The F1 sections in order. FULL adds the slow tests, the smoke run and the hashes after it."""
+    sections = [("hashes", lambda: check_hashes(main_root, coordinator_md)),
+                ("pytest", lambda: check_pytest(main_root, full))]
+    if full:
+        sections += [("evaluate.py smoke", lambda: check_smoke(main_root)),
+                     ("hashes after smoke", lambda: check_hashes(main_root, coordinator_md))]
+    return sections + [("git I3/I6", lambda: check_git(main_root)),
+                       ("gitignore", lambda: check_gitignores(main_root))]
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--repo-root", help="main checkout holding data/, models/ and results/ (default: from git)")
+    p.add_argument("--full", action="store_true", help="F1 FULL: every test, slow ones included, and the evaluate.py smoke run (merges require it)")
     p.add_argument("--e2e", action="store_true", help="instead of F1, run the E2E_CASES (Michael GOES-16, Dora GOES-18): download, build, predict")
     p.add_argument("--gitignore-target", help="run only the gitignore section, against this repo")
     p.add_argument("--coordinator-md", help="file holding the protected-hash block (default: <main root>/COORDINATOR.md)")
     args = p.parse_args()
 
     t0 = time.perf_counter()
+    mode = "GITIGNORE" if args.gitignore_target else "E2E" if args.e2e else "FULL" if args.full else "FAST"
+    print(f"mode:      {mode}" + ("  (merges require --full)" if mode == "FAST" else ""))
     if args.gitignore_target:
         print(f"gitignore target: {Path(args.gitignore_target).resolve()}")
         failed = run_sections([("gitignore", lambda: check_gitignore(args.gitignore_target))])
@@ -642,16 +703,9 @@ def main():
         else:
             # F1 tests this checkout's code, in this process too (the smoke fixture reads splits.VAL_LIST).
             sys.path.insert(0, str(CHECKOUT_SRC))
-            sections = [
-                hashes,
-                ("pytest", lambda: check_pytest(main_root)),
-                ("evaluate.py smoke", lambda: check_smoke(main_root)),
-                ("hashes after smoke", lambda: check_hashes(main_root, coordinator_md)),
-                ("git I3/I6", lambda: check_git(main_root)),
-                ("gitignore", lambda: check_gitignores(main_root)),
-            ]
+            sections = f1_sections(main_root, coordinator_md, args.full)
         failed = run_sections(sections)
-    print(f"\n{'FAIL' if failed else 'PASS'}  total {time.perf_counter() - t0:.1f} s"
+    print(f"\n{'FAIL' if failed else 'PASS'}  {mode} total {time.perf_counter() - t0:.1f} s"
           + (f"  failed: {', '.join(failed)}" if failed else ""))
     sys.exit(1 if failed else 0)
 
