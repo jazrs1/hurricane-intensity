@@ -2446,3 +2446,26 @@ training records committed. No H9 evaluation.
 - No tie-rule firing, no off-grid primary, no odd-grid near ties, no
   aborted attempts. No H9 output and no phase2_started.json.
 - Phase 2 not run; awaits John's separate yes.
+
+2026-10-19, 20:16. N5 Atlantic-only arm: BUDGET-LIMITED known before the
+H9 look; John's yes to phase 2. No H9 evaluation.
+- Known before the H9 look, from the committed training records
+  (validation only): the pre-registered BUDGET-LIMITED qualifier fires
+  in both arms.
+  - The rule (analyze_n5.py): a run is flagged when its selected epoch
+    > 0.85 x its epochs; UNDERTRAIN_RUNS = 5 flagged runs in an arm
+    fire the qualifier.
+  - Atlantic: 5/10, seeds 0, 2, 3, 5 and 7 (selected epoch >= 12 of
+    13).
+  - Control: 5/10, seeds 0, 1, 4, 5 and 6 (selected epoch >= 22 of
+    25).
+  - So the joint verdict will carry the BUDGET-LIMITED qualifier
+    whatever H9 shows. Identified by hc-adversary item 18.
+- John's decision, verbatim (relayed by the coordinator; the relay did
+  not give the time of his message, which came before this entry):
+  "Phase 2: yes. I'm proceeding knowing both arms are flagged
+  BUDGET-LIMITED (5/10 each); record that in the decisions entry as
+  known before the look."
+- Follow-up, per John: longer training for both arms, as a future,
+  separately pre-registered experiment. It is not a rerun of N5.
+- No H9 evaluation had run when this entry was written.
