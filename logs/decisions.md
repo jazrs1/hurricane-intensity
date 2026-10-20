@@ -2732,3 +2732,34 @@ evaluation or H9 read.
 - Next: launch PR A (scripts/analyze_f31.py and its synthetic tests),
   then the driver. Each goes to hc-adversary and John before anything
   runs.
+
+2026-10-20, 15:12. F-31 budget study: pre-launch record (design §10). No training,
+evaluation or H9 read by this entry.
+- Merged so far: design PR #18 (c4c4cff) and docs PR #19 (d03ccba,
+  John's §11 decisions and the train.py-pin rule); analysis PR #20
+  (482a501); driver PR #25 (2fc2863); look-evidence tightening PR #26
+  (9fd119e, merged on coordinator review as tightening only, after
+  hc-adversary items 27 and a real-git check of the unmerged-results
+  case).
+- Launch blobs, SHA-256 of the committed bytes at 9fd119e [blob id]:
+  - reports/v2_survey/f31/design.md
+    7e1ef4c10c3866dfc2addffcf6605c69b955131dcdd6911b5d56f05f9c1f215e [9cc0b05c]
+  - scripts/analyze_f31.py
+    feee9bafabee141dd393a86c3c469b4cafd17c160c8f97076cab55da0f8016e1 [fd7d4c93]
+  - scripts/run_f31.py
+    85db105ae40cab81431385de56feb8e7c3bcea204b29b7cb076cc2c90fdec435 [3e80bf03]
+  - scripts/run_n5.py (pinned by run_f31)
+    e8f13e06b80c29101ef1a4efaeac7aaa17e5922f0a8bebdc26a19f270d6d3ed7 [2ebd8cea]
+  - scripts/analyze_n5.py (pinned by analyze_f31)
+    0130641583cf09c8abb5791b9ea9467fd6410b953bc8a57c3a2ae68fb3bb1288 [679e2169]
+  - scripts/train.py (pinned, John's 2026-10-19 23:50 rule)
+    afceb4b19ea7d8c732c6f26b7d52e4b3b6d313d58153e2d0518887a3a6db231f [500bbc1e]
+  - scripts/evaluate.py
+    d2ea083178b575cd0e30902ab4c4dea59411fdcedbbcc8f64476a2fdcd68390d [af5332d6]
+  - results/n5_atlantic/frame_list_atlantic.txt
+    84e5f730edb42129bc96186b4705241759c696f5a15383c466215fc8b662cc87 [9e3275c4]
+  - reports/v2_survey/f31/runbook.md
+    e3ead7c0f04dfb1f8cfce0c9dd83f91c8ffaafe82d7977354f14674e30f27bf8 [20e0c019]
+- The launch commit L is the merge commit of this entry's PR. The
+  driver prints HEAD and the analysis blob at launch; the coordinator
+  checks them against this entry.
