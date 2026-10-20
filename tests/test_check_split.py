@@ -47,16 +47,22 @@ DURATIONS = """\
 ============================= slowest durations ==============================
 12.50s call     tests/test_a.py::test_marked
 3.00s setup    tests/test_b.py::test_unmarked[AL132020-outside H9]
-1.00s teardown tests/test_b.py::test_at_the_threshold
-0.99s call     tests/test_b.py::test_just_under
+1.50s teardown tests/test_b.py::test_at_the_threshold
+1.49s call     tests/test_b.py::test_just_under
+1.00s call     tests/test_b.py::test_jitter_at_the_marking_rule
 2.00s call     tests/test_b.py::test_unmarked[AL132020-outside H9]
 """
 
 
-def test_unmarked_slow_names_only_unmarked_tests_of_1s_or_more():
+def test_warn_threshold_is_above_the_1s_marking_rule():
+    assert check.WARN_S == 1.5
+
+
+def test_unmarked_slow_names_only_unmarked_tests_of_1_5s_or_more():
+    # 1.50 s warns; 1.49 s and 1.00 s (jitter at the 1 s marking rule) stay silent.
     late = check.unmarked_slow(DURATIONS, {"tests/test_a.py::test_marked"})
     assert late == {"tests/test_b.py::test_unmarked[AL132020-outside H9]": 3.0,
-                    "tests/test_b.py::test_at_the_threshold": 1.0}
+                    "tests/test_b.py::test_at_the_threshold": 1.5}
 
 
 def test_unmarked_slow_is_empty_when_everything_slow_is_marked():
