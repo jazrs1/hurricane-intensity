@@ -1,0 +1,26 @@
+N5 Atlantic-only arm vs retrained control, H9, seeds [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] paired. Pre-registered analysis output, unedited.
+analysis blob sha256 0130641583cf09c8abb5791b9ea9467fd6410b953bc8a57c3a2ae68fb3bb1288 (blob id 679e21696b6592e36a0ff12ee7d7acb4622dd565) at commit 2ce5eb653487a02b3714d572fc9a22b81cd54f7a
+PRIMARIES (Bonferroni, alpha 0.025 each, two-sided exact sign-flip; control re-selected on odd epochs):
+  overall MAE: control 9.571, atlantic 10.102, d +0.531 (sd 1.120), 97.5% CI [-0.413, +1.479], p 0.17383, SESOI 0.9 -> NULL (inconclusive; effects of 0.9 kt are not excluded)   [d = MAE_atl - MAE_ctl, d < 0 better]
+  >96 bias: control -6.905, atlantic -7.853, d -0.947 (sd 4.792), 97.5% CI [-5.515, +3.633], p 0.53125, SESOI 3.0 -> NULL (inconclusive; effects of 3.0 kt are not excluded)   [both negative: d = bias_atl - bias_ctl, d > 0 better]
+JOINT VERDICT: NO SIGNIFICANT DIFFERENCE on either primary | BUDGET-LIMITED: the under-training flag fired in >= 5/10 runs of an arm; a 'worse' result is read as 'worse at this budget', not as harm from the added storms; not rerun or rescued
+Under-training flag (selected step in the last 15%): control 5/10, atlantic 5/10
+Tie rule (2026-10-19 amendment, |d| < 0.0001 kt; train.py's own checkpoint evaluated): control seeds none; off-grid primary (even epoch, the same checkpoint as the sensitivity): none
+Odd-grid near ties (within 0.0001 kt of the odd-grid minimum; the first minimum is kept): none
+Aborted training attempts (restarted with the same seed and order): none; aborted H9 evaluation attempts (same checkpoint re-evaluated): none
+SENSITIVITY (pre-registered; control at its native 25-epoch selection; does not change the verdict):
+  overall MAE: control 9.288, atlantic 10.102, d +0.814 (sd 0.891), 97.5% CI [+0.095, +1.587], p 0.01367, SESOI 0.9 -> WORSE   [d = MAE_atl - MAE_ctl, d < 0 better]
+  >96 bias: control -6.758, atlantic -7.853, d -1.095 (sd 4.836), 97.5% CI [-5.587, +3.256], p 0.47852, SESOI 3.0 -> NULL (inconclusive; effects of 3.0 kt are not excluded)   [both negative: d = bias_atl - bias_ctl, d > 0 better]
+SECONDARY (alpha 0.05, uncorrected):
+  >96 MAE: d +1.267, 95% CI [-0.166, +2.718], p 0.07227
+H9 SPLIT (descriptive): original three (Ian, Nicole, Claudette) vs the six added later:
+  H3 MAE: control 9.085, atlantic 9.402, d +0.317, p 0.29492
+  H3 >96 MAE: control 14.044, atlantic 14.886, d +0.842, p 0.22266
+  H3 >96 bias: control -0.995, atlantic -2.323, d -1.328, p 0.31250
+  added6 MAE: control 9.711, atlantic 10.304, d +0.593, p 0.17773
+  added6 >96 MAE: control 11.706, atlantic 13.006, d +1.300, p 0.07812
+  added6 >96 bias: control -7.364, atlantic -8.282, d -0.918, p 0.55469
+PER STORM (exploratory; >96 stats only with >= 10 frames > 96 kt): per_storm.csv. Sam (AL182021) was traced
+  per epoch on 10-14, so it has had per-epoch exposure; read its row with that in mind.
+DESCRIPTIVE (not tests): paired_differences.csv, per_arm.csv, ensemble.csv, val_trace.csv
+Per-epoch traces are validation only (storms_val_expanded.txt); no held-out storm is evaluated per epoch.

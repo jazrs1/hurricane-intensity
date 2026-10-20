@@ -2469,3 +2469,234 @@ H9 look; John's yes to phase 2. No H9 evaluation.
 - Follow-up, per John: longer training for both arms, as a future,
   separately pre-registered experiment. It is not a rerun of N5.
 - No H9 evaluation had run when this entry was written.
+
+2026-10-19, 20:46. N5 Atlantic-only arm: results entry.
+- Commits: launch L = 2ce5eb6; training records e06d6c5 (PR #14);
+  BUDGET-LIMITED note eb482a3 (PR #15). Phase 2 (H9 evaluation) ran
+  20:22:47-20:26:01 EDT in the main checkout; the pre-registered
+  analysis ran at 20:26 (analysis blob 01306415..., at commit 2ce5eb6).
+- report.txt, quoted exactly (PRIMARIES, JOINT VERDICT, SENSITIVITY):
+```
+PRIMARIES (Bonferroni, alpha 0.025 each, two-sided exact sign-flip; control re-selected on odd epochs):
+  overall MAE: control 9.571, atlantic 10.102, d +0.531 (sd 1.120), 97.5% CI [-0.413, +1.479], p 0.17383, SESOI 0.9 -> NULL (inconclusive; effects of 0.9 kt are not excluded)   [d = MAE_atl - MAE_ctl, d < 0 better]
+  >96 bias: control -6.905, atlantic -7.853, d -0.947 (sd 4.792), 97.5% CI [-5.515, +3.633], p 0.53125, SESOI 3.0 -> NULL (inconclusive; effects of 3.0 kt are not excluded)   [both negative: d = bias_atl - bias_ctl, d > 0 better]
+JOINT VERDICT: NO SIGNIFICANT DIFFERENCE on either primary | BUDGET-LIMITED: the under-training flag fired in >= 5/10 runs of an arm; a 'worse' result is read as 'worse at this budget', not as harm from the added storms; not rerun or rescued
+SENSITIVITY (pre-registered; control at its native 25-epoch selection; does not change the verdict):
+  overall MAE: control 9.288, atlantic 10.102, d +0.814 (sd 0.891), 97.5% CI [+0.095, +1.587], p 0.01367, SESOI 0.9 -> WORSE   [d = MAE_atl - MAE_ctl, d < 0 better]
+  >96 bias: control -6.758, atlantic -7.853, d -1.095 (sd 4.836), 97.5% CI [-5.587, +3.256], p 0.47852, SESOI 3.0 -> NULL (inconclusive; effects of 3.0 kt are not excluded)   [both negative: d = bias_atl - bias_ctl, d > 0 better]
+```
+- SHA-256 of every analysis output, results/n5_atlantic/analysis/:
+  - ensemble.csv: c687dbac9fbf6fa82165f03ed31ae51128f3402be11e1824391f5c558eab54eb
+  - paired_differences.csv: 517281c7d861ae286a7660c8c1a71267d5b8341bb13be5129de1e1a0b0fab792
+  - per_arm.csv: 27fb1ae54c60b5ce409b507db03ec9387e5149072b2eccfd690af4cb7fbd80c7
+  - per_run.csv: c8d77dab23b6facd092a0ea2c3cdc476abcb3db34f0eb609a683bb6330a97555
+  - per_storm.csv: bf87dfb7bc57f90e83ebc58ba32a7bc51cc33ffcb7ce6dc362db2caeff45c822
+  - primary_tests.csv: 2bb71c0055c9ec7fc30ae5fe2608c10f7bd144f0a573d2d82c10517376818ea4
+  - report.txt: fde430de92bab775977dfc84bef9eeb7a46907ae7abfb06cb2907db2d1722bb1
+  - sensitivity.csv: 5bd4fcbf32bde9e154877d73df2fe3d3279f691b45e3ed6a9a6d9e34fd5188df
+  - val_trace.csv: 069e5345576cdf6fbafe7f99007448a4a790feb82941739e1ba3c2ee0ef36581
+- Committed with this entry:
+  - the 9 analysis outputs and the 30 H9 CSVs;
+  - the 20 manifests, the 20 training logs, the 30 eval logs and
+    phase2_started.json;
+  - reports/decisions/PR10-PR14.md and N5-result.md.
+  All are byte-identical to the main checkout, and all are stored
+  -text (.gitattributes): train.py and evaluate.py wrote CRLF, the
+  driver wrote LF, and the recorded SHA-256s (manifests, the outputs
+  above) must verify on any checkout, core.autocrlf or not. The
+  manifest pattern (runs/*_seed[0-9].json) leaves the 20 training
+  records of PR #14 as they were.
+- hc-adversary item 19: OK.
+  - An independent recompute reproduces every number in report.txt.
+  - No post-hoc checkpoint choice: every evaluated checkpoint is the
+    one in its training record.
+  - The H9 frame set is the pinned 1752 frames.
+  - The 2025 test set is untouched.
+- Reading notes from item 19 (reports/decisions/N5-result.md):
+  - (b) The null is inconclusive, not "no effect". The overall-MAE CI
+    allows the atlantic arm to be up to 1.48 kt worse but at most
+    0.41 kt better. Both analyses put the point estimate on the
+    "worse" side. The sensitivity (atlantic worse by 0.81 kt, worse in
+    8 of 10 seeds) is reported beside the verdict and never replaces
+    it. Under BUDGET-LIMITED it reads "worse at this budget".
+  - (c) The odd-epoch pick costs the control 0.28 kt of H9 MAE on
+    average (9.571 vs 9.288 at its native epoch). The largest case is
+    seed 4: 11.04 at epoch 23 vs 9.37 at epoch 24. So at this budget
+    H9 MAE can swing by as much as 1.7 kt between adjacent epochs
+    (seed 4). That is the pre-registered matched grid working as
+    designed.
+  - (d) In the original-three split, ">96 kt" is Ian alone: Nicole
+    and Claudette have no frames above 96 kt.
+- John's reading, verbatim: "the CI rules out an overall-MAE gain
+  larger than about 0.4 kt at this budget, and the result does not
+  show harm."
+  [Coordinator: John's reading refers to the pre-registered verdict.
+  The primaries show no significant difference, though the overall-MAE
+  CI does not exclude up to 1.48 kt worse; the sensitivity's WORSE is,
+  under BUDGET-LIMITED, read as 'worse at this budget', not as harm
+  from the added storms.]
+- John's priority note, verbatim: "it lowers the priority of v2 lever
+  2 (remaining Atlantic storms) and raises F-31 (the budget study),
+  which should also cover the frozen ensemble's budget."
+- Odd-epoch control checkpoints (130), hashes recorded before deletion.
+  - Per John (2026-10-19): the 10 primary-evaluated control checkpoints
+    are KEPT, together with the 20 final models seed<s>.pt, because the
+    primary analysis evaluated odd-epoch files. John's earlier "keep the
+    20 final models" had missed that. The other 120 are DELETED after
+    this PR merges.
+  - John (21:05 EDT), verbatim: "keep the 10 primary-evaluated control
+    checkpoints (seeds 0–9 at the epochs listed) plus the 20 final
+    models; delete the other 120 after PR #16 merges. My earlier 'keep
+    the 20 final models' missed that the primary used odd-epoch files;
+    the results entry should say the 10 were kept for that reason and
+    list the hashes of all 130, marking which were deleted."
+  - The 10 kept files, from each control training record's
+    selected_checkpoint, by seed 0-9: epoch_25, 23, 21, 15, 23, 23, 25, 21, 17, 13.
+  - SHA-256 of models/n5_atlantic/control/seed<s>_epochs/epoch_XX.pt;
+    all 130 equal their training record's files_sha256.
+  seed 0:
+    epoch_01 c7fd052d88bf1ee5176adc9e7aa939052fe198234207b4fb8392d9e35a6f830c DELETED
+    epoch_03 fb0fa3953f461ce8bf8abd7842126b3740ab7bfa7f82f80c57b0962670ec647f DELETED
+    epoch_05 e32dc091409374d68fce020862d43259bae8d890832ee50e267e5ec40779c9f3 DELETED
+    epoch_07 1c381bf87df18ecef013f5539e4071b0d92769cd65957ed58fd370c323d2e8c6 DELETED
+    epoch_09 1d388d02be34ed841d20313c6279189868c8d9b1eef5b650e05e02c53dac2667 DELETED
+    epoch_11 eb0fd6bd46b9e4dcdebf6ca67a21178dd440837328b744bd41fac409c497a4c2 DELETED
+    epoch_13 0926caf90a99b8392efd14a7d9bad9c6adfcbae41bdb0a314e72751396196709 DELETED
+    epoch_15 6aad221a859df33d889a988bfb323c9425dea1e48a9cc974c7ba663271218547 DELETED
+    epoch_17 bc56b3ce9813376dea63249507c93b815cffd9e6438dcb61a5fd4300f9dcf4af DELETED
+    epoch_19 7ecbfff9a8c7adfd3e0c9690516c74f877e66d5040f024b5fe757dd00eb01ac2 DELETED
+    epoch_21 7148e0428599d38f7d87fc91de9528f34f5996e42b9ba8e4a14b08fb7f5beaac DELETED
+    epoch_23 f87ceeca61bd309f84ad76b7d9918a7f8eaf0c9c4bcd8b7b835d7ea0e3e6cac2 DELETED
+    epoch_25 0b3caf50628a3fa8a0c9ac55985a42632d65b0088a9790325e06641545ee9f1f KEPT
+  seed 1:
+    epoch_01 718eefab495cacfdadd240761a599b8f7709c03c2312b3d7389a5fde755db063 DELETED
+    epoch_03 1a76206bb9765dec7bdd043de56c2a6294a69172bdd33dbddc328424ce0b1b9e DELETED
+    epoch_05 38dcfc2fd33dd1b2367e998ae2af4b4d44350af87e1c4a5f4e2032dfb29ad8c1 DELETED
+    epoch_07 5b0eaf33bdfcceb16a721bfeffe925d8f6db89206f393d7b653555c51aa4ee11 DELETED
+    epoch_09 3583e7b3608f933cab74beb3fcb8d62b86a9abf585d93763b9c12992779dc4db DELETED
+    epoch_11 3cd156e020654294f73a25bc4ae5102ee52d62efa005d23c7620a2e4bb58e7b2 DELETED
+    epoch_13 ee5334d775e7b699dca9e37608fcefafe13d61a1865f0676257160d81d83f31b DELETED
+    epoch_15 3ef41ac85ee3be8ccc2d536c489199bc2e0e700f4bcc85db99265331a1d5d494 DELETED
+    epoch_17 c641df181e7cf403ef91628ac22a565025e93cd88b56addbed7411a1ccd68ded DELETED
+    epoch_19 323e7341e6107790d409f05ee50878eb07d22980cb830fd2666fa3be2db64355 DELETED
+    epoch_21 210c05266a59e283fc524f196ad3aa53900810a4d7c8b86bad80d2d3c3f31aec DELETED
+    epoch_23 9961e12542a7175caf4534c8b1cd726e7515425ff3aa1ef059806bd8f0d9c3d7 KEPT
+    epoch_25 19ac1e363de9ec0639f820023c2ed9c08a59472acbd9ad898484703f767f49e0 DELETED
+  seed 2:
+    epoch_01 10b2c97f54c1eaa0553d11688b2eff0869294584a54e93789b38f8231ace462e DELETED
+    epoch_03 8d961da4def0253d266509509b196ce4104bd5507a57a55323f35c0364838491 DELETED
+    epoch_05 6ef75ad1f0fbb1600634e818f640a8074368a29107a197c458715d390b9bb090 DELETED
+    epoch_07 dabd98c0bd288306445fc3df15849df810de9dc90d35525ecd2972ac906cdd75 DELETED
+    epoch_09 b34b2da86bd070bb12ed474ae8774e9e68faae71b6fe196fc8ed35c4ab1f327b DELETED
+    epoch_11 bc305d6fed9447b9ce95f03b4c2b2850f2dbb229f2b6b47f52d73b65fd03aae6 DELETED
+    epoch_13 0fb8e37dfc0364f7c6330c43cad69c80e9ce580219622b390e042395b80bde28 DELETED
+    epoch_15 d20f8cd3bf7a9d275d6c1d7c67d37b0b511581f46f2a405635cd5d67f17a1535 DELETED
+    epoch_17 e4840445cb1099fa7e0c84c33d00716ce9a5aefabd156cb036cbc9e9f00a5c01 DELETED
+    epoch_19 86f182d811aefc0bfde1ee163b6b22d04a505588a7d6624290e5f8fc07a22ea4 DELETED
+    epoch_21 c63ad61415a795e354a5c94f47bf4fa3ed76f809a460ca271f5ceacca516a633 KEPT
+    epoch_23 f440f1dd9b9ca727251daf05f21824b5cd52c7baae0c51bf3f8aa029bdd7ab65 DELETED
+    epoch_25 3f7222a0a2725d67666266cf23c3136b47fcee2aab9b362b7ca5683d899d3da8 DELETED
+  seed 3:
+    epoch_01 1658803f1ca48dd589e38a2a850ac008c4104e62b38551ae14fe8bbc49696a52 DELETED
+    epoch_03 dc5646067a1a4fc9bb8fb62b8d67b43fff9a874407cc1a921de123917c52fe8b DELETED
+    epoch_05 3d4877b62722676606d960282a9f5c3dbc3a9c1704ff8973134a0c9ca512775a DELETED
+    epoch_07 58dc5afbc81957373113493209bb4de0f09ce4c1cb3e8c95a4bd995ad64c8184 DELETED
+    epoch_09 26a95baa004251c9275460e55a33a2e968f7fff0509befecb7c4f2a019e3a1cb DELETED
+    epoch_11 3a38f8848701d60a7c8a169af1a03fda603a79acb10a09ea91147d3d08716dae DELETED
+    epoch_13 74bcb63a242947f14e592f9d38ff555130e58d334f59a94414fd6033d204b50c DELETED
+    epoch_15 c670e23377d9c3d4725dfec8f89fb5ae9dac98632237c1b3aaca65d3889c32e8 KEPT
+    epoch_17 4dcc3dc5f883a80fe4734375c7842abdc160680aa56232c7232dc9f38a45fd23 DELETED
+    epoch_19 15a00dcfe6030ec873447282dc3d3712c1344f0c096d9dfaffb648b9dba9d92d DELETED
+    epoch_21 b2676984523dd991de26cba1a249e43d5f3b3424c886cbaa73cc6099d9f085f1 DELETED
+    epoch_23 f7843592e77b51191fe2f1f733dca7c83dbbeae2604631d6a95591b5b95b32c3 DELETED
+    epoch_25 3242b2bb5520c7551c5ad2167e429d1c8a089823b54309f2807c0fe1fa9c94d0 DELETED
+  seed 4:
+    epoch_01 10e68efccf4f3b7989075d7ad5561665519b9d66c0204cd15527278ae6de5309 DELETED
+    epoch_03 ea5dadfcb8bcec7797b36dc920dfa85199acd74d8c9feecaf4b450d0192aaf45 DELETED
+    epoch_05 c3e48682bccd8722640cfaa8fc3bacf21cf9291f7077168b1fcb7998e0ad171e DELETED
+    epoch_07 bef7f6c7115fe617429784602d4f1e3b9fec07a635319211e386bd569c7b1db4 DELETED
+    epoch_09 cd51e62e3e8c96c2bc42f8e33b38150ac2d473f32b358619a1acf1113e07346b DELETED
+    epoch_11 4b9b288bbf9dd27eb0d936d6a46ade7a992a023787ef75836a14fe782e8e88d7 DELETED
+    epoch_13 ff27ac272d5d80bcc5d777d150c5e2eeabf9556ff3110f401028d71b8ad79964 DELETED
+    epoch_15 0c48ec440b24508b63b78797506e4198ade8ac610e28f955582cabf853b3c6ff DELETED
+    epoch_17 f28bfb26f02b6563ce3d259c3f63ff47b8ff0ec26e11bdc6e94de75c22857bbc DELETED
+    epoch_19 d176711c322f7e179da90cdf0fcce3a84c846ceeacfb1f97fc459f405b220ada DELETED
+    epoch_21 a472430c58e9b2f6882e114508570dbf5123afd1499005232be81f1bdee7c1e0 DELETED
+    epoch_23 866518e9f05906ec69b1360270beaff862d49eb255394d677e2d79f4abb8dc4d KEPT
+    epoch_25 d021c5bc78184501cdbbef3cb56b7ca82eaf4a47d1bbd3a71ba63864e7ee44bb DELETED
+  seed 5:
+    epoch_01 905d6b3a439dc3d285669b59b1a7efb5ac78a8a893653060051a043c2cf4c6f1 DELETED
+    epoch_03 748fafcbbff75bb73e33a20e8dff9e4f8efb37ddfb653bce93e356a2f6afb80d DELETED
+    epoch_05 37504f5262a3bf37a8ef6f695869c47b8057d0ac166b96692b6cc128f51657d2 DELETED
+    epoch_07 29a79c6e894a05cdd557fe0bae02e1894fdf9b3d0fa129ee389afd828905ef45 DELETED
+    epoch_09 669550a7543592867c3b65a860453a6f3f5785bcdac4fd309f7986b6eb311cca DELETED
+    epoch_11 26603b5071fcffd935bcfb82247954e2dd4537a70a75ead2e3664924012b0fd2 DELETED
+    epoch_13 6de4bd4b7f17bc2e8848964022bc196209bcca59f94fee584e0e296bee329635 DELETED
+    epoch_15 50a9e39642d2e55cefd2fc9dcb9378546cf648559d4308b5f312a8940fdb9169 DELETED
+    epoch_17 26eef1866313bbf62941983b473d57465d5253c4f63f9c686c37c5fcd41a1ddf DELETED
+    epoch_19 0350e41a13409f36fb96bd00e077d84675afd7f6e97f7a3568ecc18848d11148 DELETED
+    epoch_21 a9c09e07b1be895108c78d5a8eafc5b115908a75d78342cf6221b28b81f8e508 DELETED
+    epoch_23 d19d395a36a6ebfab1de22a61a4a65c14180f47e419ce10c3a5930f557219a06 KEPT
+    epoch_25 8b3fd531646889f78c36fffcee79a8758b9bec8ae9820833cc69bd654660afee DELETED
+  seed 6:
+    epoch_01 3b1f9fc9877e792ddeebf2e520816601555a2bf79ca7f42d0edd5e0254744598 DELETED
+    epoch_03 be1e9caf667b6bb90fd51424245ba5cd72445765eca32317286d63715e4da7f7 DELETED
+    epoch_05 df549c97430be45568c13a7bcb993e16a26066f7bfb08aa482646a0a0559fe0e DELETED
+    epoch_07 a2cde85aa55b1798a9883780f03178ac59a1ee884a60217e091fa63f0a82d800 DELETED
+    epoch_09 dfa24002fb27d1055cb1ab7f6da678fd03c0aae1030adf7cda9e95629bd20bd8 DELETED
+    epoch_11 b9ffa0b7f0c9b2857befe89b7cf6f7eda17aea9ca1467cffb2957cb7043b01b0 DELETED
+    epoch_13 51ed069ffd409e7c7415220e09fd211cec034e44a904bcacb210d9fd96f0d087 DELETED
+    epoch_15 980d013190a7a6bb9e44c653b501e59f0860b77326884b204f7490843b445849 DELETED
+    epoch_17 52c45cd960bf3f9903af45ee909a25e6fa34fd72256ac4de9bf136661120a593 DELETED
+    epoch_19 c2fb5520aa5557010009bca04e0de4422096d56df0579033229a5f0812220580 DELETED
+    epoch_21 62ec209da1cede0ec2d2f674c88e7d708cc3a38402c2ec1194c0bcb307104b6d DELETED
+    epoch_23 89f20faf8f59591b81b44ea057f8e06fd258a72b2d4fd2121de96bddf2aceffc DELETED
+    epoch_25 f7d79ceada1a26f3cc190bffae1dd72e0f0ba4ccdf1562782f0938d3caba02fd KEPT
+  seed 7:
+    epoch_01 1b30090666dc10f0098e089e2e3c820159ebd9f81fd2520fffc4965a182929f0 DELETED
+    epoch_03 e4d38c22b4d1963023082b172141c7736039766d1ce4cf86e0f14bcbf3b09029 DELETED
+    epoch_05 5f92a22a3261e073e4be95fbf39479838ce4405480ade9bb5ce06730fe5941b2 DELETED
+    epoch_07 df09affcd56fe4e05045577a3289510c1bc5a4d52ec8dab14254c58ff486c37e DELETED
+    epoch_09 4147f8faa681a718f86607f69cbb4fcb487f76492b6a6f3ccf84de47819e3d5b DELETED
+    epoch_11 9e0c3def173caa83f8b6fea4bfa3644a6581d62cbf5fd01a9d63ab7b8ab6bec3 DELETED
+    epoch_13 0f3c129d29b2e09e7f0995af95760df6af1414dc5e294de7f2c89e2170bb9da3 DELETED
+    epoch_15 4fea407612f34b4251fe01a592d87dbae158f1c863f7cb48780fae71c6e93a6c DELETED
+    epoch_17 203c62189821f54646cca6133af6ca199023bfd1ca6416639829ced07bf70d1e DELETED
+    epoch_19 9e3db36ff63775d7ba6b59efcca0104ac304360dcd6b6755ddc7b71db9c8c181 DELETED
+    epoch_21 fe9ebad2f1b71611360e140cea42508ec06a229ba2b31549cf2100d5b68f942e KEPT
+    epoch_23 1f162c5c3520093785c9c820b060cbc05f20f7b71bb8ae17ad9066415c7b405f DELETED
+    epoch_25 7666f6666be44be5e56467cdc0334928f3d3754c4454e1538735a9b0282c3091 DELETED
+  seed 8:
+    epoch_01 f855e50657f6bb63f72301a87fa808f29e21cd63ba6429c90e8af0dc971287cf DELETED
+    epoch_03 13de8b856936a8c07e5f42ce2d2284f9ec8de3f5744ec00b5d2384a251e50ca5 DELETED
+    epoch_05 fe7de2f861670f8f53ef07b413072714645b97fabe9d774d362866c4260f7c0d DELETED
+    epoch_07 345f5ab49a8ec50c6c578fb852c702dd0035fc1be0b6dfd193a8402d6854941a DELETED
+    epoch_09 45002b4c5a39a6ea7cda2c2079ec6986468c3146ccf0073ed94e6e6322014537 DELETED
+    epoch_11 ec0eb3db005827282f17309b5da41649d05936757de3836e18c0dededd485887 DELETED
+    epoch_13 dddf1012e0d18fefcd4d79dc644bd0fd5e98c1254c315237245070563646d5ec DELETED
+    epoch_15 b36475f377770a1f5dc7ce4028476f79c17f6ecf9d783e746939fc4606264cdf DELETED
+    epoch_17 a21630d9956a56b9ebbd5c2413d992092aa9a6954ec2096309261c6ce93769b5 KEPT
+    epoch_19 0b0770fd57c9abd187e8cc29880bb20555ff6c51d1fff0f1dd4e999e46563060 DELETED
+    epoch_21 8474e122dd5775f70885c835d0414ef981666acd12f0d56cfd9d268a6eefccf5 DELETED
+    epoch_23 655213b555edc7694746137b0ecb49cacfc5257836cc19d444e082af06696229 DELETED
+    epoch_25 2eaf118846ac8f644d980a4fd3272bf9f3063aa18087bebb5c0596be6f3a59b8 DELETED
+  seed 9:
+    epoch_01 7b144178a32ae3d9b17912aff639acac904c50a2e7a1dccfb2de016fa38246c5 DELETED
+    epoch_03 f569771a605928de5f5bd53e11759ca1622837deb53e8e1bb8717bf140fd0a54 DELETED
+    epoch_05 6a1da845d6546ed6065bb74c01dacbd54d1887727a94a1e935e083499afb4e65 DELETED
+    epoch_07 f2b78b4e980efd3d9dcf007a037c9792136a0a99cb8bfbc69a035034ee535724 DELETED
+    epoch_09 e271f96ff63efbd9950787519b4d40a011f18de9729d64fcc4023014536dcbbf DELETED
+    epoch_11 3578d2aab30617c2240198b856bae75f1f07bd10f94b2b4397517095ae98909d DELETED
+    epoch_13 09b98dd8da249b1d4275ec1fe497cbcc7dfc966f3a86986c9831fcbeecae904c KEPT
+    epoch_15 3d7fe483569edeeccce8b10538210b6ae217dc51c29064cc1937576e39164978 DELETED
+    epoch_17 63fdc0826cd97dc292b1db1af0242d147468f813b2712a05e589b35e08ed2a26 DELETED
+    epoch_19 18987b2cdb393767ad0ec798d1c684e3e84d52b557faed9d73aab40cc5f24e41 DELETED
+    epoch_21 e083fddbe3935d47fc2f9c01e120fb2eeab3c6c388b64bac5f44c6cfae9d422a DELETED
+    epoch_23 fff7c692d003afcad5dd415d337687c5961d1e080a82bd40b506ae785346c2ea DELETED
+    epoch_25 c6bde3a2d4f58735c437e450f7aacabdeb6253f79775e7ff09ec1afdf86f2f5b DELETED
+- Follow-ups:
+  - F-31: a budget study for both arms and for the frozen ensemble.
+    It is a future, separately pre-registered experiment, not a rerun
+    of N5.
+  - F-32: the CI grid puts each edge up to about 0.002 kt inward
+    (cosmetic; no edge is near a threshold).
