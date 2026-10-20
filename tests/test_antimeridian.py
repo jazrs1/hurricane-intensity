@@ -68,8 +68,10 @@ def lon_mismatch(got, want):
 
 # Westward (E->W in the sense of the storm's motion, Dora's direction): from the western hemisphere's 178.5W
 # across 180 into the eastern hemisphere. Eastward: the reverse.
-WESTWARD = fixes("2023-08-12 00:00", [17.0, 17.2, 17.4, 17.6], [-178.5, -179.6, 179.3, 178.2])
-EASTWARD = fixes("2023-09-01 00:00", [20.0, 20.4, 20.8, 21.2], [178.4, 179.5, -179.4, -178.3])
+WESTWARD = fixes("2023-08-12 00:00", [17.0, 17.2, 17.4, 17.6], [-178.5, -179.6, 179.3, 178.2],
+                 [70.0, 75.0, 85.0, 90.0])
+EASTWARD = fixes("2023-09-01 00:00", [20.0, 20.4, 20.8, 21.2], [178.4, 179.5, -179.4, -178.3],
+                 [60.0, 55.0, 50.0, 40.0])
 
 
 # --- pass today: what the fix must not change ------------------------------------------------------------
@@ -163,6 +165,53 @@ def test_crop_box_geometry_wrap_safe_near_180(lon_a, lon_b):
     assert centred(a, 18.0, lon_a)
 
 
+# A track through the prime meridian (eastern Atlantic, e.g. a storm heading for Iberia) is not a crossing:
+# it must stay exactly linear. This catches a fix that interpolates in [0, 360) and maps back, which only
+# moves the seam from 180 deg to 0 deg.
+GREENWICH = fixes("2023-10-01 00:00", [40.0, 41.0, 42.0], [-1.5, -0.3, 0.9])
+
+
+def linear_hourly(vals):
+    """Hour h of fixes 6 h apart: segment h // 6 at fraction (h % 6) / 6, plain linear arithmetic."""
+    n = 6 * (len(vals) - 1)
+    return np.array([vals[h // 6] + (h % 6) / 6 * (vals[h // 6 + 1] - vals[h // 6]) if h < n else vals[-1]
+                     for h in range(n + 1)])
+
+
+def test_greenwich_grid_unchanged():
+    grid = pipeline.build_sample_grid(GREENWICH, "1h")
+    assert len(grid) == 13
+    np.testing.assert_allclose(grid["lon"].to_numpy(), linear_hourly([-1.5, -0.3, 0.9]), rtol=0, atol=1e-9)
+    assert grid["lon"].iloc[3] == pytest.approx(-0.9, abs=1e-9)
+    assert grid["lon"].iloc[9] == pytest.approx(0.3, abs=1e-9)
+
+
+def test_greenwich_position_at_unchanged():
+    times = pd.date_range("2023-10-01 00:00", "2023-10-01 12:00", freq="1h", tz="UTC")
+    _, lon = C.position_at(GREENWICH, times)
+    np.testing.assert_allclose(lon, linear_hourly([-1.5, -0.3, 0.9]), rtol=0, atol=1e-9)
+
+
+def test_greenwich_boxes_overlap():
+    assert bool(C.boxes_overlap(40.0, -0.1, 40.0, 0.1))
+    assert bool(C.boxes_overlap(40.0, 0.1, 40.0, -0.1))
+
+
+@pytest.mark.parametrize("track", ["westward", "eastward"])
+def test_crossing_grid_lat_wind_rows_unchanged(track):
+    """On a crossing track only lon is wrong today: lat and wind are linear, and the rows and is_interpolated
+    are right. Pinned here so a fix can't disturb them; lon stays in the xfail tests."""
+    fx = WESTWARD if track == "westward" else EASTWARD
+    grid = pipeline.build_sample_grid(fx, "1h")
+    assert len(grid) == 19
+    assert int(grid["is_interpolated"].sum()) == 15
+    assert grid["is_interpolated"].tolist() == [h % 6 != 0 for h in range(19)]
+    assert grid["time"].tolist() == list(pd.date_range(fx["time"].iloc[0], periods=19, freq="1h"))
+    for col in ("lat", "wind_kt"):
+        np.testing.assert_allclose(grid[col].to_numpy(), linear_hourly(fx[col].tolist()), rtol=0, atol=1e-9,
+                                   err_msg=col)
+
+
 # --- xfail today: the wrap sites --------------------------------------------------------------------------
 
 @pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: build_sample_grid interpolates lon linearly (westward)")
@@ -223,16 +272,32 @@ def test_crop_centred_on_interpolated_crossing_frame(track):
 
 
 @pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: concurrency.position_at interpolates lon linearly")
-def test_concurrency_position_at_crossing():
-    times = pd.date_range("2023-08-12 00:00", "2023-08-12 18:00", freq="1h", tz="UTC")
-    _, lon = C.position_at(WESTWARD, times)
-    err, msg = lon_mismatch(lon, expected_lon(WESTWARD["time"], WESTWARD["lon"].tolist(), times))
+@pytest.mark.parametrize("track", ["westward", "eastward"])
+def test_concurrency_position_at_crossing(track):
+    # Both directions: a fix that wraps only one way passes one of these and fails the other.
+    fx = WESTWARD if track == "westward" else EASTWARD
+    times = pd.date_range(fx["time"].iloc[0], periods=19, freq="1h")
+    _, lon = C.position_at(fx, times)
+    err, msg = lon_mismatch(lon, expected_lon(fx["time"], fx["lon"].tolist(), times))
+    assert err < TOL_DEG, msg
+
+
+@pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: concurrency.position_at either side of a fix at 180")
+@pytest.mark.parametrize("case", list(SEAM_CASES))
+def test_concurrency_position_at_fix_exactly_at_180(case):
+    lons = SEAM_CASES[case]
+    fx = fixes("2023-08-12 00:00", [17.0, 17.2, 17.4], lons)
+    times = pd.date_range("2023-08-12 00:00", "2023-08-12 12:00", freq="3h", tz="UTC")
+    _, lon = C.position_at(fx, times)
+    err, msg = lon_mismatch(lon, expected_lon(fx["time"], lons, times))
     assert err < TOL_DEG, msg
 
 
 @pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: concurrency.boxes_overlap differences lon without wrapping")
-def test_concurrency_boxes_overlap_across_180():
+@pytest.mark.parametrize("lon1, lon2", [(179.9, -179.9), (-179.9, 179.9)])
+def test_concurrency_boxes_overlap_across_180(lon1, lon2):
     # Two centres 0.2 deg of longitude apart (about 21 km at 18N) on either side of 180 deg, so the boxes overlap.
+    # Both argument orders: a fix that wraps only one sign of the difference fails one of them.
     dx_km = 0.2 * C.KM_PER_DEG * np.cos(np.radians(18.0))
     assert dx_km < 25.0
-    assert bool(C.boxes_overlap(18.0, 179.9, 18.0, -179.9)), "179.9E and 179.9W read as ~360 deg apart"
+    assert bool(C.boxes_overlap(18.0, lon1, 18.0, lon2)), f"{lon1} and {lon2} read as ~360 deg apart"
