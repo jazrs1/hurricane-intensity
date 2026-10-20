@@ -9,8 +9,9 @@ geometry, which is already wrap-safe given a correct centre (PROJ normalises lon
 Expected positions are computed here, independently of the code under test, by unwrapped-linear arithmetic:
 take the short way round (dlon in [-180, 180)), interpolate linearly in time, compare modulo 360. That is the
 pipeline's own linear rule for any track that does not cross 180 deg, so the non-crossing pin and the crossing
-expectations agree. Longitudes are compared as wrapped differences, so the fix may return either 180.0 or
--180.0 at the seam, or any other representation of the same meridian.
+expectations agree. The position tests compare longitudes as wrapped differences. The convention for the
+values themselves is John's (2026-10-20, 00:05 EDT): "interpolation short way round, linear in time; saved
+longitudes re-wrapped to [-180, 180)". test_grid_lon_in_range pins it, so a fix at 180.0E is saved as -180.0.
 
 Synthetic fixes only: no downloads, no data/ reads or writes, no network, no GPU.
 """
@@ -165,6 +166,19 @@ def test_crop_box_geometry_wrap_safe_near_180(lon_a, lon_b):
     assert centred(a, 18.0, lon_a)
 
 
+@pytest.mark.parametrize("lon_a, lon_b", [(178.0, -182.0), (-178.0, 182.0)])
+def test_crop_box_straddles_180_centre_not_near_it(lon_a, lon_b):
+    """Only the box crosses 180 deg: the centre is 2 deg from it, inside the 600 km box's half-width at 18N
+    (300 / (111.32 cos 18N) = 2.83 deg). Full size, point inside, same crop for both spellings."""
+    half = 300.0 / (111.32 * np.cos(np.radians(18.0)))
+    assert 2.0 < half
+    da = synthetic_disk()
+    a = projection.crop_box(da, 18.0, lon_a, 600.0, GOES18_CRS, GOES18_H)
+    b = projection.crop_box(da, 18.0, lon_b, 600.0, GOES18_CRS, GOES18_H)
+    assert a.shape == b.shape and np.array_equal(a.x, b.x) and np.array_equal(a.y, b.y)
+    assert centred(a, 18.0, lon_a)
+
+
 # A track through the prime meridian (eastern Atlantic, e.g. a storm heading for Iberia) is not a crossing:
 # it must stay exactly linear. This catches a fix that interpolates in [0, 360) and maps back, which only
 # moves the seam from 180 deg to 0 deg.
@@ -253,6 +267,27 @@ def test_grid_fix_exactly_at_180(case):
     assert err < TOL_DEG, msg
 
 
+RANGE_XFAIL = pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: a fix at 180.0E is saved as +180.0, outside [-180, 180)")
+
+
+@pytest.mark.parametrize("track", [
+    "westward", "eastward", "westward-180W", "eastward-180W",
+    pytest.param("westward-180E", marks=RANGE_XFAIL), pytest.param("eastward-180E", marks=RANGE_XFAIL)])
+def test_grid_lon_in_range(track):
+    """John's convention: every saved longitude lies in [-180, 180). Today linear interpolation between
+    in-range fixes stays in range, so this passes except where a fix is +180.0 itself; a fix that unwraps
+    without re-wrapping (values like -180.7) fails it."""
+    if track in ("westward", "eastward"):
+        fx = WESTWARD if track == "westward" else EASTWARD
+        grid = pipeline.build_sample_grid(fx, "1h")
+    else:
+        fx = fixes("2023-08-12 00:00", [17.0, 17.2, 17.4], SEAM_CASES[track])
+        grid = pipeline.build_sample_grid(fx, "1h")
+    lon = grid["lon"].to_numpy()
+    bad = lon[(lon < -180.0) | (lon >= 180.0)]
+    assert bad.size == 0, f"{bad.size} lon(s) outside [-180, 180): {bad[:5].tolist()}"
+
+
 @pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: crop centre of an interpolated frame between 179E and 179W")
 @pytest.mark.parametrize("track", ["westward", "eastward"])
 def test_crop_centred_on_interpolated_crossing_frame(track):
@@ -301,3 +336,19 @@ def test_concurrency_boxes_overlap_across_180(lon1, lon2):
     dx_km = 0.2 * C.KM_PER_DEG * np.cos(np.radians(18.0))
     assert dx_km < 25.0
     assert bool(C.boxes_overlap(18.0, lon1, 18.0, lon2)), f"{lon1} and {lon2} read as ~360 deg apart"
+
+
+@pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: boxes_overlap, centres on opposite sides of 180, not near it")
+@pytest.mark.parametrize("lon1, lon2", [(178.5, -178.5), (-178.5, 178.5)])
+def test_concurrency_boxes_overlap_straddling_pair(lon1, lon2):
+    # 3 deg of longitude apart at 18N: 3 * 111.32 * cos 18N = 317.6 km < 650 km, so the boxes overlap.
+    dx_km = 3.0 * C.KM_PER_DEG * np.cos(np.radians(18.0))
+    assert 300.0 < dx_km < 330.0
+    assert bool(C.boxes_overlap(18.0, lon1, 18.0, lon2)), f"{lon1} and {lon2} ({dx_km:.0f} km apart) do not overlap"
+
+
+@pytest.mark.parametrize("lon1, lon2", [(175.0, -175.0), (-175.0, 175.0)])
+def test_concurrency_boxes_far_pair_across_180(lon1, lon2):
+    # 10 deg apart at 18N: 1059 km > 650 km, so the boxes must not overlap. Passes today; a fix must keep it.
+    assert 1000.0 < 10.0 * C.KM_PER_DEG * np.cos(np.radians(18.0))
+    assert not bool(C.boxes_overlap(18.0, lon1, 18.0, lon2))
