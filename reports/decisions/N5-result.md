@@ -4,7 +4,7 @@
 1. **Results PR: yes or no.** Commit the N5 outputs through one tier-2 PR, through hc-adversary and then you. **Recommendation: yes.**
 2. **Delete the 130 odd-epoch control checkpoints** (5.5 GB, models/n5_atlantic/control/seed*_epochs/) once the results PR has merged. Design §4 says they are "kept until the analysis has run … deleted after the results entry". The 20 final models (seed<s>.pt) are kept. **Recommendation: yes, after the merge.** This is a destructive action, so it needs your explicit yes.
 
-## The verdict (report.txt, unedited; sha256 fde430de92bab775…)
+## The verdict (excerpt of report.txt; each line quoted exactly, other lines omitted; sha256 fde430de92bab775…)
 
 ```
 PRIMARIES (Bonferroni, alpha 0.025 each, two-sided exact sign-flip; control re-selected on odd epochs):
@@ -12,8 +12,8 @@ PRIMARIES (Bonferroni, alpha 0.025 each, two-sided exact sign-flip; control re-s
   >96 bias: control -6.905, atlantic -7.853, d -0.947 (sd 4.792), 97.5% CI [-5.515, +3.633], p 0.53125, SESOI 3.0 -> NULL (inconclusive; effects of 3.0 kt are not excluded)   [both negative: d = bias_atl - bias_ctl, d > 0 better]
 JOINT VERDICT: NO SIGNIFICANT DIFFERENCE on either primary | BUDGET-LIMITED: the under-training flag fired in >= 5/10 runs of an arm; a 'worse' result is read as 'worse at this budget', not as harm from the added storms; not rerun or rescued
 SENSITIVITY (pre-registered; control at its native 25-epoch selection; does not change the verdict):
-  overall MAE: control 9.288, atlantic 10.102, d +0.814 (sd 0.891), 97.5% CI [+0.095, +1.587], p 0.01367, SESOI 0.9 -> WORSE
-  >96 bias: control -6.758, atlantic -7.853, d -1.095 (sd 4.836), 97.5% CI [-5.587, +3.256], p 0.47852, SESOI 3.0 -> NULL
+  overall MAE: control 9.288, atlantic 10.102, d +0.814 (sd 0.891), 97.5% CI [+0.095, +1.587], p 0.01367, SESOI 0.9 -> WORSE   [d = MAE_atl - MAE_ctl, d < 0 better]
+  >96 bias: control -6.758, atlantic -7.853, d -1.095 (sd 4.836), 97.5% CI [-5.587, +3.256], p 0.47852, SESOI 3.0 -> NULL (inconclusive; effects of 3.0 kt are not excluded)   [both negative: d = bias_atl - bias_ctl, d > 0 better]
 SECONDARY (alpha 0.05, uncorrected):
   >96 MAE: d +1.267, 95% CI [-0.166, +2.718], p 0.07227
 ```
@@ -34,7 +34,7 @@ The per-storm table and the split between the original three and the added six s
 
 **Reading notes from the adversary for you (none changes the verdict):**
 - **(b) The null is inconclusive, not "no effect".** The overall-MAE confidence interval allows the Atlantic arm to be up to 1.48 kt worse but at most 0.41 kt better. Both analyses put the point estimate on the "worse" side. The sensitivity analysis (Atlantic worse by 0.81 kt, worse in 8 of 10 seeds) is reported beside the verdict and never replaces it. Under BUDGET-LIMITED it reads "worse at this budget".
-- **(c) Why the primary and sensitivity analyses differ.** The odd-epoch pick costs the control 0.28 kt of H9 MAE on average (9.571 vs 9.288 at its native epoch). The largest single case is seed 4: H9 MAE is 11.04 at epoch 23 and 9.37 at epoch 24. So at this budget, H9 swings by up to 1.7 kt between adjacent epochs. This is the pre-registered matched grid working as designed.
+- **(c) Why the primary and sensitivity analyses differ.** The odd-epoch pick costs the control 0.28 kt of H9 MAE on average (9.571 vs 9.288 at its native epoch). The largest single case is seed 4: H9 MAE is 11.04 at epoch 23 and 9.37 at epoch 24. So at this budget, H9 can swing by as much as 1.7 kt between adjacent epochs (seed 4). This is the pre-registered matched grid working as designed.
 - **(d) In the original-three split, ">96 kt" means Ian alone.** Nicole and Claudette have no frames above 96 kt.
 - **(a) A cosmetic follow-up.** The confidence-interval grid puts each edge up to about 0.002 kt inward. No edge is near a threshold.
 

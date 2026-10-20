@@ -2522,13 +2522,19 @@ SENSITIVITY (pre-registered; control at its native 25-epoch selection; does not 
   - (c) The odd-epoch pick costs the control 0.28 kt of H9 MAE on
     average (9.571 vs 9.288 at its native epoch). The largest case is
     seed 4: 11.04 at epoch 23 vs 9.37 at epoch 24. So at this budget
-    H9 swings by up to 1.7 kt between adjacent epochs. That is the
-    pre-registered matched grid working as designed.
+    H9 MAE can swing by as much as 1.7 kt between adjacent epochs
+    (seed 4). That is the pre-registered matched grid working as
+    designed.
   - (d) In the original-three split, ">96 kt" is Ian alone: Nicole
     and Claudette have no frames above 96 kt.
 - John's reading, verbatim: "the CI rules out an overall-MAE gain
   larger than about 0.4 kt at this budget, and the result does not
   show harm."
+  [Coordinator: John's reading refers to the pre-registered verdict.
+  The primaries show no significant difference, though the overall-MAE
+  CI does not exclude up to 1.48 kt worse; the sensitivity's WORSE is,
+  under BUDGET-LIMITED, read as 'worse at this budget', not as harm
+  from the added storms.]
 - John's priority note, verbatim: "it lowers the priority of v2 lever
   2 (remaining Atlantic storms) and raises F-31 (the budget study),
   which should also cover the frozen ensemble's budget."
