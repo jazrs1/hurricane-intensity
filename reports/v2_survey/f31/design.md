@@ -136,7 +136,10 @@ All three share the rest of the recipe: ResNet-18 IMAGENET1K_V1, Adam lr 1e-4, b
 
 **What reusing H9 means for F-31:**
 - **Absolute H9 levels are not estimates for new storms.** No F-31 number is set beside the 2025 result or the site's 9.00 kt.
-- **Every pre-registered quantity is a difference** between budgets of one configuration (the primaries), or between arms at one budget (secondary). Each checkpoint is chosen on validation only. H9 has never been used to choose a budget above 1640 steps, the 4× ladder, any selection rule here, or the seeds. So **the F-31 contrasts are not selected on H9**. The earlier looks bias H9's levels for the frozen configuration; they do not pick F-31's comparisons.
+- **Every pre-registered quantity is a difference** between budgets of one configuration (the primaries), or between arms at one budget (secondary). Each checkpoint is chosen on validation only.
+  - **Budgets above 1640 steps were seen once:** when 1640 was chosen (2026-10-13 night), per-epoch held-out H3 traces were read up to 60 epochs (about 2460 steps). The choice made then was 1640, and the 2026-10-18 23:21 entry bounds that favour near zero.
+  - **Not chosen on H9 or H3:** the 2× and 4× ladder, the 4× cap (validation columns only, §2), every selection rule here and the seeds.
+  - So **the F-31 contrasts are not selected on H9**. The earlier looks bias H9's levels for the frozen configuration; they do not pick F-31's comparisons.
 - **The inference is over training randomness (seeds), on these 9 storms.** "Longer is better on H9" means better on Ian, Sam, Beryl and the rest. H9's > 96 kt frames are dominated by a few storms (in the original three, > 96 kt is Ian alone; N5-result note (d)). The tests do not generalise over storms. The same was true of N5.
 - **F-31 was prompted partly by N5's H9 outcome.** It was pre-registered after John read N5 (his priority note) as well as because of the BUDGET-LIMITED flag known before the look.
   - The **primaries** (budget effects within a configuration) were not the contrast N5 looked at.
@@ -269,6 +272,7 @@ The BUDGET-LIMITED qualifier is appended per arm at 4× (§3).
 | Result | Reading | What it does not mean |
 |---|---|---|
 | P1 BETTER | The frozen recipe was budget-limited at 1640 steps, on H9, for this code version. | That the frozen ensemble is worse than it could be on new storms, or that it should be replaced. The frozen ensemble is not changed. A longer-budget ensemble would be a new model needing its own unspent test (§4 D). |
+| P1 WORSE | Longer training, with native selection, reads worse on H9. The smoothed sensitivity and the val-at-pick-vs-neighbours figures (§3) show whether selection optimism (§12), rather than training itself, drove it. | That 1640 steps is optimal, or that longer training harms. |
 | P1 NULL (informative) | Training 4× longer does not change the frozen recipe's H9 MAE by 0.9 kt or more. | That 1640 steps is optimal. |
 | P2 BETTER | The atlantic configuration gains from a longer budget. | Anything about N5's verdict. |
 | S1 at 4× shows no atlantic deficit (or a gain), while N5 at 1× showed d = +0.531 | Descriptive: the contrast at 4× differs from the contrast at 1×. | That N5 was wrong. N5's verdict was "at this budget" and stands. On the same H9, this is not an independent replication. |
@@ -331,7 +335,7 @@ The launch-safety design was closed by John after N5 (decisions.md 2026-10-19 17
 - `storms_train_expanded.txt`, `storms_train_n5_atlantic.txt` and `storms_val_expanded.txt`;
 - `storms_holdout_h9.txt`;
 - `results/n5_atlantic/frame_list_atlantic.txt` (SHA-256 `84e5f730…cc87`, pinned);
-- `excluded_crops.txt` (blob `10200977…0cea`; the H9 pin, 2081 control, 940 validation and 4044 atlantic frames must all hold at launch);
+- `excluded_crops.txt` (SHA-256 of the committed bytes at fbe0da9 `10200977…0cea`, blob id `cc9dfcff`; the H9 pin, 2081 control, 940 validation and 4044 atlantic frames must all hold at launch);
 - `results/ensemble/expanded10_h9_metrics.csv` and `results/storms/expanded_seed*_h9.csv` (descriptive only).
 
 **Never written:**
@@ -350,7 +354,7 @@ This PR is the design only. The scripts come in the launch PR, after John approv
 **`scripts/analyze_f31.py`** (deterministic, CPU, no torch, no random numbers):
 - **Reused from `scripts/analyze_n5.py` by import:** `epochs_for`, `sign_matrix`/`signflip_p`/`signflip_ci` (these take n), `load_csv` (H9 pin and input refusals), `read_text_strict`, `check_eval_log`, `metrics`, `per_storm`, `verify_self` and the hash definition, `PROTECTED`, and the deviations loader.
   - Where a function hard-codes N5 (pinned paths, `SEEDS = range(10)`, `TRAIN_LISTS` keyed to `n5_atlantic`, `CONTROL_EPOCHS = 25`), F-31 gets its own function instead of editing `analyze_n5.py`. `analyze_n5.py` is not modified: N5's results cite its blob.
-  - **Because F-31's behaviour depends on imported code,** the blob SHA-256 of `scripts/analyze_n5.py` (`01306415…1288`) is pinned in `analyze_f31.py`, checked at run time, and recorded in `report.txt`.
+  - **Because F-31's behaviour depends on imported code,** the blob SHA-256 of `scripts/analyze_n5.py` (`01306415…1288`, blob id `679e2169`: N5's launch blob, unchanged at fbe0da9, verified from `git show` bytes) is pinned in `analyze_f31.py`, checked at run time, and recorded in `report.txt`.
 - **New:**
   - nested-budget selection (native, matched, smoothed) from the record's re-validation table, with the `saved`-line cross-check at each budget;
   - the slot → epoch map, with each distinct epoch evaluated exactly once;
@@ -366,6 +370,26 @@ This PR is the design only. The scripts come in the launch PR, after John approv
   - a refused per-epoch H9 CSV, and refused 2025, EP and validation IDs;
   - exact p values at n = 20 against brute force on small cases;
   - determinism and LF output.
+
+**Argument lists per seed s** (`PY` = `sys.executable`; list arguments, binary-captured stdout, as N5 §8):
+
+```
+control, train:   [PY, -u, scripts/train.py, --train-list, storms_train_expanded.txt, --val-list, storms_val_expanded.txt,
+                   --epochs, 99, --seed, s, --loss, l1, --out, models/f31/control/seed<s>.pt,
+                   --epoch-dir, models/f31/control/seed<s>_epochs]                  -> logs/f31/control_seed<s>.log
+atlantic, train:  [PY, -u, scripts/train.py, --train-list, storms_train_n5_atlantic.txt, --val-list, storms_val_expanded.txt,
+                   --epochs, 52, --seed, s, --loss, l1, --frame-list, results/n5_atlantic/frame_list_atlantic.txt,
+                   --out, models/f31/atlantic/seed<s>.pt, --epoch-dir, models/f31/atlantic/seed<s>_epochs]
+                                                                                     -> logs/f31/atlantic_seed<s>.log
+re-select:        validation-only re-validation of every epoch file -> record: val_mae_revalidated, slots -> epochs
+eval, per distinct slot epoch NN:
+                  [PY, scripts/evaluate.py, --checkpoint, models/f31/<arm>/seed<s>_epochs/epoch_NN.pt,
+                   --train-list, <arm's train list>, --holdout-list, storms_holdout_h9.txt,
+                   --out, results/f31/<arm>_seed<s>_eNN_h9.csv]               -> logs/f31/<arm>_seed<s>_eNN_eval_h9.log
+analysis:         [PY, scripts/analyze_f31.py, --manifest-dir, logs/f31/runs, --out-dir, results/f31/analysis]
+```
+
+No `--circular-mask` or `--rotate`. The 99 and 52 come from `epochs_for(frames, 4 * 1640)`.
 
 **`scripts/run_f31.py`:** `run_n5.py`'s phases, guards and abort commands, with F-31's paths, epochs and seeds, `--epoch-dir` for both arms, and the nested re-selection. The same rule applies: import what is not N5-bound, pin `run_n5.py`'s blob if imported, and never edit `run_n5.py`.
 
@@ -385,6 +409,7 @@ This PR is the design only. The scripts come in the launch PR, after John approv
 - **The confounds remain:** N5 §0's bundle confounds every atlantic − control reading.
 - **Validation is blind at Cat 5** (no frames ≥ 137 kt).
 - **The budget ladder is coarse:** 1×, 2×, 4×. An optimum between them is not located.
+- **Selection pool grows with the budget:** at 4× the native rule takes the minimum of 99 (control) or 52 (atlantic) validation values; at 1×, of 25 or 13. The minimum of a larger noisy pool is more optimistic on validation (winner's curse), so a 4× − 1× contrast bundles "more training" with "more candidates". The smoothed rule and the validation-stability figures (§3) are there to show how much of a contrast is selection.
 - **Within-run zeros:** in a run whose 4× pick is ≤ 25 (control) or ≤ 13 (atlantic) epochs, the budget effect is exactly 0 for that seed.
 - **Code version:** F-31 runs on its own launch commit. Differences from N5's or the frozen members' code are part of why 1× is re-measured inside F-31, rather than taken from N5.
 
