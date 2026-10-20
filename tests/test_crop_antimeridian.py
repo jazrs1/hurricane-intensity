@@ -77,7 +77,7 @@ def check_full_box(c, lat, lon):
 
 
 LATS = [10.0, 18.0, 30.0]
-OFFSETS = [0.5, 1.0, 2.0, 2.1, 3.0, 4.5, 6.0]  # deg from 180; 2.1 is 177.9E / 177.9W (item 21b)
+OFFSETS = [0.0, 0.2, 0.5, 1.0, 2.0, 2.1, 3.0, 4.5, 6.0]  # deg from 180; 0.0 is the seam; 2.1 is 177.9E/W (21b)
 CASES = [(lat, side * (180.0 - off)) for lat in LATS for off in OFFSETS for side in (1, -1)]
 
 
@@ -99,8 +99,8 @@ def test_crop_box_same_for_both_spellings_near_180(lat, lon):
 
 
 def test_nominal_box_straddles_180_for_most_cases():
-    """Sanity check on the inputs: most cases really do put a corner across 180 deg: 26 of 42 (the half-width is 2.74 deg
+    """Sanity check on the inputs: most cases really do put a corner across 180 deg: 38 of 54 (the half-width is 2.74 deg
     at 10N and 3.11 deg at 30N), and the 6 deg cases do not, as controls."""
     straddle = [abs(lon) + BOX_KM / 2 / (KM_PER_DEG * np.cos(np.radians(lat))) > 180.0 for lat, lon in CASES]
-    assert sum(straddle) == 26  # 0.5-2.1 deg at every latitude (24), and 3 deg at 30N (2)
+    assert sum(straddle) == 38  # 0.0-2.1 deg at every latitude (36), and 3 deg at 30N (2)
     assert not any(s for s, (lat, lon) in zip(straddle, CASES) if abs(180.0 - abs(lon)) >= 4.5)
