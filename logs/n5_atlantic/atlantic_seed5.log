@@ -1,0 +1,30 @@
+RUN arm=atlantic seed=5 order=11 list=storms_train_n5_atlantic.txt val=storms_val_expanded.txt epochs=13
+START 2026-10-19T19:29:33-04:00 | 2026/10/19 19:29:33.827, 44, 2812 MHz, 51.74 W
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024', 'AL062018', 'AL092019', 'AL132019', 'AL262020', 'AL292020', 'AL122021', 'AL062022', 'AL202023', 'AL092024', 'AL182024', 'AL072021', 'AL272020', 'AL282020', 'AL082018', 'AL162018', 'AL032018', 'AL062024', 'AL102019', 'AL102024', 'AL132024', 'AL172020', 'AL052024', 'AL152023', 'AL082020', 'AL092020', 'AL132018', 'AL142023', 'AL152022', 'AL052021', 'AL052022', 'AL132022', 'AL162022', 'AL162024', 'AL022018', 'AL022019', 'AL052023', 'AL082021', 'AL092018', 'AL142020', 'AL162020', 'AL252020']
+val storms:   ['AL192020', 'AL162023', 'AL132020', 'AL202020', 'AL082023']
+seed: 5  checkpoint: models/n5_atlantic/atlantic/seed5.pt  loss: l1  circular_mask: False  rotate: False
+after exclusion: 4048
+after exclusion: 940
+frame list: results/n5_atlantic/frame_list_atlantic.txt: 4044 frames from 50 storms
+train samples: 4044  val samples: 940
+epoch 1: train 31.09 kt  val 30.01 kt
+  saved
+epoch 2: train 18.10 kt  val 14.37 kt
+  saved
+epoch 3: train 11.79 kt  val 22.17 kt
+epoch 4: train 8.90 kt  val 11.23 kt
+  saved
+epoch 5: train 7.77 kt  val 16.87 kt
+epoch 6: train 7.09 kt  val 11.30 kt
+epoch 7: train 7.53 kt  val 9.16 kt
+  saved
+epoch 8: train 6.71 kt  val 9.49 kt
+epoch 9: train 5.49 kt  val 9.45 kt
+epoch 10: train 5.30 kt  val 9.08 kt
+  saved
+epoch 11: train 5.67 kt  val 9.79 kt
+epoch 12: train 4.88 kt  val 8.59 kt
+  saved
+epoch 13: train 4.95 kt  val 11.04 kt
+END 2026-10-19T19:31:17-04:00 | 2026/10/19 19:31:17.440, 48, 2910 MHz, 86.98 W

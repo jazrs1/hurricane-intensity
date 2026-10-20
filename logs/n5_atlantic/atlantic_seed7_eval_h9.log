@@ -1,0 +1,27 @@
+checkpoint: models/n5_atlantic/atlantic/seed7.pt
+held-out storms: ['AL092022', 'AL172022', 'AL032021', 'AL022024', 'AL132023', 'AL182021', 'AL072022', 'AL122024', 'AL312020']
+after exclusion: 1752
+circular mask: False
+held-out samples: 1752
+overall MAE:      9.52 kt
+true fixes only:  9.54 kt  (n=315)
+
+TD      180 samples   MAE   9.64 kt   bias  +7.55 kt
+TS      506 samples   MAE   7.11 kt   bias  +0.32 kt
+Cat 1   264 samples   MAE   8.13 kt   bias  -2.27 kt
+Cat 2   149 samples   MAE   9.66 kt   bias  -1.66 kt
+Cat 3   274 samples   MAE  12.36 kt   bias  -2.79 kt
+Cat 4   348 samples   MAE  11.45 kt   bias  -3.96 kt
+Cat 5    31 samples   MAE  12.49 kt   bias -12.06 kt
+            count       mean
+storm_name                  
+BERYL          27   8.733125
+FIONA          31  11.255781
+IAN            48   8.139629
+IOTA           21   8.358271
+KIRK           38   4.642103
+LEE            58   8.273199
+NICOLE         12   8.519441
+SAM            29   8.144146
+
+wrote results/n5_atlantic/atlantic_seed7_h9.csv  (1752 rows)
