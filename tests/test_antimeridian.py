@@ -10,7 +10,7 @@ Expected positions are computed here, independently of the code under test, by u
 take the short way round (dlon in [-180, 180)), interpolate linearly in time, compare modulo 360. That is the
 pipeline's own linear rule for any track that does not cross 180 deg, so the non-crossing pin and the crossing
 expectations agree. The position tests compare longitudes as wrapped differences. The convention for the
-values themselves is John's (2026-10-20, 00:05 EDT): "interpolation short way round, linear in time; saved
+values themselves is John's (2026-10-20, shortly before 00:22 EDT): "interpolation short way round, linear in time; saved
 longitudes re-wrapped to [-180, 180)". test_grid_lon_in_range pins it, so a fix at 180.0E is saved as -180.0.
 
 Synthetic fixes only: no downloads, no data/ reads or writes, no network, no GPU.
