@@ -73,6 +73,13 @@ Erick EP052025, Flossie EP062025, Kiko EP112025, Priscilla EP162025, Jova EP1120
          - a refusal message, not a traceback, for a listed storm whose folder has no manifest;
          - a header note that a folder's new NaN frames appear only when that folder is scanned.
        - It goes through hc-adversary and John's yes.
+     - (c) **F-35 (John, 2026-10-20): a gate before gate 7.** Add a test that catches a crop box clipped at 180° for centres a few degrees from 180, which the current crop pins miss at about 177.9°. If the test fails, fix the crop code too.
+       - Why it is a gate: 4 v2 candidate storms have included-status fixes within 6° of 180° (coordinator's check against the cached nepac file hurdat2-nepac-1949-2025-092926.txt):
+         - EP062019 Erick: 0.0°;
+         - EP052023 Dora: 0.2° (it crosses);
+         - EP082020 Douglas: 1.9°;
+         - CP012025 Iona: 4.5°.
+       - The six H-EP storms are all at least 20.5° from 180°.
 8. **The pass, when you call it.**
 9. **Spend in code,** plus the check.py pin.
 
