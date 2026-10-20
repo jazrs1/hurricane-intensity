@@ -16,7 +16,7 @@ _spec = importlib.util.spec_from_file_location("check", ROOT / "scripts" / "chec
 check = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(check)
 
-# F1's pytest command before the split (check.py at ae80cae).
+# F1's pytest command before the split (check.py at ae80cae). --full adds only --durations to it.
 PRE_SPLIT = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "tests"]
 F1_BEFORE = ["hashes", "pytest", "evaluate.py smoke", "hashes after smoke", "git I3/I6", "gitignore"]
 
@@ -41,6 +41,28 @@ def test_protected_hashes_run_first_in_both_modes():
 def test_pytest_commands():
     assert check.pytest_command(True) == PRE_SPLIT
     assert check.pytest_command(False) == PRE_SPLIT + ["-m", "not slow"]
+
+
+DURATIONS = """\
+============================= slowest durations ==============================
+12.50s call     tests/test_a.py::test_marked
+3.00s setup    tests/test_b.py::test_unmarked[AL132020-outside H9]
+1.00s teardown tests/test_b.py::test_at_the_threshold
+0.99s call     tests/test_b.py::test_just_under
+2.00s call     tests/test_b.py::test_unmarked[AL132020-outside H9]
+"""
+
+
+def test_unmarked_slow_names_only_unmarked_tests_of_1s_or_more():
+    late = check.unmarked_slow(DURATIONS, {"tests/test_a.py::test_marked"})
+    assert late == {"tests/test_b.py::test_unmarked[AL132020-outside H9]": 3.0,
+                    "tests/test_b.py::test_at_the_threshold": 1.0}
+
+
+def test_unmarked_slow_is_empty_when_everything_slow_is_marked():
+    marked = {"tests/test_a.py::test_marked", "tests/test_b.py::test_unmarked[AL132020-outside H9]",
+              "tests/test_b.py::test_at_the_threshold"}
+    assert check.unmarked_slow(DURATIONS, marked) == {}
 
 
 def collect(cmd, *extra):

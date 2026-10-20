@@ -27,7 +27,8 @@ FAST (the default) runs the protected hashes, the tests not marked `slow` (pypro
 invariants and the unit tests), git I3/I6 and the gitignore check. --full runs everything F1 ran before
 the split: every test, slow ones included, the evaluate.py smoke run and the hashes again after it. The
 last line names the mode (FAST, FULL, E2E or GITIGNORE), so a fast run can't pass for the merge check.
-A test is marked slow if it took 1 s or more on the reference machine (F-34).
+A test is marked slow if it took 1 s or more on the reference machine (F-34). --full prints a WARNING
+(it never fails) naming any test of 1 s or more that is not marked slow, from pytest's --durations.
 
 Nothing here writes outside a tempfile.mkdtemp() directory, which is removed at the end.
 """
@@ -37,6 +38,7 @@ import argparse
 import functools
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -229,15 +231,45 @@ def pytest_command(full):
             *([] if full else ["-m", "not slow"])]
 
 
+SLOW_S = 1.0  # a test of this many seconds or more (call, setup or teardown) belongs under @pytest.mark.slow
+DURATION_RE = re.compile(r"^(\d+(?:\.\d+)?)s (?:call|setup|teardown)\s+(\S.*\S)\s*$")
+
+
+def unmarked_slow(durations_stdout, slow_ids):
+    """{test id: seconds} for the tests in pytest's --durations output that took SLOW_S or more but are not
+    in slow_ids (the ids `-m slow` collects). Used by --full to warn, never to fail."""
+    out = {}
+    for line in durations_stdout.splitlines():
+        m = DURATION_RE.match(line.strip())
+        if m and float(m.group(1)) >= SLOW_S and m.group(2) not in slow_ids:
+            out[m.group(2)] = max(out.get(m.group(2), 0.0), float(m.group(1)))
+    return out
+
+
 def check_pytest(main_root, full):
     env = checkout_env(HC_MAIN_ROOT=str(main_root))
-    r = subprocess.run(pytest_command(full), cwd=CHECKOUT_ROOT, env=env, capture_output=True, text=True)
+    # FULL also asks for every duration of SLOW_S or more, to warn about tests FAST runs but shouldn't.
+    extra = ["--durations=0", f"--durations-min={SLOW_S}"] if full else []
+    r = subprocess.run(pytest_command(full) + extra, cwd=CHECKOUT_ROOT, env=env, capture_output=True, text=True)
     print(r.stdout.rstrip())
     if r.stderr.strip():
         print(r.stderr.rstrip())
     if r.returncode != 0:
         raise AssertionError(f"pytest exited {r.returncode}")
-    return r.stdout.strip().splitlines()[-1]
+    result = r.stdout.strip().splitlines()[-1]
+    if full:
+        c = subprocess.run(pytest_command(True) + ["-m", "slow", "--collect-only"], cwd=CHECKOUT_ROOT, env=env,
+                           capture_output=True, text=True)
+        slow_ids = {line.strip() for line in c.stdout.splitlines() if "::" in line}
+        late = unmarked_slow(r.stdout, slow_ids)
+        if c.returncode != 0 or not slow_ids:
+            print(f"WARNING: could not collect the slow-marked tests (pytest exited {c.returncode})")
+            result += "; WARNING: slow-marker check did not run"
+        elif late:
+            print(f"WARNING: {len(late)} test(s) of {SLOW_S:g} s or more not marked slow, so FAST runs them; "
+                  "add @pytest.mark.slow: " + ", ".join(f"{t} ({s:.2f} s)" for t, s in sorted(late.items())))
+            result += f"; WARNING: {len(late)} unmarked test(s) of {SLOW_S:g} s or more"
+    return result
 
 
 def make_fixture(tmp):
