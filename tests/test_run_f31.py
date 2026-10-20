@@ -1052,6 +1052,26 @@ def test_a_tampered_run_n5_is_refused_before_import(tmp_path):
     assert load("run_f31_crlf", d / "run_f31.py").RN5.UPSTREAM == "origin/phase2-experiments"  # CRLF copy loads
 
 
+def test_run_n5_runs_from_the_hashed_bytes_not_a_file_swapped_after_the_check(tmp_path, monkeypatch):
+    """The file is swapped for a tampered one right after it was read and hashed (a concurrent writer): the code that
+    runs is still the hashed bytes, so the tampered file never executes."""
+    path = tmp_path / "run_n5.py"
+    path.write_bytes((CHECKOUT / "scripts" / "run_n5.py").read_bytes())
+    marker = tmp_path / "executed"
+    tampered = path.read_bytes() + f"\nopen({str(marker)!r}, 'w').close()\n".encode()
+    real = R.hashlib.sha256
+
+    def hash_then_swap(data=b""):
+        path.write_bytes(tampered)  # the swap, after the read whose bytes are being hashed
+        return real(data)
+
+    monkeypatch.setattr(R.hashlib, "sha256", hash_then_swap)
+    module = R.load_pinned_run_n5(path)
+    monkeypatch.setattr(R.hashlib, "sha256", real)
+    assert path.read_bytes() == tampered and not marker.exists()  # swapped on disk, yet never executed
+    assert module.UPSTREAM == "origin/phase2-experiments" and module.__file__ == str(path)
+
+
 @pytest.mark.slow
 def test_abort_eval_takes_a_manifest_that_load_run_refuses(trained):
     mans, runner = ev(trained)

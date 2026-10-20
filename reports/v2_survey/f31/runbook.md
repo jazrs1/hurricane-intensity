@@ -41,11 +41,24 @@ below, and its docstring is the reference. Design: `reports/v2_survey/f31/design
 
 There are two routes:
 - **(i) abort-all.** Move every run aside (`run_f31.py abort-all --reason ...`). Commit the records' removal through a PR. Then relaunch all 40 from that merge commit. Every run retrains. This is N5's fix-commit route (John's decision 2, 2026-10-19 15:48).
-- **(ii) Restore the records at L by hand:**
-  1. Check out L itself in the main checkout (it is on the first-parent chain, and the records are not tracked there).
-  2. Run `abort-run` on the bad run and `launch` again. Only that run retrains, at commit L, so the other 39 records still match.
-  3. Commit the 40 records again through a new records PR (step 3).
-  4. Note the extra attempt in decisions.md.
+- **(ii) Retrain the one run at L, with the records restored untracked** (simulated by hc-adversary, item 25b). Needs John's yes at the time, like any abort.
+  1. In the main checkout: `git checkout --detach L`. L is on the first-parent chain, so guard 5 accepts it.
+     - The 40 records are tracked at H, not at L, so this removes them from disk.
+     - Without them, launch would see the 39 good runs as "partial" and refuse (guard 4).
+  2. `git restore --source=H --worktree -- logs/f31/runs/`.
+     - The 40 records come back as untracked files.
+     - The tracked tree stays clean (guard 1), and every record is at commit L (guard 4's commit check).
+  3. `run_f31.py abort-run ARM SEED --reason ...` on the bad run, then `run_f31.py launch`.
+     - Only that run retrains, at L, in its order position with its seed.
+     - Its new record lists the attempt.
+  4. Keep `logs/f31/aborted/` on disk. The new record's `aborted_attempts` point into it, and phase 2 checks them.
+  5. The new records PR: branch from **H** (the current phase2-experiments) and change only the retrained run's record.
+     - A branch from L would re-add all 40 records and conflict (add/add) with H.
+     - Merge it as **H2**.
+  6. Before moving the main checkout to H2, delete the untracked record copies under `logs/f31/runs/` (the files restored in step 2, plus the retrained one). Otherwise git refuses: "untracked working tree files would be overwritten by checkout".
+     - Then check out H2.
+     - The records now come from git, all 40 at commit L. L..H2 touches only records and decisions docs, so guard 5e holds.
+  7. Note the extra attempt in decisions.md, then continue at step 4 of the sequence.
 
 **After a look** (any H9 output, any eval abort, or the phase-2 marker):
 - No run may be aborted or retrained. `abort-run`, `abort-all` and `launch` all refuse.

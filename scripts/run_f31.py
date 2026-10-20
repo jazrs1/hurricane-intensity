@@ -75,6 +75,7 @@ import os
 import stat
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -117,13 +118,18 @@ def load_module(name, path):
 # doc_path (the same upstream and decisions docs).
 def load_pinned_run_n5(path):
     """run_n5.py is hashed BEFORE it is imported (executed): its bytes, with CRLF read as LF (the working copy under
-    core.autocrlf), must be the pinned blob. Anything else is refused unexecuted."""
+    core.autocrlf), must be the pinned blob. Anything else is refused unexecuted. The module is compiled and executed
+    from exactly the bytes that were hashed: the file is not read again and no __pycache__ .pyc is used, so a file
+    swapped after the check can't be what runs."""
     data = Path(path).read_bytes()
     got = hashlib.sha256(data.replace(b"\r\n", b"\n")).hexdigest()
     if got != RUN_N5_BLOB_SHA256:
         raise LaunchError(f"{path} hashes to {got[:12]}..., not the pinned run_n5.py blob {RUN_N5_BLOB_SHA256[:12]}...; "
                           "refused before import")
-    return load_module("run_n5_for_f31", path)
+    module = types.ModuleType("run_n5_for_f31")
+    module.__file__ = str(path)  # run_n5 derives its ROOT from __file__
+    exec(compile(data, str(path), "exec"), module.__dict__)  # its main() is behind the __main__ guard
+    return module
 
 
 RN5 = load_pinned_run_n5(Path(__file__).resolve().parent / "run_n5.py")
