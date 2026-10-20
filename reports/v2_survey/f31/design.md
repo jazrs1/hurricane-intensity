@@ -1,6 +1,16 @@
-# F-31: budget study, design (DRAFT r1, not approved, nothing run)
+# F-31: budget study, design (DRAFT r2, not approved, nothing run)
 
 Drafted 2026-10-19 by hc-survey for the coordinator. It goes to hc-adversary, then John. **No compute until John approves this design.**
+
+**Changed in r2** (hc-adversary item 22, the coordinator's decisions):
+- §3, §6, §8, §9, §11: the 1× atlantic − control paired test is removed, and the matched slots at 1× and 2× are dropped. The control keeps 5 H9 slots, the H9 total is at most 180, and the phase-2 time and disk figures follow.
+- §3, §11: native and matched (and smoothed) at 4× can be adjacent epochs.
+- §4: the smoothed rule is listed as H9-motivated.
+- §5: the exact zero statement and p floor; the within-run sd inference; the SESOI is N5's, for comparability only; the smoothed sensitivity mixes rule and budget.
+- §2: the 4× cap's evidence comes from the baseline set.
+- §8: deleted-epoch hashes go under their own key.
+- §10: the import list.
+- The flag reference is now computed per budget (0.0003–0.0004), and the all-files disk figure is about 137 GB.
 
 - **Nothing has been run:** no training, evaluation, model load, build, download or GPU use. The only computation was `power.py` (CPU, synthetic numbers) and reading committed CSVs and logs.
 - **John's brief, verbatim:** "F-31 budget study: have hc-survey draft the pre-registration. It covers longer training for both N5 arms and for the frozen ensemble configuration, with epoch sensitivity included."
@@ -67,7 +77,10 @@ All three share the rest of the recipe: ResNet-18 IMAGENET1K_V1, Adam lr 1e-4, b
 - **Trained length:** the control trains 99 epochs and the atlantic arm 52. Both carry `--epoch-dir`. In N5 only the control did.
 - **The 1× rows are N5's budget exactly:** 25 and 13 epochs, 1650 and 1651 steps.
 - **Why 4× is the maximum:**
-  - **Evidence:** the only longer-budget record usable for a choice is validation-only. The 2026-10-13 60-epoch traces, validation columns only (the 2026-10-18 23:21 entry), show validation MAE flat from about epoch 31 to 60 (41 batches per epoch: about 1270–2460 steps). 4× gives the control 99 passes and the atlantic arm 52, well past that.
+  - **Evidence:** the only longer-budget record usable for a choice is validation-only. The 2026-10-13 60-epoch traces, validation columns only (the 2026-10-18 23:21 entry), show validation MAE flat from about epoch 31 to 60.
+    - Those runs were on the **baseline set** (original nine storms, 1307 frames, 41 batches per epoch), so about 1270–2460 steps. That is neither F-31 arm: the control has 2081 frames and 66 batches, and the atlantic arm 4044 and 127.
+    - The evidence is about passes and steps on a smaller set, not a measurement on these arms.
+    - 4× gives the control 99 passes (6534 steps) and the atlantic arm 52 (6604), well past it in both.
   - **Cost:** the phase-1 time stays inside one night (§9).
   - **What these traces are not used for:** their held-out columns (H3, per epoch) are **not used** for this or any other F-31 choice. That follows the 2026-10-18 rule.
 - **If 4× is still budget-limited:** that is a finding (§3). F-31 does not extend again; a longer budget would need a new design.
@@ -81,7 +94,7 @@ All three share the rest of the recipe: ResNet-18 IMAGENET1K_V1, Adam lr 1e-4, b
 | Rule | Definition at budget E_k | Arms | Budgets |
 |---|---|---|---|
 | **native** | first argmin of re-validated val MAE over epochs 1..E_k | both | 1×, 2×, 4× |
-| **matched** | first argmin over the odd epochs ≤ E_k (N5's matched grid, extended) | control | 1×, 2×, 4× |
+| **matched** | first argmin over the odd epochs ≤ E_k (N5's matched grid, extended) | control | 4× only (for S1) |
 | **smoothed** (sensitivity) | first argmin over e ≤ E_k of the median of re-validated val MAE over epochs [e−2, e+2] ∩ [1, E_k]; the checkpoint evaluated is epoch e | both | 4× |
 
 **End-to-end check at every budget, not just the last.**
@@ -93,15 +106,18 @@ All three share the rest of the recipe: ResNet-18 IMAGENET1K_V1, Adam lr 1e-4, b
 
 **Exactly which checkpoints see H9.**
 - **The slots:**
-  - a control run has 7 slots: native at 1×, 2× and 4×, matched at 1×, 2× and 4×, and smoothed at 4×;
+  - a control run has 5 slots: native at 1×, 2× and 4×, matched at 4×, and smoothed at 4×;
   - an atlantic run has 4: native at 1×, 2× and 4×, and smoothed at 4×.
 - **Slots are fixed before any look.** Each slot's epoch is written into the phase-1 training record, before any H9 evaluation (§8).
-- **Each distinct epoch is evaluated once.** Coinciding slots share one CSV, and the record maps slot → epoch. So at most 7 H9 evaluations per control run and 4 per atlantic run. That is at most 220 for the 40 runs.
+- **Each distinct epoch is evaluated once.** Coinciding slots share one CSV, and the record maps slot → epoch. So at most 5 H9 evaluations per control run and 4 per atlantic run. That is at most 180 for the 40 runs.
+- **Adjacent epochs can both be read on H9.**
+  - At 4×, a control run's native and matched slots can be adjacent epochs (an even native pick and the odd epoch next to it). The smoothed slot can sit next to either. So for some runs H9 is read on adjacent epochs.
+  - That is a small, fixed set: every slot is written into the record before the look, and no H9 value feeds any selection. It is not a per-epoch trace.
 - **Nothing else is evaluated on H9:** no other epoch, and no per-epoch trace. That follows the 2026-10-18 rule ("No held-out storm is evaluated per epoch").
 
 **What "epoch sensitivity" means here.**
 - **Budget sensitivity:** each primary is read at 4×. The 2× reading is a pre-registered sensitivity, and the 1×/2×/4× curve is reported.
-- **Selection-rule sensitivity:** native vs matched for the control at every budget, and native vs smoothed at 4×.
+- **Selection-rule sensitivity:** native vs matched for the control at 4×, and native vs smoothed at 4× in both arms. (Matched at 1× and 2× was dropped in r2; open item 6.)
   - N5 showed H9 MAE can move by up to 1.7 kt between adjacent epochs (seed 4, epochs 23 vs 24).
   - The smoothed rule shows whether a pick less driven by single-epoch validation noise reads differently on H9.
 - **Validation-only stability, descriptive:**
@@ -113,12 +129,12 @@ All three share the rest of the recipe: ResNet-18 IMAGENET1K_V1, Adam lr 1e-4, b
 
 **Under-training flag at the new budgets.**
 - **Rule, as in N5** (`analyze_n5.py`): a run is flagged at budget E_k when its selected epoch is > 0.85 × E_k. Flagged epochs:
-  - control: 1× 22–25, 2× 43–50, 4× 85–99 (odd grid: 23 and 25; 43–49; 85–99);
+  - control: 1× 22–25, 2× 43–50, 4× 85–99 (matched rule at 4×: the odd epochs 85–99);
   - atlantic: 1× 12–13, 2× 23–26, 4× 45–52.
 - **The qualifier:**
   - BUDGET-LIMITED at (arm, budget) fires when **≥ 10 of 20 runs** are flagged under the primary rule (native). That is N5's "half the runs" (5/10).
-  - For the control, the matched-rule count is also reported.
-- **Reference for a flat validation curve:** if the pick were uniform over the budget, P(flag) = 0.15 per run, and P(≥ 10/20) = 0.0002 (and P(≥ 5/10) = 0.0099) (`power.py`). A qualifier firing at 4× is therefore evidence that validation was still improving at 6600 steps.
+  - For the control at 4×, the matched-rule count is also reported.
+- **Reference for a flat validation curve:** if the pick were uniform over the E_k epochs of the budget, P(flag) is 0.15–0.16 per run (for example 15/99 for the control at 4×, 8/52 for the atlantic arm), and P(≥ 10/20) is 0.0003–0.0004 per (arm, budget) (`power.py`). A qualifier firing at 4× is therefore evidence that validation was still improving at 6600 steps.
 - **Known before any H9 look:** every flag and qualifier is computed from the phase-1 records. It is recorded in decisions.md before phase 2, as N5's 20:16 entry was.
 - **Reading:** a primary at a BUDGET-LIMITED budget is read "at this budget". If 4× fires in an arm, F-31 reports that the arm was still budget-limited at 6600 steps, and does not extend.
 
@@ -138,7 +154,11 @@ All three share the rest of the recipe: ResNet-18 IMAGENET1K_V1, Adam lr 1e-4, b
 - **Absolute H9 levels are not estimates for new storms.** No F-31 number is set beside the 2025 result or the site's 9.00 kt.
 - **Every pre-registered quantity is a difference** between budgets of one configuration (the primaries), or between arms at one budget (secondary). Each checkpoint is chosen on validation only.
   - **Budgets above 1640 steps were seen once:** when 1640 was chosen (2026-10-13 night), per-epoch held-out H3 traces were read up to 60 epochs (about 2460 steps). The choice made then was 1640, and the 2026-10-18 23:21 entry bounds that favour near zero.
-  - **Not chosen on H9 or H3:** the 2× and 4× ladder, the 4× cap (validation columns only, §2), every selection rule here and the seeds.
+  - **Not chosen on H9 or H3:** the 2× and 4× ladder, the 4× cap (validation columns only, §2), the native and matched rules, and the seeds.
+  - **The smoothed rule is H9-MOTIVATED.**
+    - It was proposed because of N5's seed-4 H9 swing (1.7 kt between epochs 23 and 24).
+    - Its window and its definition were not tuned on any data, and it selects on validation only.
+    - It is a sensitivity, never a primary.
   - So **the F-31 contrasts are not selected on H9**. The earlier looks bias H9's levels for the frozen configuration; they do not pick F-31's comparisons.
 - **The inference is over training randomness (seeds), on these 9 storms.** "Longer is better on H9" means better on Ian, Sam, Beryl and the rest. H9's > 96 kt frames are dominated by a few storms (in the original three, > 96 kt is Ian alone; N5-result note (d)). The tests do not generalise over storms. The same was true of N5.
 - **F-31 was prompted partly by N5's H9 outcome.** It was pre-registered after John read N5 (his priority note) as well as because of the BUDGET-LIMITED flag known before the look.
@@ -166,14 +186,17 @@ All three share the rest of the recipe: ResNet-18 IMAGENET1K_V1, Adam lr 1e-4, b
 
 **Primaries: two, Bonferroni α = 0.025 each.** Both are H9 pooled overall MAE (1752 frames), per run, native selection, two-sided:
 
-| Primary | Statistic, per seed s | Better means | SESOI (power-derived, not a meaningfulness claim) |
+| Primary | Statistic, per seed s | Better means | SESOI (N5's, for comparability; not a meaningfulness claim) |
 |---|---|---|---|
 | **P1, control (= frozen-ensemble configuration)** | d = MAE(4×) − MAE(1×), same run | d < 0 | 0.9 kt |
 | **P2, atlantic** | d = MAE(4×) − MAE(1×), same run | d < 0 | 0.9 kt |
 
 - **Test:** exact paired sign-flip over all 2^20 sign assignments (n = 20), with 97.5% CIs by test inversion, as in N5.
-- **Zeros:** a seed whose 4× pick is ≤ E_1 has d = 0 exactly. Zeros make the test conservative.
-- **The SESOI is N5's, for comparability:** John's reading of N5 was "the CI rules out an overall-MAE gain larger than about 0.4 kt at this budget".
+- **Zeros, exactly:** a seed whose 4× native pick is ≤ E_1 has d = 0 exactly, and contributes nothing to the sign-flip distribution.
+  - With m non-zero seeds, the test is exact on those m. Its smallest attainable two-sided p is 2^(1−m).
+  - **So P1 or P2 cannot reach p < 0.025 unless at least 7 of the 20 seeds pick beyond E_1 at 4×** (2^(1−6) = 0.031; 2^(1−7) = 0.016).
+  - The count of zeros per arm is in the phase-1 records, so it is known before the look, and it is reported with the flags.
+- **SESOI: N5's 0.9 kt, for comparability only.** It is not derived for budget effects.
 - **Expectation, stated in advance:** both d < 0, and larger in the atlantic arm, which made 13 passes against the control's 25 and fired the flag in 5/10 runs. Both tests are two-sided.
 - **Why overall MAE only:** that is the quantity the budget-limited reading and John's reading are about.
   - The > 96 kt bias budget effect is a secondary (S3).
@@ -189,7 +212,7 @@ Every S1/S2 line in `report.txt` carries N5's verdict beside it, verbatim, with 
 
 **Pre-registered sensitivities** (do not change any verdict):
 - P1/P2 at 2× (d = MAE(2×) − MAE(1×));
-- P1/P2 with the smoothed rule at 4× (d = MAE(4×, smoothed) − MAE(1×, native));
+- P1/P2 with the smoothed rule at 4× (d = MAE(4×, smoothed) − MAE(1×, native)). This contrast changes the rule and the budget together, so it cannot separate them. It shows only whether the 4× reading survives a less noise-driven pick. No extra 1× smoothed slot is added.
 - S1 with the control at its native 4× pick.
 
 **Seeds: 20 per arm, seeds 10–29. 40 runs.**
@@ -205,6 +228,7 @@ Every S1/S2 line in `report.txt` carries N5's verdict beside it, verbatim, with 
 - **0.85:** N5's planning case.
 - **1.12:** N5's observed atlantic − control sd.
 - **Planning value: 1.12.**
+- **Caveat on the planning value:** 1.12 kt is a between-arm figure. The primaries are within-run. N5's per-run sds of H9 overall MAE (control on the matched grid 0.57, atlantic 0.79) suggest a within-run 4× − 1× sd of at most about 0.81 (control) and 1.11 (atlantic), if the within-run correlation ρ ≥ 0, from √(2σ²(1 − ρ)). With the native control picks (sd 0.20) it would be about 0.28. **That is an inference, not a bound:** the two budgets' sds can differ, and ρ is unmeasured.
 
 **P1/P2, overall MAE, 4× − 1× within one configuration (α 0.025): at n = 20, 87–100% power to detect a 0.9 kt difference (plan on 87%). At n = 10: 45–98% (plan on 45%).**
 
@@ -241,6 +265,7 @@ Every S1/S2 line in `report.txt` carries N5's verdict beside it, verbatim, with 
 
 Notes:
 - **Monte Carlo error:** about ±0.01 at p ≈ 0.8 with 2000 reps (√(0.16/2000)). The 80% MDE comes from a 0.05 kt (0.1 kt for the bias) grid at 1000 reps, so read it to that step.
+- **The tables assume no zeros.** With z of the 20 seeds at d = 0, the test runs on 20 − z, so the P1/P2 figures are optimistic by roughly the zero share.
 - **The normal model is an approximation.** N5's per-seed differences were not normal (seed 4's +1.7 kt swing). The power figures are planning ranges, not guarantees.
 - **The S1/S2 rows assume N5's 1× sd also holds at 4×.** No data says whether a longer budget shrinks or widens it.
 
@@ -253,7 +278,9 @@ Notes:
   - **Spread:** a deterministic leave-one-seed-out jackknife range for the 10-member figures.
   - **The atlantic arm:** the same figures.
   - **The frozen ensemble's committed H9 figures** (`results/ensemble/expanded10_h9_metrics.csv`, overall MAE 8.57) are quoted beside them, labelled **unpaired: different seeds, an older code version, and the same H9**. They are not a test.
-- **1× atlantic − control on the matched grid:** a descriptive re-measure of N5's contrast by new runs. It is reported once, labelled "not N5, not pooled with N5". A difference from N5's d = +0.531 is run-to-run and code-version variation.
+- **The two arms at 1×:** each arm's mean H9 overall MAE at 1× (native) appears in the budget curve, side by side, with **no paired difference, p or CI**.
+  - **Why:** a paired 1× atlantic − control test would re-run N5's primary on the same H9, and F-31 is not a rerun of N5.
+  - No 1× matched slot exists (r2).
 - **Selection:** the epoch picked by every rule at every budget, the flag counts per budget and rule, tie-rule firings and near ties, and the validation-only stability figures of §3.
 - **H9 split** (Ian/Nicole/Claudette vs the six added later) and **per storm** (> 96 kt figures only with ≥ 10 frames > 96 kt; Sam's caveat), as in N5.
 
@@ -295,10 +322,10 @@ The launch-safety design was closed by John after N5 (decisions.md 2026-10-19 17
 | Guards: first-parent chain after a fetch, main checkout, child imports `hurricane_intensity` from ROOT/src, CUDA available, epoch dir inside ROOT, refuse existing outputs, protected hashes before/after every run | unchanged |
 | `seed<s>.pt` equals `epoch_<native>.pt` | unchanged, at 4×. **Differs:** at 1×/2× the evaluated file is the epoch file. |
 | Re-validation of every epoch; argmin == `train.py`'s pick; tie rule TIE_KT; odd-grid near ties kept as the first minimum | **differs:** applied at three nested budgets, against the last `saved` ≤ E_k (§3), and both arms carry `--epoch-dir` |
-| Pinned paths per (arm, seed); CSV ↔ eval-log content link (MAE 2 dp, sample count, `wrote` path/rows); identity refusal across runs | **differs:** paths are pinned per (arm, seed, epoch). Slots map to epochs in the record, so coinciding slots share one CSV and the "same-pick exemption" becomes structural. Distinct epochs must give distinct vectors. |
+| Pinned paths per (arm, seed); CSV ↔ eval-log content link (MAE 2 dp, sample count, `wrote` path/rows); identity refusal across runs | **differs:** paths are pinned per (arm, seed, epoch); 5 control and 4 atlantic slots. Slots map to epochs in the record, so coinciding slots share one CSV and the "same-pick exemption" becomes structural. Distinct epochs must give distinct vectors. |
 | Exact sign-flip, CIs by inversion, Bonferroni, verdict table | **differs:** n = 20 (2^20 assignments; `analyze_n5.sign_matrix(n)` already takes n) |
 | verify_self, hash as SHA-256 of `git show` bytes, LF outputs, `.gitattributes -text` for records/logs/CSVs | unchanged, for `scripts/analyze_f31.py` and `scripts/run_f31.py` (plus `scripts/analyze_n5.py` / `scripts/run_n5.py` if imported; §10) |
-| Disk: delete non-candidates after re-validation; keep candidates | **differs:** kept = the selected epochs (≤ 7 control, ≤ 4 atlantic per run). The SHA-256 of every epoch file is recorded before deletion (§9). |
+| Disk: delete non-candidates after re-validation; keep candidates | **differs:** kept = the selected epochs (≤ 5 control, ≤ 4 atlantic per run). For the launch PR: the deleted files' hashes go under their own key (e.g. `deleted_epoch_sha256`), never `files_sha256`, which N5's verify_record treats as "present and read-only". The SHA-256 of every epoch file is recorded before deletion (§9). |
 | H-EP guards, 2025 block, protected set | unchanged |
 
 ## 9. Compute, disk and paths
@@ -313,15 +340,15 @@ The launch-safety design was closed by John after N5 (decisions.md 2026-10-19 17
   - atlantic 52 × 7.8 s ≈ 6.8 min, plus 52 re-validations ≈ 1.0 min;
   - about 17.4 min per seed.
 - **Phase 1 (40 runs): about 5.8 h; plan on 5.5–7 h**, allowing for back-to-back GPU heat (decisions.md 2026-10-13 run-order note). n = 10 would be about 2.9 h.
-- **Phase 2:** at most 220 H9 evaluations at about 6.5 s each (N5: 30 in 3 min 14 s), so at most 25 min.
+- **Phase 2:** at most 180 H9 evaluations at about 6.5 s each (N5: 30 in 3 min 14 s), so at most about 20 min.
 - **Analysis:** CPU only, a few minutes (2^20 sign-flip enumeration and CI inversion).
 - **No build and no download:** every storm was built for N5.
 
 **Disk (checkpoint 44.8 MB):**
 - **Transient, one run at a time:** at most 99 epoch files ≈ 4.4 GB.
 - **After re-validation:** the driver writes every epoch file's SHA-256 into the run's record, keeps only the selected epochs (read-only), and deletes the rest.
-- **Kept:** at most 11 files per seed pair × 20, plus 40 `seed<s>.pt`: **at most about 12 GB**. The C: drive had 781 GB free on 2026-10-19.
-- **Alternative:** keep all epoch files until the results entry (about 134 GB), so every candidate stays re-verifiable. It is affordable; open item 4.
+- **Kept:** at most 9 files per seed pair × 20 (about 8.1 GB), plus 40 `seed<s>.pt` (1.8 GB): **at most about 10 GB**. The C: drive had 781 GB free on 2026-10-19.
+- **Alternative:** keep all epoch files until the results entry (about 137 GB, `seed<s>.pt` included), so every candidate stays re-verifiable. It is affordable; open item 4.
 
 **New paths (only these are written):**
 - `models/f31/{control,atlantic}/seed<s>.pt` and `seed<s>_epochs/epoch_NN.pt`;
@@ -352,11 +379,17 @@ The driver's output check refuses any path outside the three `f31` roots, as `ru
 This PR is the design only. The scripts come in the launch PR, after John approves this design. **Both are hashed before launch, as with N5.**
 
 **`scripts/analyze_f31.py`** (deterministic, CPU, no torch, no random numbers):
-- **Reused from `scripts/analyze_n5.py` by import:** `epochs_for`, `sign_matrix`/`signflip_p`/`signflip_ci` (these take n), `load_csv` (H9 pin and input refusals), `read_text_strict`, `check_eval_log`, `metrics`, `per_storm`, `verify_self` and the hash definition, `PROTECTED`, and the deviations loader.
-  - Where a function hard-codes N5 (pinned paths, `SEEDS = range(10)`, `TRAIN_LISTS` keyed to `n5_atlantic`, `CONTROL_EPOCHS = 25`), F-31 gets its own function instead of editing `analyze_n5.py`. `analyze_n5.py` is not modified: N5's results cite its blob.
+- **Reused from `scripts/analyze_n5.py` by import, pure functions only:**
+  - `epochs_for(frames, target)`;
+  - `signflip_p` / `signflip_ci`, always called with n passed explicitly (their default is `len(SEEDS)` = 10);
+  - `load_csv` (H9 pin and input refusals), `read_text_strict`, `check_eval_log`, `metrics`, `per_storm`;
+  - the `PROTECTED` constant.
+- **Rewritten in `analyze_f31.py`, not imported:** `verify_self` (bound to `SELF_PATH`), `load_deviations` and `check_deviations` (bound to `DEVIATIONS_PATH` and N5's records), and anything else bound to `SELF_PATH`, `SEEDS` or `DEVIATIONS_PATH`.
+  - The same goes for N5-specific pinned paths, `TRAIN_LISTS` keyed to `n5_atlantic` and `CONTROL_EPOCHS = 25`.
+  - F-31 gets its own function instead of editing `analyze_n5.py`. `analyze_n5.py` is not modified: N5's results cite its blob.
   - **Because F-31's behaviour depends on imported code,** the blob SHA-256 of `scripts/analyze_n5.py` (`01306415…1288`, blob id `679e2169`: N5's launch blob, unchanged at fbe0da9, verified from `git show` bytes) is pinned in `analyze_f31.py`, checked at run time, and recorded in `report.txt`.
 - **New:**
-  - nested-budget selection (native, matched, smoothed) from the record's re-validation table, with the `saved`-line cross-check at each budget;
+  - nested-budget selection (native at 1×, 2× and 4×; matched and smoothed at 4×) from the record's re-validation table, with the `saved`-line cross-check at each budget;
   - the slot → epoch map, with each distinct epoch evaluated exactly once;
   - a refusal of any H9 CSV for an epoch that is not a slot;
   - the per-budget flag and qualifier;
@@ -399,9 +432,10 @@ No `--circular-mask` or `--rotate`. The 99 and 52 come from `epochs_for(frames, 
 
 1. **Seeds: 20 per arm (recommended) or 10.** n = 10 halves phase 1 (about 2.9 h). The cost is power: at the observed sd of 1.12 kt, a 0.9 kt budget effect has about 45% power at n = 10, against 87% at n = 20.
 2. **Primaries: the two within-configuration budget effects (recommended), or three** (add atlantic − control at 4× as P3, each at α 0.0167). Making the N5 contrast primary on the same H9, right after N5's look, reads as a second attempt at N5's question. As a secondary it is reported in full, beside N5's verdict.
-3. **Epoch sensitivity: validation-only plus the per-budget and per-rule H9 slots (recommended).** The alternative, H9 at the neighbours of each pick (±1 epoch), would show the adjacent-epoch swing directly. But it is a held-out per-epoch trace, which the 2026-10-18 rule forbids. It would need John to lift that rule for F-31, and I don't recommend it.
-4. **Disk: keep only the selected epoch files, about 12 GB (recommended), or all of them until the results entry, about 134 GB.**
+3. **Epoch sensitivity: validation-only plus the per-budget and per-rule H9 slots (recommended).** The alternative, H9 at the neighbours of each pick (±1 epoch), would show the adjacent-epoch swing directly. But it is a held-out per-epoch trace, which the 2026-10-18 rule forbids. It would need John to lift that rule for F-31, and I don't recommend it. Note that the slots already read H9 on adjacent epochs in some runs (native and matched, or smoothed, at 4×; §3). That is fixed before the look and feeds no selection.
+4. **Disk: keep only the selected epoch files, about 10 GB (recommended), or all of them until the results entry, about 137 GB.**
 5. **Evaluation set: H9 as in §4 (recommended; the only usable set).** Option D (a future 2026-season set) would be a separate protocol.
+6. **Matched slots at 1× and 2× (dropped in r2, coordinator's decision).** John can restore them if he wants native vs matched at every budget. The cost is up to 40 more H9 evaluations (2 per control run). They would stay descriptive, with no atlantic − control test at 1× or 2×.
 
 ## 12. Known limits
 

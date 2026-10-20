@@ -66,11 +66,21 @@ def table(title, ns, sds, deltas, alpha, grid, sesoi, rng):
             print(f"{n} | {sd:.2f} | " + " | ".join(f"{c:.2f}" for c in cells) + f" | {m:.2f} | {nul:.2f}")
 
 
+# Native rule, flagged epochs > 0.85 x E_k: (arm, budget, flagged epochs, E_k)
+FLAG_CELLS = (("control", "1x", 4, 25), ("control", "2x", 8, 50), ("control", "4x", 15, 99),
+              ("atlantic", "1x", 2, 13), ("atlantic", "2x", 4, 26), ("atlantic", "4x", 8, 52))
+
+
+def tail(n, k, p):
+    return sum(comb(n, j) * p ** j * (1 - p) ** (n - j) for j in range(k, n + 1))
+
+
 def flag_reference():
-    print("\nUnder-training flag on a flat validation curve (pick position uniform, P(last 15%) = 0.15):")
-    for n, k in ((10, 5), (20, 10)):
-        p = sum(comb(n, j) * 0.15 ** j * 0.85 ** (n - j) for j in range(k, n + 1))
-        print(f"  P(>= {k}/{n} flagged) = {p:.4f}")
+    print("\nUnder-training flag on a flat validation curve (pick uniform over the E_k epochs of the budget):")
+    for arm, budget, flagged, e in FLAG_CELLS:
+        p = flagged / e
+        print(f"  {arm} {budget}: P(flag) = {flagged}/{e} = {p:.4f}; P(>= 10/20) = {tail(20, 10, p):.5f}; "
+              f"P(>= 5/10) = {tail(10, 5, p):.4f}")
 
 
 if __name__ == "__main__":

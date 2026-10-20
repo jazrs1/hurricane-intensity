@@ -25,6 +25,10 @@ n | sd_diff | 2.0 kt | 3.0 kt | 4.0 kt | 5.0 kt | 80% MDE | informative null at 
 20 | 4.79 | 0.43 | 0.76 | 0.95 | 0.99 | 3.10 | 0.50
 20 | 6.00 | 0.30 | 0.57 | 0.80 | 0.94 | 3.90 | 0.17
 
-Under-training flag on a flat validation curve (pick position uniform, P(last 15%) = 0.15):
-  P(>= 5/10 flagged) = 0.0099
-  P(>= 10/20 flagged) = 0.0002
+Under-training flag on a flat validation curve (pick uniform over the E_k epochs of the budget):
+  control 1x: P(flag) = 4/25 = 0.1600; P(>= 10/20) = 0.00043; P(>= 5/10) = 0.0130
+  control 2x: P(flag) = 8/50 = 0.1600; P(>= 10/20) = 0.00043; P(>= 5/10) = 0.0130
+  control 4x: P(flag) = 15/99 = 0.1515; P(>= 10/20) = 0.00027; P(>= 5/10) = 0.0103
+  atlantic 1x: P(flag) = 2/13 = 0.1538; P(>= 10/20) = 0.00031; P(>= 5/10) = 0.0110
+  atlantic 2x: P(flag) = 4/26 = 0.1538; P(>= 10/20) = 0.00031; P(>= 5/10) = 0.0110
+  atlantic 4x: P(flag) = 8/52 = 0.1538; P(>= 10/20) = 0.00031; P(>= 5/10) = 0.0110
