@@ -2504,8 +2504,8 @@ SENSITIVITY (pre-registered; control at its native 25-epoch selection; does not 
   -text (.gitattributes): train.py and evaluate.py wrote CRLF, the
   driver wrote LF, and the recorded SHA-256s (manifests, the outputs
   above) must verify on any checkout, core.autocrlf or not. The
-  pattern logs/n5_atlantic/runs/*.json also covers the 20 training
-  records (PR #14), whose blobs were already LF.
+  manifest pattern (runs/*_seed[0-9].json) leaves the 20 training
+  records of PR #14 as they were.
 - hc-adversary item 19: OK.
   - An independent recompute reproduces every number in report.txt.
   - No post-hoc checkpoint choice: every evaluated checkpoint is the

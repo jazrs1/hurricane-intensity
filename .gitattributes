@@ -8,7 +8,7 @@ logs/n5_atlantic/*.log -text
 # N5 analysis outputs, manifests, phase-2 marker and their decision records: kept byte-for-byte too, so a
 # checkout reproduces the recorded SHA-256s exactly.
 results/n5_atlantic/analysis/* -text
-logs/n5_atlantic/runs/*.json -text
+logs/n5_atlantic/runs/*_seed[0-9].json -text
 logs/n5_atlantic/phase2_started.json -text
 reports/decisions/PR1[0-4].md -text
 reports/decisions/N5-result.md -text
