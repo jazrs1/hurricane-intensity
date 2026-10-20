@@ -1,0 +1,71 @@
+run_f31.py deliberate-breakage table (reports/v2_survey/f31/run_f31_breakage.py). Each guard disabled on
+its own; the row's tests must fail on the broken copy and pass on the unmodified driver.
+
+| # | guard | -k | unmodified | broken | first failing test |
+|---|---|---|---|---|---|
+| 1 | 1: tracked tree clean | `uncommitted_or_unpinned and dirty` | pass | fails (1 failed, 78 deselected in 14.25s) | test_refuses_an_uncommitted_or_unpinned_tree[dirty] |
+| 2 | 1: analysis/N5/run_n5/train.py equal HEAD | `uncommitted_or_unpinned and (analysis or analyze_n5 or run_n5 or train_py)` | pass | fails (4 failed, 3 passed, 72 deselected in 53.74s) | test_refuses_an_uncommitted_or_unpinned_tree[analysis] |
+| 3 | 1: run_n5.py is the pinned blob | `run_n5_blob` | pass | fails (1 failed, 78 deselected in 14.26s) | test_refuses_an_uncommitted_or_unpinned_tree[run_n5_blob] |
+| 4 | 1: analyze_n5.py is analyze_f31's pin | `analyze_n5_blob` | pass | fails (1 failed, 78 deselected in 14.25s) | test_refuses_an_uncommitted_or_unpinned_tree[analyze_n5_blob] |
+| 5 | 2: train.py is the pinned blob (John 23:50) | `train_py_blob` | pass | fails (1 failed, 78 deselected in 14.25s) | test_refuses_an_uncommitted_or_unpinned_tree[train_py_blob] |
+| 6 | 2: frame list SHA-256 | `frame_list` | pass | fails (1 failed, 78 deselected in 14.25s) | test_refuses_a_frame_list_with_another_sha |
+| 7 | 3: PROTECTED == COORDINATOR.md block | `protected_copy` | pass | fails (1 failed, 78 deselected in 14.26s) | test_refuses_an_analysis_protected_copy_that_drifted |
+| 8 | 3: protected files have their hashes | `changed_protected_file` | pass | fails (1 failed, 78 deselected in 1.61s) | test_refuses_a_changed_protected_file |
+| 9 | 6: main checkout, not a worktree | `worktree` | pass | fails (1 failed, 78 deselected in 12.22s) | test_refuses_a_worktree_or_another_checkout |
+| 10 | 6: child imports ROOT/src | `child_that_imports` | pass | fails (1 failed, 78 deselected in 12.33s) | test_refuses_a_child_that_imports_the_package_from_elsewhere |
+| 11 | 6: CUDA available | `without_cuda` | pass | fails (1 failed, 78 deselected in 12.34s) | test_refuses_without_cuda |
+| 12 | 4: no pending abort (both phases) | `interrupted_abort or pending_eval_abort` | pass | fails (2 failed, 77 deselected in 14.02s) | test_an_interrupted_abort_is_pending_blocks_launch_and_resumes |
+| 13 | 4: outputs confined to the F-31 roots | `output_paths_are_confined` | pass | fails (1 failed, 78 deselected in 1.52s) | test_output_paths_are_confined |
+| 14 | 4: no launch after the phase-2 marker | `bytes_back or cannot_launder` | pass | fails (2 failed, 77 deselected in 17.13s) | test_after_a_look_a_bad_record_asks_for_the_bytes_back |
+| 15 | 4: no launch over a bad record | `fails_verification` | pass | fails (1 failed, 78 deselected in 13.55s) | test_a_record_that_fails_verification_can_be_aborted_and_retrained |
+| 16 | 4: no launch over an unfinished run | `existing_output or restart_keeps_seed` | pass | fails (2 failed, 77 deselected in 2.27s) | test_refuses_any_existing_output |
+| 17 | 4: records/manifests at HEAD's commit | `relaunch_at_another` | pass | fails (1 failed, 78 deselected in 12.39s) | test_relaunch_at_another_commit_is_refused_until_abort_all |
+| 18 | 4: no training after a look | `never_follows` | pass | fails (1 failed, 78 deselected in 2.33s) | test_training_never_follows_an_h9_output |
+| 19 | 5: fetch succeeds | `fetch_fails` | pass | fails (1 failed, 78 deselected in 14.05s) | test_refuses_a_commit_not_on_the_first_parent_chain[fetch_fails] |
+| 20 | 5: first-parent chain | `not_first_parent or launch_not_first_parent` | pass | fails (2 failed, 77 deselected in 35.68s) | test_refuses_a_commit_not_on_the_first_parent_chain[not_first_parent] |
+| 21 | phase 1: refuse existing outputs | `appears_mid_launch` | pass | fails (1 failed, 78 deselected in 12.74s) | test_driver_refuses_an_output_that_appears_mid_launch |
+| 22 | phase 1: no training after a look (per run) | `planted_mid_phase1` | pass | fails (1 failed, 78 deselected in 12.36s) | test_an_h9_output_planted_mid_phase1_stops_training |
+| 23 | phase 1: train.py failure stops | `training_failure` | pass | fails (1 failed, 78 deselected in 1.90s) | test_training_failure_is_logged_and_stops |
+| 24 | phase 1: epoch dir inside ROOT | `resolving_outside` | pass | fails (1 failed, 78 deselected in 12.30s) | test_epoch_dir_resolving_outside_the_repo_is_refused |
+| 25 | phase 1: every epoch file present | `missing_epoch_file` | pass | fails (1 failed, 78 deselected in 2.18s) | test_a_missing_epoch_file_stops_before_any_delete |
+| 26 | phase 1: re-validation rounds to the log | `does_not_round` | pass | fails (1 failed, 78 deselected in 15.07s) | test_revalidation_that_does_not_round_to_the_log_stops |
+| 27 | phase 1: seed<s>.pt == native 4x epoch | `native_checkpoint_must_hold` | pass | fails (1 failed, 78 deselected in 13.18s) | test_native_checkpoint_must_hold_the_native_4x_epoch_weights |
+| 28 | phase 1: protected unchanged during a run | `changed_during_revalidation` | pass | fails (1 failed, 78 deselected in 2.49s) | test_protected_file_changed_during_revalidation_stops |
+| 29 | phase 1: protected unchanged during the training step | `changed_during_a_run` | pass | fails (1 failed, 78 deselected in 2.66s) | test_protected_file_changed_during_a_run_stops |
+| 30 | phase 1: protected unchanged before a run | `drift_before_a_run` | pass | fails (1 failed, 78 deselected in 12.90s) | test_protected_drift_before_a_run_stops_it_unstarted |
+| 31 | phase 2: protected unchanged before each H9 step | `drift_before_an_h9_step` | pass | fails (1 failed, 78 deselected in 22.52s) | test_protected_drift_before_an_h9_step_stops_it_unrun |
+| 32 | phase 2: protected unchanged during each H9 step | `during_an_h9_step` | pass | fails (1 failed, 78 deselected in 13.58s) | test_protected_file_changed_during_an_h9_step_stops_without_a_manifest |
+| 33 | import: run_n5.py hashed before it is executed | `tampered_run_n5` | pass | fails (1 failed, 78 deselected in 1.87s) | test_a_tampered_run_n5_is_refused_before_import |
+| 34 | import: run_n5.py executed from the hashed bytes | `swapped_after_the_check` | pass | fails (1 failed, 78 deselected in 1.89s) | test_run_n5_runs_from_the_hashed_bytes_not_a_file_swapped_after_the_check |
+| 35 | phase 1: kept files read-only | `fails_verification` | pass | fails (1 failed, 78 deselected in 14.47s) | test_a_record_that_fails_verification_can_be_aborted_and_retrained |
+| 36 | phase 1: deleted hashes never in files_sha256 | `end_to_end` | pass | fails (1 failed, 78 deselected in 2.34s) | test_end_to_end_records_manifests_and_the_analysis_accepts_them |
+| 37 | phase 1: non-slot epoch files deleted | `end_to_end` | pass | fails (1 failed, 78 deselected in 13.40s) | test_end_to_end_records_manifests_and_the_analysis_accepts_them |
+| 38 | 5e: records tracked | `committed_records_as_evidence and untracked` | pass | fails (1 failed, 78 deselected in 22.44s) | test_phase2_requires_the_committed_records_as_evidence[untracked] |
+| 39 | 5e: records equal HEAD's blob | `committed_records_as_evidence and differs` | pass | fails (1 failed, 78 deselected in 22.54s) | test_phase2_requires_the_committed_records_as_evidence[differs] |
+| 40 | 5e: launch commit on the first-parent chain | `launch_not_first_parent` | pass | fails (1 failed, 78 deselected in 22.52s) | test_phase2_requires_the_committed_records_as_evidence[launch_not_first_parent] |
+| 41 | 5e: HEAD pushed | `not_pushed` | pass | fails (1 failed, 78 deselected in 21.08s) | test_phase2_requires_the_committed_records_as_evidence[not_pushed] |
+| 42 | 5e: L..HEAD only records, docs, deviations | `code_changed` | pass | fails (1 failed, 78 deselected in 22.85s) | test_phase2_requires_the_committed_records_as_evidence[code_changed] |
+| 43 | rule (A): only after a look | `refused_before_any_look` | pass | fails (1 failed, 78 deselected in 22.60s) | test_rule_a_is_refused_before_any_look |
+| 44 | rule (A): the fixed path | `other_path` | pass | fails (1 failed, 78 deselected in 21.29s) | test_evaluate_refuses_a_deviation_rule_a_does_not_cover[other_path] |
+| 45 | rule (A): identical to HEAD's blob | `deviation_rule_a_does_not_cover and differs` | pass | fails (1 failed, 78 deselected in 21.07s) | test_evaluate_refuses_a_deviation_rule_a_does_not_cover[differs] |
+| 46 | rule (A): analyze_f31.load_deviations | `deviation_rule_a_does_not_cover and (healthy or restorable or untracked)` | pass | fails (3 failed, 76 deselected in 27.30s) | test_evaluate_refuses_a_deviation_rule_a_does_not_cover[healthy] |
+| 47 | phase 2: no evaluation over a bad record | `fails_verification or bytes_back` | pass | fails (2 failed, 77 deselected in 15.09s) | test_a_record_that_fails_verification_can_be_aborted_and_retrained |
+| 48 | phase 2: all 40 trained first | `while_any_training_run_is_unfinished` | pass | fails (2 failed, 77 deselected in 11.46s) | test_phase2_refuses_while_any_training_run_is_unfinished[order3] |
+| 49 | phase 2: no half-evaluated run | `crashed_evaluation` | pass | fails (1 failed, 78 deselected in 14.04s) | test_a_crashed_evaluation_is_moved_aside_and_the_same_slots_re_evaluated |
+| 50 | phase 2 entry: verify_self at L | `verify_self_at_the_launch` | pass | fails (2 failed, 77 deselected in 34.92s) | test_phase2_entry_runs_verify_self_at_the_launch_commit[analysis] |
+| 51 | phase 2 entry: check_training on all 40 | `training_side_checks_before_any_h9` | pass | fails (5 failed, 1 passed, 73 deselected in 26.24s) | test_phase2_entry_applies_the_training_side_checks_before_any_h9[slots] |
+| 52 | phase 2 entry: the phase-2 marker | `cannot_launder or marker_alone` | pass | fails (2 failed, 77 deselected in 17.00s) | test_abort_eval_cannot_launder_an_h9_look |
+| 53 | phase 2: an evaluated run must pass load_run | `takes_a_manifest_that_load_run_refuses` | pass | fails (1 failed, 78 deselected in 25.15s) | test_abort_eval_takes_a_manifest_that_load_run_refuses |
+| 54 | evaluate_one: eval attempts complete | `checks_its_eval_attempts` | pass | fails (1 failed, 78 deselected in 13.88s) | test_evaluate_one_checks_its_eval_attempts_before_the_h9_step |
+| 55 | evaluate_one: the epoch file, never seed<s>.pt | `end_to_end` | pass | fails (1 failed, 78 deselected in 13.68s) | test_end_to_end_records_manifests_and_the_analysis_accepts_them |
+| 56 | evaluate_one: manifest = record + 3 keys | `end_to_end` | pass | fails (1 failed, 78 deselected in 12.66s) | test_end_to_end_records_manifests_and_the_analysis_accepts_them |
+| 57 | evaluate_one: load_run after the evaluation | `manifest_the_analysis_refuses` | pass | fails (1 failed, 78 deselected in 21.42s) | test_a_manifest_the_analysis_refuses_stops_phase2_at_that_run |
+| 58 | lock: exclusive create | `held_lock` | pass | fails (1 failed, 78 deselected in 12.92s) | test_a_held_lock_refuses_every_writing_stage |
+| 59 | abort-run: refused after a look | `abort_run_refusals or cannot_launder` | pass | fails (2 failed, 77 deselected in 14.05s) | test_abort_run_refusals |
+| 60 | abort-run: refused for a verified record | `abort_run_refusals` | pass | fails (1 failed, 78 deselected in 2.37s) | test_abort_run_refusals |
+| 61 | abort-all: refused after a look | `abort_all_refuses or marker_alone` | pass | fails (2 failed, 77 deselected in 15.75s) | test_abort_all_refuses_after_an_h9_output |
+| 62 | abort-eval: only a half-evaluated or refused run | `crashed_evaluation or takes_a_manifest` | pass | fails (2 failed, 77 deselected in 20.68s) | test_a_crashed_evaluation_is_moved_aside_and_the_same_slots_re_evaluated |
+| 63 | abort: abort.json pending before any move | `interrupted_abort` | pass | fails (1 failed, 78 deselected in 2.64s) | test_an_interrupted_abort_is_pending_blocks_launch_and_resumes |
+| 64 | verify_record: hashed files unchanged | `fails_verification` | pass | fails (1 failed, 78 deselected in 12.32s) | test_a_record_that_fails_verification_can_be_aborted_and_retrained |
+
+64 guards; 64 rows OK; problems: 0

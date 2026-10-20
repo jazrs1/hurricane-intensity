@@ -12,3 +12,13 @@ logs/n5_atlantic/runs/*_seed[0-9].json -text
 logs/n5_atlantic/phase2_started.json -text
 reports/decisions/PR1[0-4].md -text
 reports/decisions/N5-result.md -text
+# F-31 (reports/v2_survey/f31/design.md §13): the driver compares the 40 training records with their HEAD blobs, and
+# the manifests pin the SHA-256 of every train log, eval log and H9 CSV (train.py and evaluate.py write CRLF on
+# Windows, the driver LF). So every F-31 output is stored and checked out byte-for-byte, autocrlf or not.
+logs/f31/runs/*.json -text
+logs/f31/*.log -text
+logs/f31/phase2_started.json -text
+logs/f31/deviations.json -text
+logs/f31/aborted/** -text
+results/f31/*_h9.csv -text
+results/f31/analysis/* -text
