@@ -22,3 +22,10 @@ logs/f31/deviations.json -text
 logs/f31/aborted/** -text
 results/f31/*_h9.csv -text
 results/f31/analysis/* -text
+# v2 recipe (reports/v2_survey/v2_recipe/design.md §5): the records pin the SHA-256 of each train log and member, and
+# the members file's blob hash is recorded at the freeze; every committed output is stored and checked out byte-for-byte.
+logs/v2_recipe/*.log -text
+logs/v2_recipe/runs/*.json -text
+logs/v2_recipe/aborted/** -text
+results/v2_recipe/* -text
+reports/decisions/V2-*.md -text
