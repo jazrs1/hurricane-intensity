@@ -15,11 +15,12 @@ Fact sheet for the 2026 clean-test protocol draft (hc-survey). It covers the lab
 | route | label source | expected date | Atlantic storms > 96 kt | East Pacific storms > 96 kt |
 |---|---|---|---|---|
 | A. Operational | ATCF b-deck (operational working best track), with a caveat | now (season open to Nov 30) | **1**: Isaias AL092026, 105 kt | **9** EP-ID storms, plus 1 CP-ID storm (Lala) |
-| B. Per-storm TCR | TCR post-analysis best track | storm by storm. For a hurricane, by precedent about 2-4 months after the storm, sometimes later. For Isaias: roughly Dec 2026 to Feb 2027 | not knowable yet; operationally 1 | not knowable yet |
+| B. Per-storm TCR | TCR post-analysis best track | storm by storm. For a hurricane, by precedent about 2.5-5.5 months after the storm, sometimes later. For Isaias: roughly late Dec 2026 to late Mar 2027 | not knowable yet; operationally 1 | not knowable yet |
 | C. HURDAT2 | annual HURDAT2 update | late Feb to mid-June 2027, most years April-May (precedent below) | not knowable yet; operationally 1 | not knowable yet |
 
 - The Atlantic route A count is 1 storm with 15 hourly frames > 96 kt.
-- The Atlantic set is thin on any route. All three Atlantic storms within 10 kt of the line peaked at 105 kt.
+- The Atlantic set is thin on any route.
+- Across both basins, the three storms one 5 kt step above the lowest Cat 3 value all peaked at 105 kt: Isaias (AL), Rachel and Trudy (EP).
 - No published rate was found for how often post-analysis moves a storm across the Cat 3 line. A two-season check in this repo's terms (2024-25, 31 Atlantic storms) found that peaks moved in 9-10 storms, but **none crossed 96 kt**. It is not a citable rate (see §3).
 
 ## 1. The three label sources
@@ -81,7 +82,7 @@ Fact sheet for the 2026 clean-test protocol draft (hc-survey). It covers the lab
   - Two 2024 examples: Helene's TCR shows 2026-02-17 and Milton's 2026-07-30. Both are long after HURDAT2 2024 (April 2025).
   - True first-release dates aren't recoverable from the headers.
 - A TCR revision doesn't necessarily move the best track. Melissa's block (`AL132025` to end of file) is byte-identical (md5 `fb7dda8d…`) in `hurdat2-1851-2025-02272026.txt` and `hurdat2-1851-2025-092326.txt`, despite the May 19 TCR update.
-- **For Isaias:** the 2025 hurricanes other than Melissa were available 2.5-4 months after the storm. That suggests roughly Dec 2026 to Feb 2027, but it is precedent, not a schedule.
+- **For Isaias:** the 2025 hurricanes other than Melissa were available about 2.5 months (Dexter, Gabrielle, Humberto) to 5.5 months (Erin, storm ended Aug 22, TCR Jan 30) after the storm. For Isaias (ended Oct 11), that suggests roughly late Dec 2026 to late Mar 2027. It is precedent, not a schedule.
 
 ### C. The annual HURDAT2 update
 
@@ -121,7 +122,9 @@ Fact sheet for the 2026 clean-test protocol draft (hc-survey). It covers the lab
   - SHA-256 `ee35819c…` (the 2025 test's pinned hash, decisions.md:1896);
   - last storm in the file is Melissa AL132025; no 2026 storm.
 - `hurdat2_atlantic.txt.source.json`: `https://www.nhc.noaa.gov/data/hurdat/hurdat2-1851-2025-02272026.txt`, fetched 2026-08-18T21:08:23Z.
-- So the 2025 test (built 2026-10-15/16, decisions.md:2077) was labelled from the Feb 27, 2026 HURDAT2. That was about 8 months after the season, and after every 2025 TCR's current revision except Chantal's.
+- So the 2025 test (built 2026-10-15/16, decisions.md:2077) was labelled from the Feb 27, 2026 HURDAT2.
+  - That file came about 3 months after the season ended (Nov 30, 2025). The build came about 7.5 months after the file.
+  - The file predates two current TCR revisions: Melissa (May 19) and Chantal (Jun 29). Both storms' blocks are unchanged between the Feb 27 file and the Sep 23 one: Melissa by the md5 match above, Chantal by `diff` of its block (2026-10-21).
 - The resolver scrapes the index page, which now points to the Sep 23 file. A refresh today would change the SHA away from `ee35819c…` without adding any 2026 storm.
 - The nepac file used by H-EP is pinned in `reports/v2_survey/hep/protocol.md`: `hurdat2-nepac-1949-2025-092926.txt`, SHA-256 `caece626…`. Its B-v2-2 cache is a pending gate there.
 
@@ -130,7 +133,7 @@ Fact sheet for the 2026 clean-test protocol draft (hc-survey). It covers the lab
 | route | expected date | basis |
 |---|---|---|
 | A. Operational b-deck | available now for finished storms; the season count is final only after Nov 30, 2026 | live b-decks; season end |
-| B. TCR | storm by storm. A hurricane is typically about 2-4 months after the storm, sometimes later (upper bounds above). Isaias: roughly Dec 2026 to Feb 2027 | 2025 TCR Last-Modified dates |
+| B. TCR | storm by storm. A hurricane is typically about 2.5-5.5 months after the storm, sometimes later (upper bounds above). Isaias: roughly late Dec 2026 to late Mar 2027 | 2025 TCR Last-Modified dates |
 | C. HURDAT2 | late Feb to mid-June 2027; most years April-May | 2017-2025 release table |
 
 ## 3. 2026 storms at the line, and how often post-analysis moves a peak
@@ -148,10 +151,23 @@ Fact sheet for the 2026 clean-test protocol draft (hc-survey). It covers the lab
 | AL092026 | Isaias | 105 kt (2026-10-09 12Z and 18Z) | 2 | 15 | −87.6 to −87.1 |
 
 - Isaias's sequence is 85, 90, **105, 105**, 95 kt (09/00Z to 10/00Z). It is a Cat 3 for two synoptic times only.
-- Isaias is **5 kt above the line**. A −10 kt post-analysis change would make it a Cat 2.
+- Isaias is **one 5 kt step above the lowest Cat 3 value** (100 kt). A −10 kt post-analysis change at both of its 105 kt fixes would make it a Cat 2.
 - All other 2026 Atlantic storms are ≤ 60 kt, so none is near the line.
 - Hourly frames are estimated through the repo's `build_sample_grid(fixes, "1h")` on the b-deck fixes with statuses LO,TD,SD,TS,SS,HU. They are an estimate of the label count only: 1 h samples with no scan matching, and no imagery seen.
-- Isaias has 15 frames > 96 kt, so the per-storm statistic threshold (≥ 10 frames > 96 kt, decisions.md:1963; `analyze_n5.py:91`) would apply operationally. It stays ≥ 10 if either 105 kt fix alone drops by 10 kt (hand-computed: 10 frames). It leaves Cat 3 only if both drop to ≤ 95.
+- Isaias has 15 frames > 96 kt, so the per-storm statistic threshold (≥ 10 frames > 96 kt, decisions.md:1963; `analyze_n5.py:91`) would apply operationally. That threshold is sensitive to post-analysis. The est. frames > 96 kt, computed the same way with the 105 kt fixes revised:
+
+| revision | frames > 96 kt |
+|---|---|
+| none | 15 |
+| 12Z → 100 | 14 |
+| 12Z → 95 | 11 |
+| 18Z → 100 | 14 |
+| **18Z → 95** | **9** |
+| both → 100 | 13 |
+| both → 95 | 0 |
+
+- A −10 kt revision at the 18Z fix alone takes Isaias below the per-storm threshold; the same revision at 12Z does not.
+- It stops being a Cat 3 only if both fixes drop to ≤ 95.
 
 **Name reuse:** the 2026 Atlantic names are the 2020 list.
 - Isaias AL092020 and Hanna AL082020 are in `storms_n5_new.txt` / `storms_train_n5_atlantic.txt`.
@@ -206,7 +222,7 @@ Fact sheet for the 2026 clean-test protocol draft (hc-survey). It covers the lab
 |---|---|---|---|---|
 | Chris AL032024 | 35 | 40 | +5 | TS, same |
 | Francine AL062024 | 80 | 90 | +10 | **Cat 1 to Cat 2** |
-| Helene AL092024 | 120 [115] | 120 | 0 [+5] | Cat 3, same |
+| Helene AL092024 | 120 [115] | 120 | 0 [+5] | Cat 4, same |
 | Kirk AL122024 | 125 | 130 | +5 | Cat 4, same |
 | Milton AL142024 | 150 | 155 | +5 | Cat 5, same |
 | Nadine AL152024 | 45 | 50 | +5 | TS, same |
