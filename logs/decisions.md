@@ -3316,3 +3316,34 @@ SECONDARY (alpha 0.05, uncorrected; reported beside the verdicts, never replacin
   - 3517be23ffc26901962cb6670b0b354b9fb2ce0ff19f7ef9f5470b7c846b1169  results/f31/control_seed29_e42_h9.csv
   - 0316aa6c55ec2a564882b4851f29d26bfbd988502973413cfe6e8dc0aae5c572  results/f31/control_seed29_e79_h9.csv
   - 93fdc5031ce35eedcca741821b794f7504cf1398cb18612eb48923a9122f951b  results/f31/control_seed29_e81_h9.csv
+
+2026-10-21, 16:23. v2 after F-31: John's four decisions on the
+coordinator's note. No training, evaluation, H9 or H-EP read, and no
+compute, by this entry.
+- Source: reports/v2_survey/f31/v2_implications.md, section 5 (the
+  coordinator's draft note; untracked). SHA-256 of the note as John
+  read it: 82381a1f1fac16aa8a872b69549906a253c05894cbaf536f22cbcf5c7be08f63.
+- John's decisions, verbatim (relayed by the coordinator):
+  "§5 decisions:
+  1. Yes: the 4× control recipe (99 epochs, native selection, 10
+  members) is the v2 Atlantic candidate, confirmed only on the 2026
+  clean test.
+  2. Yes: hc-survey drafts its design, hc-adversary reviews it (max two
+  rounds unless there's a concrete defect), then it comes to me. No
+  compute before my yes.
+  3. Yes: E3 uses the same fixed budget, with an Atlantic-only
+  comparator at that budget (the v2 ensemble may serve).
+  4. Yes: start the 2026 clean-test protocol draft; the
+  no-2026-imagery rule is unchanged. The draft must lay out the label
+  choice for me: wait for the post-season HURDAT2 update vs. use
+  operational best track with a stated caveat, with the expected date
+  for each and how many 2026 storms each would give at ≥96 kt."
+- What this does not change: the frozen ensemble stays the reported
+  model; the 2025 Atlantic test set stays spent; I4 (no 2026 imagery)
+  stands; H-EP stays sealed under protocol.md 3901f4cf.
+- Next (design only):
+  - hc-survey drafts the v2 Atlantic recipe design; then hc-adversary;
+    then John.
+  - The 2026 clean-test protocol draft, with the label choice laid
+    out as John asks; then hc-adversary; then John.
+  - E3: the rule above applies when its design is drafted.
