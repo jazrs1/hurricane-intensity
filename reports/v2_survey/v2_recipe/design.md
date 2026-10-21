@@ -1,4 +1,4 @@
-# v2 Atlantic recipe: design (r2, after hc-adversary item 31; not approved; nothing run)
+# v2 Atlantic recipe: design (r2 + tightening after hc-adversary item 31b; not approved; nothing run)
 
 **Status:** design only.
 - No training, evaluation or analysis runs before John's yes (his decision 2, 2026-10-21).
@@ -19,7 +19,7 @@
 
 **How H9 entered, stated plainly:**
 - The recipe was chosen *because of* F-31's H9 result: 4× beat 1× on H9 in the control arm (P1 BETTER). That is why only an unspent set can confirm it.
-- The v2 checkpoints themselves are read on H9 **zero** times under this design. That holds under transfer-gap option (a), the recommendation (§3). Option (b), if John picks it in E3's design, would add exactly one H9 evaluation of the frozen ensemble.
+- The v2 checkpoints themselves are read on H9 **zero** times under this design. That holds under transfer-gap option (a), the recommendation (§3). Option (b), if John picks it in E3's design, would add exactly one H9 evaluation of the frozen v2 ensemble.
 
 ## 1. The recipe (fixed)
 
@@ -100,7 +100,7 @@
 
 **Recommendation: none.**
 - Neither the ensemble nor any member is evaluated on H9 before the clean test, and this design plans none after it.
-- That is under transfer-gap option (a) below. Option (b) would be one H9 evaluation of the frozen ensemble inside the H-EP pass.
+- That is under transfer-gap option (a) below. Option (b) would be one H9 evaluation of the frozen v2 ensemble inside the H-EP pass.
 
 **Made structural, and tested behaviourally:**
 - **No evaluation stage.** The driver never builds an `evaluate.py` or `ensemble_eval.py` command.
@@ -121,7 +121,7 @@
 **Where they may not come from:**
 - any H9 read of a v2 checkpoint (except (b), if chosen);
 - any H-EP read, except through the H-EP pass's own pre-registered outputs;
-- any 2026 read before the clean-test protocol is committed and its single pass runs.
+- any clean-test read before the clean-test protocol is committed and its single pass runs.
 
 **A conflict for John (choice), settled in E3's design:**
 - **The conflict:** the H-EP pass computes each evaluation's transfer gap from "E's H9 per-frame CSV" (protocol §2f, §6: `hep_report.py --h9`). v2 has none under this design. E3 has none either: §2f names H9 sources only for E1 and E2. So E3's design settles the transfer gap for E3 and its comparator together.
@@ -154,7 +154,8 @@
 
 **A defect found while the freeze PR is under review (guard 8's procedure):**
 - **The command.** `run_v2_recipe.py unfreeze --reason "<text>"` is the only way to remove the members file. It refuses unless:
-  - the members file is not on `origin/phase2-experiments` (the freeze PR is unmerged);
+  - the members file is not on `origin/phase2-experiments` (the freeze PR is unmerged). This is decided only **after a `git fetch origin`**, and unfreeze refuses if the fetch fails;
+  - neither HEAD's nor `origin/phase2-experiments`' `logs/decisions.md` already holds the "v2 Atlantic ensemble frozen" entry;
   - no H-EP or clean-test output exists.
 - **What it does:**
   - it moves the file to `logs/v2_recipe/aborted/freeze_<n>/members_sha256.txt`, with an `abort.json` (reason, time, the file's SHA-256, status `complete`);
@@ -187,7 +188,7 @@
 
 - v2 is the same under either reading: 99 epochs, 6534 steps.
 
-**Ordering with the clean-test protocol:** if v2 is E3's comparator, the clean-test protocol is committed **before** the H-EP pass, and it cannot be amended afterwards. So no H-EP result can shape it (implications note §4; item 31, follow-up to finding 7).
+**Ordering with the clean-test protocol:** the clean-test protocol is committed **before** the H-EP pass, **unconditionally**, and it cannot be amended afterwards. The frozen ensemble is E1 in H-EP whatever happens, so H-EP results always precede the clean pass. So no H-EP result can shape it, whether or not v2 is E3's comparator (implications note §4; item 31, follow-up to finding 7; clean-test protocol draft r2 §8 step 2).
 
 **Timeline against E3's deadline** (about end-January 2027; the date is set when the H-EP protocol is committed at its gate 6):
 - v2 needs none of H-EP gates 1–7.
@@ -246,7 +247,7 @@ reports/decisions/V2-*.md -text
 - Stages: `launch` (guards, then train the 10 seeds in order, each re-validated and checked), `verify` (all 10 records), `freeze` (writes the members file), and `abort-run` / `unfreeze`.
 
 **Imports: exactly these, each from a module hashed before it is executed.**
-- **How each module is loaded.** It is read as bytes and hashed with CRLF read as LF; the hash must be its pin. It is then compiled and executed from exactly those bytes, with no re-read and no `.pyc`. That is `run_f31.load_pinned_run_n5`'s method (`run_f31.py:122-138`), written into the v2 driver.
+- **How each module is loaded.** It is read as bytes and hashed with CRLF read as LF; the hash must be its pin. A fresh module object gets `__file__` set to the file's path **before** execution (`run_n5` derives its `ROOT` from `__file__`). The module is then compiled and executed from exactly those bytes, with no re-read and no `.pyc`. That is `run_f31.load_pinned_run_n5`'s method (`run_f31.py:122-138`), written into the v2 driver.
 
 | Module | Pin (SHA-256) | Names used |
 |---|---|---|
@@ -261,7 +262,9 @@ reports/decisions/V2-*.md -text
   - `run_paths` and the record writer and verifier;
   - the abort helpers (`logs/v2_recipe/aborted/`);
   - the train-log parser, expecting `models/v2_recipe/seed<s>.pt` and the v2 driver's own header and END footer;
-  - the selection functions `last_saved`, `native_pick` and `flagged`. These are copied from `analyze_f31.py:153-211` (pure, 20 lines). A launch-PR test checks that they agree with `analyze_f31`'s on the 20 F-31 control records' re-validation tables. The test reads those committed records and imports `analyze_f31` in the test only, after hashing it and `analyze_n5`.
+  - the selection functions `last_saved`, `native_pick` and `flagged`. These are copied from `analyze_f31.py:153-211` (pure, 20 lines). A launch-PR test checks that they agree with `analyze_f31`'s on the 20 F-31 control records' re-validation tables. The test reads those committed records and imports `analyze_f31` in the test only, after hashing it and `analyze_n5`. None of the 20 records has a non-null `tie_rule`, so the records exercise only the common path. **The test adds synthetic validation tables** for the remaining paths, run through both implementations, which must agree:
+    - a table whose re-validated first minimum differs from the last `saved` epoch by less than `TIE_KT`. The tie branch must return `train.py`'s pick, with the tie record;
+    - a table where they differ by `TIE_KT` or more. Both must refuse.
 - **`revalidate` imports `hurricane_intensity`** from the checkout's `src`. That package is covered by the src pin (§1; guard 2).
 
 **Launch guards (all before the first run; each refuses):**
@@ -276,6 +279,12 @@ reports/decisions/V2-*.md -text
 6. **Paths:** every output path is under the `v2_recipe` roots. No `models/v2_recipe/seed<s>.pt` exists unless its record verifies (resume).
 7. **No held-out argument:** nothing held-out appears in any command (§3's behavioural test).
 8. **Not frozen:** no `results/v2_recipe/members_sha256.txt` exists, tracked or on disk. Once frozen, `launch` refuses; only `unfreeze` (§4) can reopen it, and only before the freeze PR merges.
+9. **Run environment** (as F-31's `common_guards`):
+   - the run root is the main checkout, with a `.git` directory, not a worktree;
+   - a child Python imports `hurricane_intensity` from `<root>/src` (`child_package_path`);
+   - CUDA is available.
+   - **Why:** the `.venv` editable install's `.pth` points at the main checkout's `src`. A launch from a worktree would pass guard 2 on the worktree's blobs while training on the main checkout's `src`.
+   - The guard tests cover each refusal: a worktree root, a child import from elsewhere, and no CUDA.
 
 **Per run (seed s, ascending 30–39):**
 ```
@@ -309,7 +318,7 @@ reports/decisions/V2-*.md -text
 - **Native pick and tie:**
   - `native_pick(reval, saved, 99)`: the re-validated first minimum must be the last `saved` epoch, or differ from it by less than `TIE_KT` (N5's amendment (a)).
   - The record's `tie_rule` (`None`, or `{revalidated_argmin, saved_epoch, delta_kt}`) must equal the recomputed one.
-- **Same weights:** the pick's epoch file is byte-identical to `seed<s>.pt` (`native_same_weights: true`) before the epoch files are deleted.
+- **Same weights:** the pick's epoch file is **tensor-equal** to `seed<s>.pt` (`run_n5.same_weights`: the same state_dict keys, every tensor `torch.equal`), as F-31 checked (`native_same_weights: true`). The check runs before the epoch files are deleted. r2 said "byte-identical", which this function does not test.
 - **Files:**
   - `files_sha256` names exactly the train log and `seed<s>.pt`, with matching hashes;
   - `deleted_epoch_sha256` hashes all 99 epoch files, and none remains on disk.
@@ -340,7 +349,7 @@ reports/decisions/V2-*.md -text
 
 0. **Design approval:** this design approved by John, after hc-adversary (two rounds).
 1. **Launch PR:**
-   - `scripts/run_v2_recipe.py` and its tests: synthetic records, every guard above, the behavioural no-evaluation test, the selection-agreement test, the coverage test and the unfreeze procedure;
+   - `scripts/run_v2_recipe.py` and its tests: synthetic records, every guard above (guard 9 included), the behavioural no-evaluation test, the selection-agreement test with its synthetic tie and refusal tables, the coverage test, and the unfreeze procedure with its fetch-or-refuse rule;
    - the `.gitattributes` rows and the `.gitignore` row for the lock.
    - It goes to hc-adversary and John before anything runs.
 2. **Checks:** `check.py` PASS (FAST and `--full`) on the launch commit.
@@ -352,7 +361,7 @@ reports/decisions/V2-*.md -text
    - the protocol.md disclosure by line (§4).
 4. **Training** (`run_v2_recipe.py launch`), after John's yes. No H9, H-EP or 2026 read.
 5. **Freeze PR:** the records, logs, members file and the freeze entry (§4). From then on, v2 is frozen.
-6. **The clean-test protocol** is committed before any clean-test build, and before the H-EP pass if v2 is E3's comparator. Only then does v2 meet held-out data.
+6. **The clean-test protocol** is committed before any clean-test build, and before the H-EP pass, unconditionally (§4). Only then does v2 meet held-out data.
 
 ## Files in this draft
 
