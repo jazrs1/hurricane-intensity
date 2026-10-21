@@ -1,6 +1,6 @@
 # 2026–2027 clean test: protocol (DRAFT r3: John's answers of 2026-10-21 recorded in §10; not yet the committed protocol; nothing built or run)
 
-**Status:** a draft for John (his decision 4, 2026-10-21). John answered its open items on 2026-10-21 (§10, his words verbatim). It is committed as the protocol at §8 step 2. I4 is unchanged now: no 2026 imagery is downloaded, listed or cropped, and no 2026 label file is downloaded. §8 states the one I4 amendment the test would need later, at step 4, with John's yes.
+**Status:** a draft for John (his decision 4, 2026-10-21). John answered its open items on 2026-10-21 (§10, his words verbatim). It becomes the protocol at §8 step 2. I4 is unchanged now: no 2026 imagery is downloaded, listed or cropped, and no 2026 label file is downloaded. §8 states the one I4 amendment the test would need later, at step 4, with John's yes.
 
 **Inputs:**
 - **2026 counts:** from hc-reviewer's fact sheet, `label_facts.md` (this folder). The season counts are **as of 2026-10-21 20:27 UTC**, from the operational b-decks.
@@ -38,7 +38,7 @@
 **Pooled n, with the basis stated:**
 - 2026 has 9 candidates.
 - The NOAA 1991–2020 normal Atlantic season has about 14 named storms, 7 hurricanes and 3 major hurricanes.
-- So option 3 would plausibly reach n ≥ 16 before build drops. At n = 16, power for Δ = 1.0 is 0.96 at sd 1.0 and 0.69 at sd 1.5.
+- So option 3 would have about 23 candidates before build drops, so n ≥ 16 after them is plausible. At n = 16, power for Δ = 1.0 is 0.96 at sd 1.0 and 0.69 at sd 1.5.
 - For the > 96 kt secondaries, about 3 major hurricanes in a normal 2027 plus Isaias would still likely fall short of 6 qualifying storms. **Option 3 does not reliably make the high end testable either.**
 
 **Why option 3** (the draft's recommendation, label-informed and model-blind; John chose it):
@@ -86,7 +86,7 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 
 | | **A. Operational best track (ATCF b-deck), with a caveat** | **C. Post-season HURDAT2 update** |
 |---|---|---|
-| Source | `bal{nn}2026.dat`, NHC's working best track (6-hourly, 5 kt steps) | the annual HURDAT2 file containing 2026, pinned by filename and SHA-256 |
+| Source | `bal{nn}2026.dat`, NHC's working best track (6-hourly, 5 kt steps) | the latest `hurdat2-1851-2026-*.txt` on NHC's HURDAT2 listing at the §8 step 4 retrieval, pinned by filename and SHA-256 |
 | Expected date | **now** for finished storms; the season count is final only after **Nov 30, 2026** | **late Feb to mid-June 2027, most years April–May.** Over 2017–2025, posting dates ran Mar 5 to Jun 10; the most recent (2025's) was the earliest. |
 | 2026 Atlantic storms (all) | 9 so far (the season is open) | not knowable yet; likely the same storms |
 | …of which > 96 kt | **1:** Isaias AL092026, 105 kt, about 15 hourly frames > 96 kt (estimated, unbuilt). ≥ 96 is the same set, since all peaks are multiples of 5 (sheet §5). | not knowable yet; operationally 1 |
@@ -102,20 +102,22 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 
 | Season | Route | Source | Backup |
 |---|---|---|---|
-| 2026 | **C** | the post-season HURDAT2 update containing 2026 (late Feb to mid-June 2027), which exists before the pass | the hashed December 2026 route A snapshot |
+| 2026 | **C** | the latest `hurdat2-1851-2026-*.txt` on NHC's HURDAT2 listing at the §8 step 4 retrieval (expected late Feb to mid-June 2027, before the pass) | the hashed December 2026 route A snapshot, if and only if the saved listing has no `hurdat2-1851-2026-*.txt` |
 | 2027 | **A** | the hashed December 2027 route A snapshot, with the caveat below | the OFCL a-deck rebuild (below), if the snapshot is missed |
 
 - "A for both" would have scored 2026 against operational values although HURDAT2 with 2026 exists before the pass. "C for both" would have moved the pass to spring 2028. The hybrid avoids both.
 
 **The 2026 HURDAT2 update (route C):**
+- **The version, named mechanically:** 2026's labels are the latest `hurdat2-1851-2026-*.txt` on NHC's HURDAT2 listing at the step 4 retrieval. The listing is saved, with its SHA-256 and retrieval time. No other version is read.
 - It is read as a **new, separately hashed file** at a pinned, season-specific path (§7), pinned by filename and SHA-256 at retrieval. It is first read at §8 step 4.
 - It never writes `data/interim/hurdat2_atlantic.txt`: that file is protected (`ee35819c…0bcb5c`) and never refreshed, and `--force-hurdat2-refresh` is never used.
-- **If it has not been posted by §8 step 4** (the list step, which scoring needs): 2026 is scored on route A from the December 2026 snapshot, with route A's caveat. This is recorded in the step 4 commit before the list is read. If that snapshot was also missed, the OFCL a-deck rebuild (below) applies. A later HURDAT2 release does not trigger a second pass.
+- **The trigger:** the backup fires if and only if that saved listing has no `hurdat2-1851-2026-*.txt`. 2026 is then scored on route A from the December 2026 snapshot, with route A's caveat. The saved listing is the trigger record: its own commit in §8 step 4, made before any 2026 label file or snapshot is read, and before the list is drawn. If that snapshot was also missed, the OFCL a-deck rebuild (below) applies. A later HURDAT2 release does not trigger a second pass.
+- The December 2026 snapshot (b-decks, a-decks, TCR record) is read only if the backup fires; otherwise it is never read.
 
 **The 2027 caveat (route A), written out:**
 - 2027 storms are scored against NHC's operational best track as of the December 2027 snapshot, not against the final HURDAT2.
 - **Operational values are revised in post-analysis.** NHC: the best track "may differ from values contained in system advisories". There is no citable rate. The repo's own 2024–25 check (31 storms) found 9 peaks moved (mostly 5–10 kt), 3 changed category and none crossed 96 kt (sheet §3). It is not a rate.
-- So the pooled primary scores 2026 on final labels and 2027 on operational ones. Each season's d̄ is reported separately, descriptively (§5).
+- So the pooled primary scores 2026 on final labels (operational if the §2 backup fires) and 2027 on operational ones. Each season's d̄ is reported separately, descriptively (§5).
 - No re-scoring against the final 2027 HURDAT2 is declared (§10 item 8).
 
 **The route A snapshots** (December 2026, 2026's backup; December 2027, 2027's source; John's yes, §10 item 2; not done):
@@ -129,11 +131,11 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 - **A snapshot may come before this protocol's commit (§8 step 2).** Each is hashed and committed but **not read** until §8 step 4.
 - **A-deck fallback:** if the snapshot is missed, the operational track is rebuilt from the a-deck's **OFCL** τ0 rows (the advisory intensity), named now. CARQ is not used; the two differ (sheet: Helene 120/115, Karen 40/45). The known limitation: intensities given only in special or intermediate advisories are missed.
 - **John's explicit yes is given for both** (§10 item 2), since they bring label files into the repo.
-- **Route C needs no snapshot:** the HURDAT2 file is pinned at retrieval, as in 2025.
+- **Route C needs no snapshot:** the HURDAT2 file is the latest `hurdat2-1851-2026-*.txt` on the saved step 4 listing, pinned by filename and SHA-256 at retrieval.
 
-**Fixed whatever the choice:**
+**Fixed:**
 - The label route per season is fixed above and recorded in the commit of this protocol. The only switch is the 2026 backup rule above.
-- A later HURDAT2 release does not trigger a second pass.
+- A later HURDAT2 release or version, after the step 4 retrieval, is not read and does not trigger a second pass.
 - No descriptive re-scoring against final HURDAT2 is declared (decided, §10 item 8).
 
 ## 3. The list rule (stated without imagery, applied mechanically)
@@ -316,7 +318,7 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 
 ## 8. Order of operations (each committed before the next)
 
-1. **V frozen:** its freeze entry is committed (v2 design §4; target mid-December 2026). The route A snapshots (§2: December 2026, 2026's backup; December 2027, 2027's source) are committed unread, in their own commits.
+1. **V frozen:** its freeze entry is committed (v2 design §4; target mid-December 2026). The route A snapshots (§2: December 2026, 2026's backup; December 2027, 2027's source) are taken in the first half of December of each season and committed unread, each in its own commit, at any point in this order. The December 2027 one necessarily comes after step 3. Neither holds up step 2.
 2. **This protocol committed:**
    - **When:** after V's freeze and after hc-adversary's review of the driver and report scripts, and **before the H-EP pass, unconditionally.** F is E1 in H-EP whatever happens, so H-EP results on F always precede the clean pass.
    - **It can't be amended after the H-EP pass.** A defect found later is reported, not edited.
@@ -334,7 +336,8 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
    - **Reason:** no test result can then shape E3's design, its budget or its comparator.
    - **Cost:** none under option 3, whose pass (about Dec 2027) is after E3's deadline.
 4. **Labels available, and the list:**
-   - The 2026 HURDAT2 update and the December 2027 snapshot are read for the first time. If the update has not been posted, the 2026 backup (§2) is recorded first.
+   - **The trigger record first, in its own commit:** NHC's HURDAT2 listing, saved with its SHA-256 and retrieval time, before any 2026 label file or snapshot is read (§2).
+   - Then the latest `hurdat2-1851-2026-*.txt` on that listing and the December 2027 snapshot are read for the first time. The December 2026 snapshot is read only if the backup fires (the listing has no `hurdat2-1851-2026-*.txt`).
    - The storm selection rule (§3) is applied, and `storms_test_2026_2027.txt` is committed (header and status reads only).
    - **I4 amendment, with John's explicit yes, in the same commit** (John: "noted; ask me at the list step", §10 item 7):
      - `tests/test_list_invariants.py::test_no_2026_id_in_any_list` exempts exactly that list file by name, as `test_no_2025_test_storm_in_any_other_list` does for `storms_test_2025.txt`;
@@ -371,7 +374,7 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 ## 10. Decided (John, 2026-10-21; his words verbatim)
 
 1. **The option:** "Option 3: pool 2026 and 2027 in one scoring run. Decision 1 now reads "confirmed on the 2026–2027 clean test"." (Read first.)
-2. **Labels:** "2026 scored on the HURDAT2 update (it arrives before scoring under option 3). 2027 on operational best track from a hashed December 2027 snapshot, caveat stated. Yes to the hashed December 2026 operational snapshot as backup." (§2.)
+2. **Labels:** "2026 scored on the HURDAT2 update (it arrives before scoring under option 3). 2027 on operational best track from a hashed December 2027 snapshot, caveat stated. Yes to the hashed December 2026 operational snapshot as backup." (§2.) Version and trigger rule: coordinator's wording, for John's confirmation.
 3. **SESOI:** "Smallest effect worth acting on: 1.0 kt. State in the protocol that F-31's H9 gain (0.48 kt) is below it, so a null is the expected outcome and does not mean the recipe failed." (§6.)
 4. **Decision rule:** "as recommended": replace only on BETTER (§5).
 5. **2026 EP storms:** "as recommended": excluded (§4).
