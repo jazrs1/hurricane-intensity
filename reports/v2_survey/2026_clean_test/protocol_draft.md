@@ -1,6 +1,6 @@
-# 2026 clean test: protocol (DRAFT r2, after hc-adversary item 32; not approved, nothing built or run)
+# 2026–2027 clean test: protocol (DRAFT r3: John's answers of 2026-10-21 recorded in §10; not yet the committed protocol; nothing built or run)
 
-**Status:** a draft for John (his decision 4, 2026-10-21). I4 is unchanged now: no 2026 imagery is downloaded, listed or cropped, and no 2026 label file is downloaded. §8 states the one I4 amendment the test would need later, at step 4, with John's yes.
+**Status:** a draft for John (his decision 4, 2026-10-21). John answered its open items on 2026-10-21 (§10, his words verbatim). It is committed as the protocol at §8 step 2. I4 is unchanged now: no 2026 imagery is downloaded, listed or cropped, and no 2026 label file is downloaded. §8 states the one I4 amendment the test would need later, at step 4, with John's yes.
 
 **Inputs:**
 - **2026 counts:** from hc-reviewer's fact sheet, `label_facts.md` (this folder). The season counts are **as of 2026-10-21 20:27 UTC**, from the operational b-decks.
@@ -29,18 +29,11 @@
 - **Power here is P(p < 0.05).** The chance of reading BETTER is at most that.
 - **The high end:** under any option with 2026 alone, the > 96 kt questions, where the frozen ensemble's known weakness lies, can only be descriptive. There is one such storm, and it sits one 5 kt step above the line.
 
-**What this means for John's decision 1** ("confirmed only on the 2026 clean test"):
-- Under the 2025-style rule, 2026 cannot confirm anything.
-- Under the all-storm rule, 2026 can confirm or fail to confirm v2 on mean per-storm MAE over mostly weak storms. Whether the test is decisive depends on the unknown sd.
+**John's decision 1 now reads "confirmed on the 2026–2027 clean test"** (§10 item 1). It read "confirmed only on the 2026 clean test". Under the 2025 test's inferred rule, 2026 alone could not confirm anything.
 
-**Options** (presented neutrally):
-
-| Option | What it is | For | Against |
-|---|---|---|---|
-| **1. All-storm rule, 2026 only** | §3's rule; the primary on up to about 9 Atlantic storms | keeps decision 1's wording and timing (pass about Feb–Jun 2027, §8); well powered if sd ≈ 0.5 | underpowered if sd ≥ 1; the population is mostly weak storms; the high end is descriptive only |
-| **2. 2026 descriptive only; confirmation deferred** | 2026 reported without a test or replacement decision; confirmation on 2027 storms under this protocol | no test spent on a small set | 2026 is used without testing; v2 is unconfirmed until 2027 labels |
-| **3. Pooled 2026 + 2027, one pass** | the all-storm rule over both seasons, one pass after the 2027 labels | the n is robust to the unknown sd (below); more hurricanes in the population | changes decision 1 to "confirmed on the 2026–2027 clean test"; about one year's delay; needs 2027 protections at commit (§8) |
-| **4. Add 2026 East Pacific storms** | the 9 EP-ID storms > 96 kt join the test | many high-end storms | mixes basin and GOES-18 transfer into a recipe comparison, and spends E3's natural confirmation set (§4) |
+**The plan: option 3, pooled 2026 + 2027 in one scoring run** (John, §10 item 1).
+- The storm selection rule (§3) over both seasons, with one pass after the 2027 labels (about Dec 2027, §8).
+- **Its cost:** about one year's delay, and the 2027 protections at commit (§8 step 2).
 
 **Pooled n, with the basis stated:**
 - 2026 has 9 candidates.
@@ -48,14 +41,16 @@
 - So option 3 would plausibly reach n ≥ 16 before build drops. At n = 16, power for Δ = 1.0 is 0.96 at sd 1.0 and 0.69 at sd 1.5.
 - For the > 96 kt secondaries, about 3 major hurricanes in a normal 2027 plus Isaias would still likely fall short of 6 qualifying storms. **Option 3 does not reliably make the high end testable either.**
 
-**Recommendation, label-informed and model-blind: option 3.**
+**Why option 3** (the draft's recommendation, label-informed and model-blind; John chose it):
 - **The reason is robustness to the unknown sd.** Option 1 is decisive only if the sd is near its one H9-derived anchor. Option 3 keeps power at about 0.7–1.0 for Δ = 1.0 up to sd 1.5 kt, which is this draft's own grid cap, not a known bound; at sd 2.0 and n = 16 it is 0.47. Its population also has more hurricanes, though it is still mostly sub-hurricane: about 9 + 14 named storms, with about 8 hurricanes.
 - **For comparison at sd 1.0 and Δ = 1.0:** option 1 at n ≈ 9 has power of about 0.74, against 0.96 for option 3 at n = 16. The 0.74 is interpolated between `power_output.txt`'s n = 8 (0.67) and n = 10 (0.80) rows, since n = 9 is not in the grid; the 0.96 is its n = 16 row.
-- **Its cost is a year, and changing decision 1's wording.**
-- **Option 1 is the better choice** if John weighs 2026 timing above robustness, or judges the sd likely near 0.5. If the sd is in fact about 0.5, option 3 buys little power for its year.
-- **This recommendation was formed after seeing the 2026 counts.** The counts are model-blind (labels, not predictions), and John asked for them. Whichever option John picks, the test stays valid for its pre-registered population, because the list rule is applied mechanically and nothing is tuned to any storm (§3).
+- **Its cost is a year, and changing decision 1's wording.** If the sd is in fact about 0.5, option 3 buys little power for its year.
+- **This recommendation was formed after seeing the 2026 counts, and John chose after seeing them.** The counts are model-blind (labels, not predictions), and John asked for them. The test stays valid for its pre-registered population, because the storm selection rule is applied mechanically and nothing is tuned to any storm (§3).
 
-**What carries over under any option:** the list rule, the label route and snapshot (§2), the SESOI and the EP decision.
+**Considered, not chosen:**
+- **Option 1, all-storm rule, 2026 only:** kept decision 1's wording and timing, but is decisive only if the sd is near 0.5 (about 0.74 at sd 1.0, above).
+- **Option 2, 2026 descriptive only, confirmation on 2027:** uses 2026 without a test.
+- **Option 4, add the 2026 East Pacific storms:** mixes basin and GOES-18 transfer into a recipe comparison, and spends E3's natural confirmation set (§4).
 
 ## 0. What the test is
 
@@ -85,7 +80,7 @@
 - **`best_model.pt`:** out (as in H-EP §1).
 - **V must be frozen before the protocol is committed.** V's freeze entry is committed first, and the protocol is never committed with an open slot.
 
-## 2. Labels: John's choice, route A (operational) vs route C (HURDAT2)
+## 2. Labels: decided (§10 item 2): route C for 2026, route A for 2027
 
 John asked for "wait for the post-season HURDAT2 update vs. use operational best track with a stated caveat, with the expected date for each and how many 2026 storms each would give at ≥96 kt". All figures are from `label_facts.md`, as of 2026-10-21 20:27 UTC.
 
@@ -103,40 +98,59 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 - For a hurricane, by 2025 precedent, a TCR appears "about 2.5-5 months after the storm, sometimes later" (sheet §2). So Isaias's is due roughly late Dec 2026 to late Mar 2027.
 - It is final storm by storm, but not a pinned season file, so it is not offered as a route of its own.
 
-**Per-season route (option 3 only; John's choice).** Each season's route is chosen at the commit:
+**Per-season route, decided** (John: "2026 scored on the HURDAT2 update (it arrives before scoring under option 3). 2027 on operational best track from a hashed December 2027 snapshot, caveat stated. Yes to the hashed December 2026 operational snapshot as backup."):
 
-| Choice | 2026 | 2027 | Pass |
+| Season | Route | Source | Backup |
 |---|---|---|---|
-| A for both | Dec 2026 snapshot | Dec 2027 snapshot | about Dec 2027 |
-| **C for 2026, A for 2027** | the 2026 HURDAT2 (spring 2027), which exists before the pass | Dec 2027 snapshot | about Dec 2027 |
-| C for both | spring 2027 | spring 2028 | spring 2028 |
+| 2026 | **C** | the post-season HURDAT2 update containing 2026 (late Feb to mid-June 2027), which exists before the pass | the hashed December 2026 route A snapshot |
+| 2027 | **A** | the hashed December 2027 route A snapshot, with the caveat below | the OFCL a-deck rebuild (below), if the snapshot is missed |
 
-- Under "A for both", the 2026 storms would be scored against operational values although HURDAT2 with 2026 already exists. The hybrid avoids that without waiting for 2028.
+- "A for both" would have scored 2026 against operational values although HURDAT2 with 2026 exists before the pass. "C for both" would have moved the pass to spring 2028. The hybrid avoids both.
 
-**The route A snapshot (John's choice; not done):**
+**The 2026 HURDAT2 update (route C):**
+- It is read as a **new, separately hashed file** at a pinned, season-specific path (§7), pinned by filename and SHA-256 at retrieval. It is first read at §8 step 4.
+- It never writes `data/interim/hurdat2_atlantic.txt`: that file is protected (`ee35819c…0bcb5c`) and never refreshed, and `--force-hurdat2-refresh` is never used.
+- **If it has not been posted by §8 step 4** (the list step, which scoring needs): 2026 is scored on route A from the December 2026 snapshot, with route A's caveat. This is recorded in the step 4 commit before the list is read. If that snapshot was also missed, the OFCL a-deck rebuild (below) applies. A later HURDAT2 release does not trigger a second pass.
+
+**The 2027 caveat (route A), written out:**
+- 2027 storms are scored against NHC's operational best track as of the December 2027 snapshot, not against the final HURDAT2.
+- **Operational values are revised in post-analysis.** NHC: the best track "may differ from values contained in system advisories". There is no citable rate. The repo's own 2024–25 check (31 storms) found 9 peaks moved (mostly 5–10 kt), 3 changed category and none crossed 96 kt (sheet §3). It is not a rate.
+- So the pooled primary scores 2026 on final labels and 2027 on operational ones. Each season's d̄ is reported separately, descriptively (§5).
+- No re-scoring against the final 2027 HURDAT2 is declared (§10 item 8).
+
+**The route A snapshots** (December 2026, 2026's backup; December 2027, 2027's source; John's yes, §10 item 2; not done):
+- **Label files only:** the b-decks, the a-decks and the per-storm TCR record below. No imagery.
 - **What it is:** a copy of the season's Atlantic b-decks (`bal01–bal{nn}<yr>.dat`), each with its SHA-256 and retrieval time, at a basin- and year-specific path.
   - It is never `data/interim/hurdat2_atlantic.txt`: that file is protected (`ee35819c…0bcb5c`) and never refreshed, and `--force-hurdat2-refresh` is never used.
 - **Taken alongside it:**
   - **the a-decks** (`aal{nn}<yr>`) for the same storms;
   - **a per-storm record of whether that storm's TCR existed at snapshot time.** A live b-deck may already carry post-analysis values for a storm whose TCR is out. The sheet shows only the bulk archive rewrite.
 - **Who and when:** a worker named by the coordinator, in its own commit, in the **first half of December** of the season. That is after Nov 30 and well before the archive rewrite (2025's was 2026-03-06).
-- **The snapshot may come before this protocol's commit (§8 step 2).** It is hashed and committed but **not read** until §8 step 4.
+- **A snapshot may come before this protocol's commit (§8 step 2).** Each is hashed and committed but **not read** until §8 step 4.
 - **A-deck fallback:** if the snapshot is missed, the operational track is rebuilt from the a-deck's **OFCL** τ0 rows (the advisory intensity), named now. CARQ is not used; the two differ (sheet: Helene 120/115, Karen 40/45). The known limitation: intensities given only in special or intermediate advisories are missed.
-- **It needs John's explicit yes,** because it brings label files into the repo.
+- **John's explicit yes is given for both** (§10 item 2), since they bring label files into the repo.
 - **Route C needs no snapshot:** the HURDAT2 file is pinned at retrieval, as in 2025.
 
 **Fixed whatever the choice:**
-- The label route is chosen once per season, in the commit of this protocol.
+- The label route per season is fixed above and recorded in the commit of this protocol. The only switch is the 2026 backup rule above.
 - A later HURDAT2 release does not trigger a second pass.
-- Under A, a descriptive re-scoring against final HURDAT2 is possible only if it is declared here. **Open item:** recommend none.
+- No descriptive re-scoring against final HURDAT2 is declared (decided, §10 item 8).
 
 ## 3. The list rule (stated without imagery, applied mechanically)
 
-**The rule (unchanged since r0):** the test list = every **Atlantic** ATCF ID of the test season(s) (`AL<nn>2026`, plus `AL<nn>2027` under option 3) in the chosen label source that meets all of these:
+### Storm selection rule (F-40)
+
+**This is the test's storm selection rule (unchanged since r0):** the test list = every **Atlantic** ATCF ID of the test season(s) (`AL<nn>2026` and `AL<nn>2027`) in the chosen label source that meets all of these:
 1. **Status:** at least one fix with status TS or HU.
 2. **No overlap:** it is in no other list (checked by `load_splits`, the I5 forbidden sets, and the F-10 alias/concurrency check).
    - **A test-season storm that another list names is never silently dropped.** The list commit refuses and the conflict goes to John, because it means a protection was breached (§8, the 2027 protections).
 3. **Frames:** ≥ 12 frames after the build survive the unchanged NaN rule. A storm with fewer is dropped and reported before any model runs.
+
+- **The 2025 test's rule was never written down.** It is inferred from its list as HURDAT2 peak ≥ 64 kt (sheet §4). It is not this test's rule. Under it, 2026 would give 1 storm (Read first).
+- **Where n and the power figures come from, under this rule:**
+  - 2026: all 9 storms so far have TS status rows, so up to 9 meet rule 1 (Read first).
+  - 2027: a normal season has about 14 named storms (NOAA 1991–2020). A named storm has TS status rows unless it was subtropical only, which rule 1 excludes.
+  - So about 23 candidates meet rule 1 before rule 3's frame drops, fewer by any subtropical-only 2027 storm. Read first's "n ≥ 16" and the n = 16 power rows (§6) sit below that count.
 
 **Why all storms, on meaning:**
 - The deployed ensemble predicts every intensity, and the primary is mean per-storm MAE.
@@ -164,12 +178,12 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 **Disclosure:**
 - **The rule was in r0** (01d107b, 16:35:53 EDT). It was committed before the fact sheet was committed (80ed2bb, 16:37:40) or merged here (d2baf56, 16:41:59).
   - Git shows the commit order, not what the author had seen. The sheet's counts were taken at 16:27 EDT.
-- **Any option John chooses now** (Read first) is chosen after the 2026 counts were seen. The counts are model-blind, and John asked for them.
+- **John's option 3** (Read first) was chosen after the 2026 counts were seen. The counts are model-blind, and John asked for them.
 - **No threshold was tuned to Isaias** or to any 2026 storm. The ≥ 12-frame floor is r0's; the ≥ 10-frame > 96 kt rule is 2025's.
 
-**Subtropical-only storms** (SS but never TS or HU) are out under rule 1. **Open item:** include them.
+**Subtropical-only storms** (SS but never TS or HU) are out under rule 1 (decided, §10 item 8).
 
-## 4. East Pacific storms: excluded (recommended; John's choice)
+## 4. East Pacific storms: excluded (decided, §10 item 5)
 
 - **What 2026 EP holds** (operational, sheet §3):
   - 9 EP-ID storms > 96 kt: Genevieve, Karina, Lowell, Nolo, Odalys, Polo, Rachel, Simon and Trudy;
@@ -178,10 +192,6 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 - **Why exclude them:**
   - F and V are Atlantic-only, and EP storms are imaged by GOES-18 at different viewing angles. So V − F there mixes the recipe with transfer, which H-EP measures.
   - 2026 EP is also E3's natural unspent confirmation set.
-- **If John includes them:**
-  - they form a separate, declared secondary, never pooled;
-  - the hold in §8 step 3 becomes required;
-  - 2026 EP is spent for E3 afterwards.
 
 ## 5. The comparison, the test and the reading
 
@@ -204,7 +214,7 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 - **A note for John:** at these n the CIs are wide. BETTER does **not** require d̄ near Δ, only that the CI reach beyond −Δ. For example, d̄ = −0.6 kt with a CI of [−1.2, −0.1] reads BETTER at Δ = 1.0.
 - **Conversely,** with an effect near the H9-derived 0.48 kt, a significant result is often SIGNIFICANT BUT BELOW SESOI.
 
-**Decision rule** (open item for John; recommendation):
+**Decision rule** (decided, §10 item 4):
 - v2 replaces the frozen ensemble **only on BETTER**.
 - On every other reading, the frozen ensemble stays.
 - A replacement is its own committed decision, with new I3/I6 pins.
@@ -226,7 +236,8 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 
 **SESOI, grounded in the decision it serves** (not in F-31, and not in label noise):
 - **What Δ is:** the smallest gain in mean per-storm MAE that would justify replacing a frozen, tested reference. A replacement costs new I3/I6 pins, a new site build and a new reference figure, and it breaks the 2025 test's comparability for the deployed model.
-- **Recommended Δ = 1.0 kt** (open item for John). That is a judgment of what gain is worth a switch; no external figure fixes it. The alternative is Δ = 0.5 kt.
+- **Δ = 1.0 kt (decided, §10 item 3).** That is a judgment of what gain is worth a switch; no external figure fixes it. The alternative considered was Δ = 0.5 kt.
+- **F-31's H9 gain, 0.48 kt, is below Δ** (John). So a null is the expected outcome, and it does not mean the recipe failed.
 - **Label noise is not the argument.** It is shared by both models in a paired comparison and averages over frames. So best-track uncertainty does not set Δ.
 
 **Power over storms** (`power.py`; output `power_output.txt`):
@@ -250,7 +261,7 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 | 14 | 1.00 | 0.93 | 0.62 | 0.41 |
 | 16 | 1.00 | 0.96 | 0.69 | 0.47 |
 
-**Power at Δ = 0.5 kt:**
+**Power at Δ = 0.5 kt** (the alternative considered; not used):
 
 | n | sd 0.5 | sd 1.0 | sd 1.5 | sd 2.0 |
 |---|---|---|---|---|
@@ -305,33 +316,31 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 
 ## 8. Order of operations (each committed before the next)
 
-1. **V frozen:** its freeze entry is committed (v2 design §4; target mid-December 2026). Route A snapshots (§2) may be taken and committed at any time, unread.
+1. **V frozen:** its freeze entry is committed (v2 design §4; target mid-December 2026). The route A snapshots (§2: December 2026, 2026's backup; December 2027, 2027's source) are committed unread, in their own commits.
 2. **This protocol committed:**
    - **When:** after V's freeze and after hc-adversary's review of the driver and report scripts, and **before the H-EP pass, unconditionally.** F is E1 in H-EP whatever happens, so H-EP results on F always precede the clean pass.
    - **It can't be amended after the H-EP pass.** A defect found later is reported, not edited.
    - **The decisions.md entry records:**
-     - John's option (Read first) and the label route per season, with the snapshot choice;
+     - option 3 (Read first) and the label route per season (2026 C with the December 2026 backup, 2027 A), with the snapshots;
      - Δ, the decision rule and the EP choice;
-     - the list rule;
+     - the storm selection rule (§3);
      - the members files' blob hashes;
      - the blob hashes of the driver, the report, the label-input code (§7), `ensemble_eval.py` and `src/hurricane_intensity/*.py`.
-   - **Under option 3, the same commit adds the 2027 protections:**
+   - **The same commit adds the 2027 protections** (option 3):
      - an I4-style row for 2027 ("no 2027 storm imagery downloaded or cropped");
      - a `test_no_2027_id_in_any_list`;
      - a `data/processed/*2027*` check, as for 2026.
-3. **E3 settled (John's choice; recommended):** the pass waits until E3's design and checkpoints are frozen, or its slot has closed at its deadline (about end-January 2027).
+3. **E3 settled (decided, §10 item 6):** the pass waits until E3's design and checkpoints are frozen, or its slot has closed at its deadline (about end-January 2027).
    - **Reason:** no test result can then shape E3's design, its budget or its comparator.
-   - **Cost:** under option 1 with route A, the pass moves from about December 2026 to about February 2027. There is no cost under route C or option 3.
-   - **Alternative:** no hold.
-   - **If 2026 EP storms are included (§4),** the hold is required.
+   - **Cost:** none under option 3, whose pass (about Dec 2027) is after E3's deadline.
 4. **Labels available, and the list:**
-   - The route's labels become available, or the snapshot is read for the first time.
-   - The list rule is applied, and `storms_test_2026.txt` is committed (or `storms_test_2026_2027.txt` under option 3; header and status reads only).
-   - **I4 amendment, with John's explicit yes, in the same commit:**
+   - The 2026 HURDAT2 update and the December 2027 snapshot are read for the first time. If the update has not been posted, the 2026 backup (§2) is recorded first.
+   - The storm selection rule (§3) is applied, and `storms_test_2026_2027.txt` is committed (header and status reads only).
+   - **I4 amendment, with John's explicit yes, in the same commit** (John: "noted; ask me at the list step", §10 item 7):
      - `tests/test_list_invariants.py::test_no_2026_id_in_any_list` exempts exactly that list file by name, as `test_no_2025_test_storm_in_any_other_list` does for `storms_test_2025.txt`;
      - the list gets its `LIST_ROLES` entry;
      - check.py's I4 check and the FEATURES.md I4 row are reworded: no `*2026` ID in any `storms_*.txt` **except** the named test list, and no `data/processed/*2026*`, with `data/2026_sealed/` the only place 2026 crops may exist;
-     - under option 3, the same applies for 2027.
+     - the same applies for 2027.
    - **Nothing is changed in any test now;** this draft only states the amendment.
 5. **Build** into `data/2026_sealed/` (I4's lift for this build, under step 4's yes). The build reads labels only through the pinned label input (§7). `data/interim/hurdat2_atlantic.txt` is neither refreshed nor used for test seasons.
    - Then the NaN exclusion step, with carry-forward (as H-EP gate 7), and the GOES-19 check (§3).
@@ -348,10 +357,7 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 
 | Option and route | Pass |
 |---|---|
-| Option 1, route A | about Feb 2027 with the hold, about Dec 2026 without it |
-| Option 1, route C | after the 2027 HURDAT2 file (late Feb to mid-June 2027) |
-| Option 3, A for both or C/A | about Dec 2027 |
-| Option 3, C for both | spring 2028 |
+| Option 3, C for 2026 and A for 2027 | about Dec 2027, after the December 2027 snapshot |
 
 ## 9. If the result is poor, or a bug is found
 
@@ -362,16 +368,18 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 - **A bug in the evaluation code** found afterwards is fixed and rerun, and both runs are reported with the reason.
 - **No later selection:** the test set is never used to select a model.
 
-## 10. Open items for John
+## 10. Decided (John, 2026-10-21; his words verbatim)
 
-1. **The option:** 1, 2, 3 (recommended; label-informed and model-blind) or 4 (Read first). Options 2 and 3 change decision 1's "confirmed only on the 2026 clean test".
-2. **Labels:** route A (operational, with a caveat) or C (HURDAT2), per season under option 3 (§2). Under A, a yes is needed to the December snapshot (with a-decks and the per-storm TCR record), or to the OFCL a-deck rebuild instead.
-3. **SESOI:** Δ = 1.0 kt recommended, or 0.5 kt (§6).
-4. **Decision rule:** replace only on BETTER (recommended) (§5).
-5. **2026 EP storms:** excluded (recommended) (§4).
-6. **The hold:** hold the pass until E3 is settled (recommended), or no hold (§8 step 3).
-7. **The I4 amendment at step 4** (§8). It will need John's yes when the list is committed. It is stated here so it is not a surprise.
-8. **Subtropical-only storms** (§3), and under A, any declared re-scoring against final HURDAT2 (§2). Recommend no to both.
+1. **The option:** "Option 3: pool 2026 and 2027 in one scoring run. Decision 1 now reads "confirmed on the 2026–2027 clean test"." (Read first.)
+2. **Labels:** "2026 scored on the HURDAT2 update (it arrives before scoring under option 3). 2027 on operational best track from a hashed December 2027 snapshot, caveat stated. Yes to the hashed December 2026 operational snapshot as backup." (§2.)
+3. **SESOI:** "Smallest effect worth acting on: 1.0 kt. State in the protocol that F-31's H9 gain (0.48 kt) is below it, so a null is the expected outcome and does not mean the recipe failed." (§6.)
+4. **Decision rule:** "as recommended": replace only on BETTER (§5).
+5. **2026 EP storms:** "as recommended": excluded (§4).
+6. **The hold:** "as recommended": the pass waits until E3 is settled (§8 step 3).
+7. **The I4 amendment at step 4** (§8): "noted; ask me at the list step." **Still open:** it needs John's yes when the list is committed.
+8. **Subtropical-only storms and re-scoring:** "as recommended": no subtropical-only storms (§3), and no declared re-scoring against final HURDAT2 (§2).
+
+**F-40** (John): "the 2026–2027 protocol must state its storm selection rule explicitly and say the 2025 rule was inferred (HURDAT2 peak ≥64 kt)." Done in §3, "Storm selection rule".
 
 ## Files in this draft
 
