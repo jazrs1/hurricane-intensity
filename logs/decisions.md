@@ -2826,4 +2826,10 @@ entry.
   - f91a66b9e497ec54d9ac7475fb5a81566c8d7c2d73797e1c695e1b015363189b  logs/f31/runs/control_seed27.train.json
   - ddcce64a17da44f1f8ba9d2c7cbdf46a7598d39c12d1b948c31368202f2d150a  logs/f31/runs/control_seed28.train.json
   - 18d285de97dfadd7a23159c8ad070874a061eb04e4e6af1f2586105950bac2d7  logs/f31/runs/control_seed29.train.json
+- Correction to the 2026-10-20 pre-launch entry: run_f31.py printed
+  HEAD (fc71b98…) and the train.py pin (afceb4b19ea7…), not the
+  analysis blob. The coordinator verified the analysis blob
+  independently at launch: the working analyze_f31.py = the HEAD blob =
+  feee9baf…, as in that entry, and launch guard 1 requires it to equal
+  HEAD. Follow-up F-38: a future driver prints it.
 - Next: John's separate yes to phase 2 (runbook step 4).
