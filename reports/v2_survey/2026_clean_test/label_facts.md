@@ -15,7 +15,7 @@ Fact sheet for the 2026 clean-test protocol draft (hc-survey). It covers the lab
 | route | label source | expected date | Atlantic storms > 96 kt | East Pacific storms > 96 kt |
 |---|---|---|---|---|
 | A. Operational | ATCF b-deck (operational working best track), with a caveat | now (season open to Nov 30) | **1**: Isaias AL092026, 105 kt | **9** EP-ID storms, plus 1 CP-ID storm (Lala) |
-| B. Per-storm TCR | TCR post-analysis best track | storm by storm. For a hurricane, by precedent about 2.5-5.5 months after the storm, sometimes later. For Isaias: roughly late Dec 2026 to late Mar 2027 | not knowable yet; operationally 1 | not knowable yet |
+| B. Per-storm TCR | TCR post-analysis best track | storm by storm. For a hurricane, by precedent about 2.5-5 months after the storm, sometimes later. For Isaias: roughly late Dec 2026 to late Mar 2027 | not knowable yet; operationally 1 | not knowable yet |
 | C. HURDAT2 | annual HURDAT2 update | late Feb to mid-June 2027, most years April-May (precedent below) | not knowable yet; operationally 1 | not knowable yet |
 
 - The Atlantic route A count is 1 storm with 15 hourly frames > 96 kt.
@@ -82,7 +82,7 @@ Fact sheet for the 2026 clean-test protocol draft (hc-survey). It covers the lab
   - Two 2024 examples: Helene's TCR shows 2026-02-17 and Milton's 2026-07-30. Both are long after HURDAT2 2024 (April 2025).
   - True first-release dates aren't recoverable from the headers.
 - A TCR revision doesn't necessarily move the best track. Melissa's block (`AL132025` to end of file) is byte-identical (md5 `fb7dda8d…`) in `hurdat2-1851-2025-02272026.txt` and `hurdat2-1851-2025-092326.txt`, despite the May 19 TCR update.
-- **For Isaias:** the 2025 hurricanes other than Melissa were available about 2.5 months (Dexter, Gabrielle, Humberto) to 5.5 months (Erin, storm ended Aug 22, TCR Jan 30) after the storm. For Isaias (ended Oct 11), that suggests roughly late Dec 2026 to late Mar 2027. It is precedent, not a schedule.
+- **For Isaias:** the 2025 hurricanes other than Melissa were available about 2.5 months (Dexter, Gabrielle, Humberto) to 5 months (Erin, last HURDAT2 fix Aug 27, TCR Jan 30) after the storm. For Isaias (ended Oct 11), that suggests roughly late Dec 2026 to late Mar 2027. It is precedent, not a schedule.
 
 ### C. The annual HURDAT2 update
 
@@ -133,7 +133,7 @@ Fact sheet for the 2026 clean-test protocol draft (hc-survey). It covers the lab
 | route | expected date | basis |
 |---|---|---|
 | A. Operational b-deck | available now for finished storms; the season count is final only after Nov 30, 2026 | live b-decks; season end |
-| B. TCR | storm by storm. A hurricane is typically about 2.5-5.5 months after the storm, sometimes later (upper bounds above). Isaias: roughly late Dec 2026 to late Mar 2027 | 2025 TCR Last-Modified dates |
+| B. TCR | storm by storm. A hurricane is typically about 2.5-5 months after the storm, sometimes later (upper bounds above). Isaias: roughly late Dec 2026 to late Mar 2027 | 2025 TCR Last-Modified dates |
 | C. HURDAT2 | late Feb to mid-June 2027; most years April-May | 2017-2025 release table |
 
 ## 3. 2026 storms at the line, and how often post-analysis moves a peak
@@ -306,6 +306,7 @@ curl -sI https://www.nhc.noaa.gov/data/tcr/AL052025_Erin.pdf | grep -i last-modi
 ```
 
 - **Hourly frame estimates:** the b-deck rows go through `hurricane_intensity.pipeline.build_sample_grid(fixes, "1h")` after the status filter `config.DEFAULT_INCLUDE_STATUSES`. The frame-level threshold check uses `hurdat2.parse_storm` over the local cache.
+- **Isaias revision table (§3):** the same `build_sample_grid` b-deck script, with the 12Z/18Z (2026-10-09) `wind_kt` overridden to 100 or 95, one fix at a time and then both.
 - Both were run with `.venv/Scripts/python.exe -B` and `PYTHONPATH=src`, from scripts in the session scratchpad, not added to the repo.
 
 **Sources** (all accessed 2026-10-21):
