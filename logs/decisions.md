@@ -2763,3 +2763,73 @@ evaluation or H9 read by this entry.
 - The launch commit L is the merge commit of this entry's PR. The
   driver prints HEAD and the analysis blob at launch; the coordinator
   checks them against this entry.
+
+2026-10-20, 21:02. F-31 pre-look record (design §3), from the 40 phase-1
+records, before any H9 look. No training, evaluation or H9 read by this
+entry.
+- Phase 1: `run_f31.py launch` at L = fc71b989feaaf1c450d2da0df5b59d2f405b46a6
+  finished 20:58:53 EDT, exit 0, 40/40 trained. All 40 records name
+  commit L. analyze_f31.check_training passes on all 40 (0 problems).
+  `run_f31.py looked`: none.
+- Flags: selected epoch > 0.85 x E_k (analyze_f31.flagged). Qualifier
+  BUDGET-LIMITED at (arm, budget) when >= 10/20 native picks are flagged.
+  - control: 1x (E 25) 12/20 BUDGET-LIMITED; 2x (E 50) 8/20;
+    4x (E 99) 5/20.
+  - atlantic: 1x (E 13) 8/20; 2x (E 26) 13/20 BUDGET-LIMITED;
+    4x (E 52) 12/20 BUDGET-LIMITED.
+  - Also reported (not qualifiers): control matched_4x 4/20, control
+    smoothed_4x 7/20, atlantic smoothed_4x 12/20.
+- Reading (design §3): the atlantic arm is still budget-limited at 4x
+  (6600 steps). F-31 reports that and does not extend.
+- Zero seeds (native 4x = native 1x): control 0, atlantic 0, so m = 20
+  in both arms and significance is reachable.
+- Record SHA-256s (`sha256sum` of the committed bytes, sorted by path);
+  SHA-256 of this 40-line listing, LF-terminated:
+  0a3085dda4acb729f20f21e7d4a5abb94e4e832697a3d08cb66915fabfc3621d
+  - 08d7a68b42f0af9e1b09ad1d4f70895bfd7ee06de40d4909933ca909c872cb76  logs/f31/runs/atlantic_seed10.train.json
+  - a3e8b1543c27f6a078fa85528d0765d4b44eeef34ce9363a1870f9b3d9393526  logs/f31/runs/atlantic_seed11.train.json
+  - 9a6dd8bb85da651dd3014bec52843dfb057e78956a634cd426e911a44a7fe26b  logs/f31/runs/atlantic_seed12.train.json
+  - c3de574d20496e344796d9ea02819a735d08ba58734e6e8877a02cfb5150ca53  logs/f31/runs/atlantic_seed13.train.json
+  - ee21225cff4b752f3706340edca958ff56a13c529b0fbe6a834ade3775ad6858  logs/f31/runs/atlantic_seed14.train.json
+  - a90edcc7984fa2edb6b77dca700034e467cddff3a8860d46e54d41b72c5826f4  logs/f31/runs/atlantic_seed15.train.json
+  - 211146e2bcd49fc00193d37469b6bf3db844b25ce9b5ac01d13063147fb26c38  logs/f31/runs/atlantic_seed16.train.json
+  - 92de021f8a8e2c86431a727cc2c4e60d9387fe07bf0ceb997f5601792cd9915b  logs/f31/runs/atlantic_seed17.train.json
+  - 217319cc7a7b572bac91f57ca2a0c7577eb563d2653ecc94eed6b70bebe52890  logs/f31/runs/atlantic_seed18.train.json
+  - 7a01bf231e731313cfe14d34bf278b01dcf05571aa26f8cda9a05a2d2289cbf0  logs/f31/runs/atlantic_seed19.train.json
+  - f0db0555e8cd66572acff10ec9745517e07c1c3479219dfd6325f79ba35078e6  logs/f31/runs/atlantic_seed20.train.json
+  - e20243642898114df2aea85335e56d211026e2ece60a3b4f74ef1e2f5968b910  logs/f31/runs/atlantic_seed21.train.json
+  - 21d780d8664c57f7a151fd67fb862c090cb0407a6fb35d9f5e0308c0cbd4cdba  logs/f31/runs/atlantic_seed22.train.json
+  - 4a2d07fb63155c057853ea39062129c1a6339dea4430f1841192be61f7567ad9  logs/f31/runs/atlantic_seed23.train.json
+  - 80c4a97d1754f000620bf378664d1c656bcd5ca0f225bb198f2c4869badc98ac  logs/f31/runs/atlantic_seed24.train.json
+  - 65b7c59af8bfce8df54864d48178c5e94413ff05e4fb5a8a709fd3decb681c6a  logs/f31/runs/atlantic_seed25.train.json
+  - c4d3bc168c9996fb81506c38f79d490c36b905dd43b711e2bd35ed5ad5b4e220  logs/f31/runs/atlantic_seed26.train.json
+  - db32aa84068d8c3721505f0d7c3d0ce887450a6c3b49ddca16c52db24c305749  logs/f31/runs/atlantic_seed27.train.json
+  - 169f26760a900774745dce4a0863598cd6af1b9d62337368b216e21dbeb507e5  logs/f31/runs/atlantic_seed28.train.json
+  - ce5c7dab6836e80d2efbf849167b94472f8d99c776c6367fbaeac27fc79ce134  logs/f31/runs/atlantic_seed29.train.json
+  - a61609fb3897cf7af0fc39c4e6f442d55fe4765fbeb1bde67781406d726fad24  logs/f31/runs/control_seed10.train.json
+  - 2df05e948d18e2cc0302b65588dc51f9764e4610a76442cd83b735f6595a9329  logs/f31/runs/control_seed11.train.json
+  - 7c97b7ae23efa886052f2d6a69b8ec8ef690484d5f106cbbcb09c520314db88b  logs/f31/runs/control_seed12.train.json
+  - 934ad92587886589e6ef80c9c8c389b86e1cbfc17a4497efe0d194dfa96187e1  logs/f31/runs/control_seed13.train.json
+  - de96828f6aed6e98eec598e9c506ae2278ce339f71a634ccee0329cdf6d10a46  logs/f31/runs/control_seed14.train.json
+  - bab33b8261775e4347f7bfd7706e20b365c4841de509e209e5819c8bc2013922  logs/f31/runs/control_seed15.train.json
+  - e966c324de4ee0e2fac1d0e57dc4cd0ab1c0bc40bb129b17d7a3678819aad127  logs/f31/runs/control_seed16.train.json
+  - dbd640285caae2d002010b3e5d85ae5b5475fed78eab719494ecaab8f59f8fd7  logs/f31/runs/control_seed17.train.json
+  - b672b09b8c9bec916a4160c97f7a619acb02771dc337502e2b1a367904339beb  logs/f31/runs/control_seed18.train.json
+  - 6bffe2e0e97368853942212726c35752ddae6a896427ff49340947a2c3ca0b32  logs/f31/runs/control_seed19.train.json
+  - 3b42bf329a3cfa70e4de68706cf3a0b1b973abfb2317d87b9a3ccc927cdc8065  logs/f31/runs/control_seed20.train.json
+  - d6096e3aeb1e1b7f84cf52f829f3ff526b273aef2c1ea07f7d06873df1579744  logs/f31/runs/control_seed21.train.json
+  - 6629baeefacb007caccfb2a0f204afc6654dbab222de9fb8fbff19f00dc9315a  logs/f31/runs/control_seed22.train.json
+  - 7bdc07432f1c7f7620bee34418a9b6bf5973f244163a02f1a9b80fbe06968d0c  logs/f31/runs/control_seed23.train.json
+  - 2a3a135344ce409e5303f59f1c35bbf0509920c8b0c438adcdbd38b657199f80  logs/f31/runs/control_seed24.train.json
+  - e58a48c3e7c98100d4252a1a94649d078fcedb8fadf599e2c184dcfcb18dc4d6  logs/f31/runs/control_seed25.train.json
+  - f61fdaff511cf7f0812fc039957c5943faa1523bf258dafc0144497c7f03bca2  logs/f31/runs/control_seed26.train.json
+  - f91a66b9e497ec54d9ac7475fb5a81566c8d7c2d73797e1c695e1b015363189b  logs/f31/runs/control_seed27.train.json
+  - ddcce64a17da44f1f8ba9d2c7cbdf46a7598d39c12d1b948c31368202f2d150a  logs/f31/runs/control_seed28.train.json
+  - 18d285de97dfadd7a23159c8ad070874a061eb04e4e6af1f2586105950bac2d7  logs/f31/runs/control_seed29.train.json
+- Correction to the 2026-10-20 pre-launch entry: run_f31.py printed
+  HEAD (fc71b98…) and the train.py pin (afceb4b19ea7…), not the
+  analysis blob. The coordinator verified the analysis blob
+  independently at launch: the working analyze_f31.py = the HEAD blob =
+  feee9baf…, as in that entry, and launch guard 1 requires it to equal
+  HEAD. Follow-up F-38: a future driver prints it.
+- Next: John's separate yes to phase 2 (runbook step 4).
