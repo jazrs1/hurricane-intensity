@@ -47,7 +47,7 @@ John asked for this choice to be laid out. Post-season HURDAT2 vs operational be
 | …of which reach ≥ 96 kt | **[fact sheet]** | **[fact sheet]** |
 | …with ≥ 10 frames > 96 kt (the per-storm > 96 kt rule) | **[fact sheet]** (estimated from fixes; frames are known only after the build) | **[fact sheet]** |
 | Caveat | none beyond best-track uncertainty | operational intensities are revised after the season; the size and direction of revisions is **[fact sheet]**. Results read "against operational best track". |
-| Earliest pass (with §8's ordering) | after availability, and after E3's freeze or deadline | after E3's freeze or deadline (about end-January 2027), even if the labels are ready earlier |
+| Earliest pass | after availability (and, under §8 choice 3, after E3's freeze or deadline) | when the labels are ready; under §8 choice 3, not before E3's freeze or deadline (about end-January 2027) |
 
 **What does not change with the choice:** the list rule, the metrics, the SESOI, the reading and the single pass.
 
@@ -184,7 +184,11 @@ John asked for this choice to be laid out. Post-season HURDAT2 vs operational be
    - the list rule;
    - the members files' blob hashes;
    - the driver and report blob hashes.
-3. **E3 settled:** E3's design and checkpoints frozen, or its slot closed at its deadline (about end-January 2027). The 2026 pass waits for this, so no 2026 result can shape E3.
+3. **E3 settled (John's choice; recommended):** the 2026 pass waits until E3's design and checkpoints are frozen, or its slot has closed at its deadline (about end-January 2027).
+   - **Reason:** then no 2026 result can shape E3's design, its budget or its comparator.
+   - **Cost:** under option (B) the pass moves from when the labels are ready (about December 2026) to about February 2027. Under option (A) there is no cost, since the HURDAT2 update comes later anyway.
+   - **Alternative:** no hold. Only step 2 orders the two tests: the protocol is committed before the H-EP pass. The 2026 pass may then run before E3 is frozen, and a 2026 v2-vs-frozen result could be seen while E3's design is still open.
+   - If 2026 EP storms are included (§4), the hold is required, not a choice.
 4. **Labels available** under the chosen option (§2). The list rule is applied and `storms_test_2026.txt` is committed, with only header and status reads.
 5. **Build** into `data/2026_sealed/` with `--bucket noaa-goes19`. Then the NaN exclusion step, with carry-forward (as H-EP gate 7). Frames per storm are counted, and rule 3 drops are committed. Still no model.
 6. **Domain shift:** 2026 vs H9, before any model runs.
@@ -192,7 +196,7 @@ John asked for this choice to be laid out. Post-season HURDAT2 vs operational be
 8. **Spend in code:** the 2026 IDs join TCDataset's spent set through the registry role, with a `check.py` pin of `results/final_2026/` (as I3 / I3b).
 
 **Timeline:**
-- **Option (B):** the pass falls after E3's deadline, so about February 2027.
+- **Option (B):** about February 2027 with the hold in step 3; as soon as the labels are ready without it.
 - **Option (A):** after the HURDAT2 update (**[fact sheet]**).
 - No step before 5 touches 2026 imagery. Step 5 needs John's explicit yes, since I4 is lifted only for this build.
 
@@ -211,7 +215,8 @@ John asked for this choice to be laid out. Post-season HURDAT2 vs operational be
 2. **SESOI:** Δ = 1.0 kt recommended, or 0.5 kt (§6).
 3. **The decision rule:** replace only on BETTER (recommended) (§5).
 4. **2026 EP storms:** excluded (recommended) (§4).
-5. **Subtropical-only storms** (§3), and under (B), any declared re-scoring against final HURDAT2 (§2). Recommend no to both.
+5. **Hold the 2026 pass until E3 is settled** (recommended), or rely on the protocol commit before the H-EP pass alone (§8 step 3).
+6. **Subtropical-only storms** (§3), and under (B), any declared re-scoring against final HURDAT2 (§2). Recommend no to both.
 
 ## Files in this draft
 
