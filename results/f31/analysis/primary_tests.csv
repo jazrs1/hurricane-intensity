@@ -1,0 +1,3 @@
+test,branch,n,m_nonzero,p_floor,mean_diff,sd_diff,ci_level,ci_lo,ci_hi,p_signflip,alpha,sesoi,n_seeds_better,significant,direction,verdict,arm,ref_mean,new_mean
+"P1 control (frozen-ensemble configuration): overall MAE, 4x - 1x","d = MAE(native_4x) - MAE(native_1x), d < 0 better",20,20,0.000002,-0.992584,0.346227,97.5%,-1.181477,-0.814099,0.000002,0.025000,0.900000,20,True,better,BETTER,control,9.551465,8.558881
+"P2 atlantic: overall MAE, 4x - 1x","d = MAE(native_4x) - MAE(native_1x), d < 0 better",20,20,0.000002,-1.364415,0.610727,97.5%,-1.699186,-1.034308,0.000002,0.025000,0.900000,20,True,better,BETTER | BUDGET-LIMITED at 4x in the atlantic arm: read 'at this budget',atlantic,9.717180,8.352765

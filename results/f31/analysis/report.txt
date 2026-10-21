@@ -1,0 +1,50 @@
+F-31 budget study: each arm read at 1x, 2x and 4x x 1640 steps inside one run per seed, H9 pooled. Pre-registered analysis output, unedited.
+seeds [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]; control epochs {1: 25, 2: 50, 4: 99}, atlantic epochs {1: 13, 2: 26, 4: 52}
+analysis blob sha256 feee9bafabee141dd393a86c3c469b4cafd17c160c8f97076cab55da0f8016e1 (blob id fd7d4c934b2d76912ce3905a773c5936ac3ae7cc); imported scripts/analyze_n5.py blob sha256 0130641583cf09c8abb5791b9ea9467fd6410b953bc8a57c3a2ae68fb3bb1288 (blob id 679e21696b6592e36a0ff12ee7d7acb4622dd565); commit fc71b989feaaf1c450d2da0df5b59d2f405b46a6
+F-31 is a new experiment, not a rerun or rescue of N5. N5's verdict stands whatever F-31 finds.
+PRIMARIES (Bonferroni, alpha 0.025 each, two-sided exact sign-flip, native selection; SESOI 0.9 kt, N5's, for comparability):
+  P1 control (frozen-ensemble configuration): overall MAE, 4x - 1x: d -0.993 (sd 0.346, n 20, 20 non-zero, p floor 1.9e-06), 97.5% CI [-1.181, -0.814], p 0.00000 -> BETTER   [d = MAE(native_4x) - MAE(native_1x), d < 0 better]
+  P2 atlantic: overall MAE, 4x - 1x: d -1.364 (sd 0.611, n 20, 20 non-zero, p floor 1.9e-06), 97.5% CI [-1.699, -1.034], p 0.00000 -> BETTER | BUDGET-LIMITED at 4x in the atlantic arm: read 'at this budget'   [d = MAE(native_4x) - MAE(native_1x), d < 0 better]
+  Zero seeds (4x pick <= the 1x budget, d = 0 exactly): control 0, atlantic 0. With m non-zero seeds the p floor is 2^(1-m); p < 0.025 needs m >= 7.
+BUDGET-LIMITED (native rule; flagged when the selected epoch > 0.85 x E_k; qualifier at >= half the runs):
+  control 1x (E_k 25): 12/20 flagged -> BUDGET-LIMITED
+  control 2x (E_k 50): 8/20 flagged
+  control 4x (E_k 99): 5/20 flagged
+  atlantic 1x (E_k 13): 8/20 flagged
+  atlantic 2x (E_k 26): 13/20 flagged -> BUDGET-LIMITED
+  atlantic 4x (E_k 52): 12/20 flagged -> BUDGET-LIMITED
+  also reported: control matched_4x 4, smoothed_4x control 7, atlantic 12
+SENSITIVITY (pre-registered; does not change any verdict):
+  P1 sensitivity, 2x: overall MAE, 2x - 1x: d -0.665 (sd 0.396, n 20, 19 non-zero, p floor 3.8e-06), 97.5% CI [-0.882, -0.450], p 0.00000 -> SIGNIFICANT BUT BELOW SESOI (better; real but smaller than 0.9 kt)   [d = MAE(native_2x) - MAE(native_1x), d < 0 better]
+  P1 sensitivity, smoothed 4x vs native 1x (rule and budget change together): d -0.515 (sd 0.788, n 20, 20 non-zero, p floor 1.9e-06), 97.5% CI [-0.937, -0.079], p 0.01044 -> BETTER   [d = MAE(smoothed_4x) - MAE(native_1x), d < 0 better]
+  P2 sensitivity, 2x: overall MAE, 2x - 1x: d -0.769 (sd 0.617, n 20, 19 non-zero, p floor 3.8e-06), 97.5% CI [-1.110, -0.437], p 0.00001 -> BETTER | BUDGET-LIMITED at 2x in the atlantic arm: read 'at this budget'   [d = MAE(native_2x) - MAE(native_1x), d < 0 better]
+  P2 sensitivity, smoothed 4x vs native 1x (rule and budget change together): d -0.951 (sd 0.834, n 20, 20 non-zero, p floor 1.9e-06), 97.5% CI [-1.405, -0.504], p 0.00008 -> BETTER | BUDGET-LIMITED at 4x in the atlantic arm: read 'at this budget'   [d = MAE(smoothed_4x) - MAE(native_1x), d < 0 better]
+  S1 sensitivity, atlantic - control at 4x: control at its native 4x pick: d -0.206 (sd 0.330, n 20, 20 non-zero, p floor 1.9e-06), 95% CI [-0.359, -0.051], p 0.01284 -> SIGNIFICANT BUT BELOW SESOI (better; real but smaller than 0.9 kt)   [d = MAE_atl(native_4x) - MAE_ctl(native_4x), d < 0 better]
+SECONDARY (alpha 0.05, uncorrected; reported beside the verdicts, never replacing them):
+  S1 atlantic - control at 4x: overall MAE (control matched): d -0.260 (sd 0.393, n 20, 20 non-zero, p floor 1.9e-06), 95% CI [-0.444, -0.075], p 0.00912 -> SIGNIFICANT BUT BELOW SESOI (better; real but smaller than 0.9 kt)   [d = MAE_atl(native_4x) - MAE_ctl(matched_4x), d < 0 better]
+  S2 atlantic - control at 4x: >96 kt bias (control matched): d +0.772 (sd 2.972, n 20, 20 non-zero, p floor 1.9e-06), 95% CI [-0.619, +2.160], p 0.25911 -> NULL (informative; the 95% CI excludes effects of 3.0 kt or more)   [both negative: d = bias_atl - bias_ctl, d > 0 better]
+  N5's verdict, verbatim from its report (N5's verdict stands; same H9, so S1/S2 are not an independent replication):
+      overall MAE: control 9.571, atlantic 10.102, d +0.531 (sd 1.120), 97.5% CI [-0.413, +1.479], p 0.17383, SESOI 0.9 -> NULL (inconclusive; effects of 0.9 kt are not excluded)   [d = MAE_atl - MAE_ctl, d < 0 better]
+      >96 bias: control -6.905, atlantic -7.853, d -0.947 (sd 4.792), 97.5% CI [-5.515, +3.633], p 0.53125, SESOI 3.0 -> NULL (inconclusive; effects of 3.0 kt are not excluded)   [both negative: d = bias_atl - bias_ctl, d > 0 better]
+    JOINT VERDICT: NO SIGNIFICANT DIFFERENCE on either primary | BUDGET-LIMITED: the under-training flag fired in >= 5/10 runs of an arm; a 'worse' result is read as 'worse at this budget', not as harm from the added storms; not rerun or rescued
+  S3 control: >96 kt bias, 4x - 1x: d +0.299 (sd 3.645, n 20, 20 non-zero, p floor 1.9e-06), 95% CI [-1.403, +2.012], p 0.71677 -> not significant (better); no SESOI in the design   [both negative: d = bias_4x - bias_1x, d > 0 better]
+  S4 control: >96 kt MAE, 4x - 1x: d -1.437 (sd 1.109, n 20, 20 non-zero, p floor 1.9e-06), 95% CI [-1.957, -0.928], p 0.00001 -> SIGNIFICANT (better); no SESOI in the design   [d = >96 MAE(4x) - >96 MAE(1x), d < 0 better]
+  S3 atlantic: >96 kt bias, 4x - 1x: d +1.152 (sd 3.511, n 20, 20 non-zero, p floor 1.9e-06), 95% CI [-0.503, +2.799], p 0.15700 -> not significant (better); no SESOI in the design   [both negative: d = bias_4x - bias_1x, d > 0 better]
+  S4 atlantic: >96 kt MAE, 4x - 1x: d -1.582 (sd 1.191, n 20, 20 non-zero, p floor 1.9e-06), 95% CI [-2.141, -1.026], p 0.00002 -> SIGNIFICANT (better); no SESOI in the design   [d = >96 MAE(4x) - >96 MAE(1x), d < 0 better]
+NO atlantic - control test at 1x or 2x (F-31 is not a rerun of N5). Arm means, side by side, descriptive:
+  1x native: control 9.551, atlantic 9.717
+  2x native: control 8.887, atlantic 8.948
+H9 SPLIT (descriptive): original three (Ian, Nicole, Claudette) vs the six added later, mean overall MAE:
+  control native_1x: H3 9.105, added6 9.681
+  control native_4x: H3 8.550, added6 8.561
+  atlantic native_1x: H3 9.370, added6 9.818
+  atlantic native_4x: H3 8.152, added6 8.411
+VALIDATION STABILITY (descriptive, validation only): val at each pick vs its +-2-epoch neighbours, and the sd over each budget's last 15%: selection.csv
+FROZEN ENSEMBLE (committed H9 figures, results/ensemble; unpaired: different seeds, an older code version, the same H9; not a test): overall MAE 8.571, >96 MAE 10.815, >96 bias -7.715
+  F-31 ensembles of the control arm (= the frozen recipe) by budget: ensemble.csv
+Tie rule (|d| < 0.0001 kt; train.py's own pick evaluated): none
+Near ties (matched_4x, smoothed_4x; the first minimum is kept): {'control seed 10': {'smoothed_4x': [46]}, 'control seed 11': {'smoothed_4x': [92]}, 'control seed 13': {'smoothed_4x': [51]}, 'control seed 14': {'smoothed_4x': [88, 89]}, 'control seed 15': {'smoothed_4x': [81, 82]}, 'control seed 16': {'smoothed_4x': [73, 74, 75]}, 'control seed 20': {'smoothed_4x': [81]}, 'control seed 22': {'smoothed_4x': [96]}, 'control seed 23': {'smoothed_4x': [84]}, 'control seed 24': {'smoothed_4x': [69]}, 'control seed 25': {'smoothed_4x': [69]}, 'control seed 28': {'smoothed_4x': [85]}, 'control seed 29': {'smoothed_4x': [80]}, 'atlantic seed 10': {'smoothed_4x': [31]}, 'atlantic seed 11': {'smoothed_4x': [44, 45]}, 'atlantic seed 12': {'smoothed_4x': [39]}, 'atlantic seed 15': {'smoothed_4x': [38, 39]}, 'atlantic seed 16': {'smoothed_4x': [50, 52]}, 'atlantic seed 17': {'smoothed_4x': [38]}, 'atlantic seed 18': {'smoothed_4x': [43]}, 'atlantic seed 19': {'smoothed_4x': [47]}, 'atlantic seed 22': {'smoothed_4x': [40, 41]}, 'atlantic seed 25': {'smoothed_4x': [46, 47, 48]}, 'atlantic seed 26': {'smoothed_4x': [52]}}
+Aborted training attempts: none; aborted H9 evaluation attempts: none
+H9 is read only on the slot epochs fixed before the look (native at 1x/2x/4x, matched and smoothed at 4x); some runs' slots are adjacent epochs. No held-out storm is evaluated per epoch; traces are validation only.
+PER STORM (exploratory; >96 stats only with >= 10 frames > 96 kt): per_storm.csv. Sam (AL182021) had per-epoch exposure on 10-14.
+DESCRIPTIVE (not tests): budget_curve.csv, per_run.csv, selection.csv, ensemble.csv, val_trace.csv
