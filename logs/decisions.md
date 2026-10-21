@@ -3347,3 +3347,55 @@ compute, by this entry.
   - The 2026 clean-test protocol draft, with the label choice laid
     out as John asks; then hc-adversary; then John.
   - E3: the rule above applies when its design is drafted.
+
+2026-10-21, 18:37. PR #31 approved and PR #32's eight decisions: John's
+reply to the coordinator's packages. No training, evaluation, H9 or H-EP
+read, and no compute, by this entry.
+- Sources: reports/decisions/PR31.md and reports/decisions/PR32.md (the
+  coordinator's packages; untracked), and the PR #32 draft
+  reports/v2_survey/2026_clean_test/protocol_draft.md at PR head
+  13091026a59d19e5ace41cb1cf70c4a06b038b25, section 10.
+- John's reply, verbatim (relayed by the coordinator):
+  "PR #31: yes, merge pinned to 2b05386 on PASS FULL total.
+  PR #32, my answers:
+  1. Option 3: pool 2026 and 2027 in one scoring run. Decision 1 now
+  reads "confirmed on the 2026–2027 clean test".
+  2. Labels: 2026 scored on the HURDAT2 update (it arrives before
+  scoring under option 3). 2027 on operational best track from a hashed
+  December 2027 snapshot, caveat stated. Yes to the hashed December 2026
+  operational snapshot as backup.
+  3. Smallest effect worth acting on: 1.0 kt. State in the protocol that
+  F-31's H9 gain (0.48 kt) is below it, so a null is the expected
+  outcome and does not mean the recipe failed.
+  4–6, 8: as recommended.
+  7: noted; ask me at the list step.
+  F-40: the 2026–2027 protocol must state its storm selection rule
+  explicitly and say the 2025 rule was inferred (HURDAT2 peak ≥64 kt).
+  Track v2_implications.md: yes, as a docs-only PR you may merge."
+- Items 4–6 and 8 "as recommended" (PR #32 draft section 10): replace
+  the frozen ensemble only on BETTER, as its own committed decision with
+  new pins; 2026 East Pacific storms excluded; the clean-test pass holds
+  until E3 is settled; no subtropical-only storms and no re-scoring
+  against final HURDAT2.
+- Amendment: decision 1 of the 16:23 entry now reads "confirmed on the
+  2026–2027 clean test". The 16:23 entry and the quotation in
+  reports/v2_survey/v2_recipe/design.md stay as written; this entry
+  supersedes them on that point.
+- PR #31 (the v2 Atlantic recipe design) merged at 18:37 pinned to
+  2b05386425450b304f5006ce8ccfb71dfcfef5a7, after check.py --full
+  passed on the merge tree. The design approves no compute; training
+  waits for the launch PR and John's yes on it.
+- reports/v2_survey/f31/v2_implications.md is tracked by this entry's
+  PR, byte-for-byte (-text): SHA-256
+  82381a1f1fac16aa8a872b69549906a253c05894cbaf536f22cbcf5c7be08f63, the
+  note as John read it (16:23 entry).
+- What this does not change: the frozen ensemble stays the reported
+  model; the 2025 Atlantic test set stays spent; I4 (no 2026 imagery)
+  stands, and its amendment for the test list is asked at the list step;
+  H-EP stays sealed under protocol.md 3901f4cf. The snapshots are
+  label files only, taken in December and hashed; nothing is downloaded
+  by this entry.
+- Next: hc-survey folds these answers into the PR #32 draft (the storm
+  selection rule stated explicitly, the 2025 rule marked as inferred,
+  the 0.48 kt sentence); then the v2 launch PR (driver and tests), to
+  hc-adversary and then John.

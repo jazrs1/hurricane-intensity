@@ -22,3 +22,6 @@ logs/f31/deviations.json -text
 logs/f31/aborted/** -text
 results/f31/*_h9.csv -text
 results/f31/analysis/* -text
+# John's v2 note after F-31 (decisions.md 2026-10-21 16:23 and 18:37 entries): its SHA-256 is recorded there, so it is
+# stored and checked out byte-for-byte.
+reports/v2_survey/f31/v2_implications.md -text
