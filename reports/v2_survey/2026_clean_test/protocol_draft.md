@@ -49,7 +49,8 @@
 - For the > 96 kt secondaries, about 3 major hurricanes in a normal 2027 plus Isaias would still likely fall short of 6 qualifying storms. **Option 3 does not reliably make the high end testable either.**
 
 **Recommendation, label-informed and model-blind: option 3.**
-- **The reason is robustness to the unknown sd.** Option 1 is decisive only if the sd is near its one H9-derived anchor. Option 3 is decisive (power about 0.7–1.0 at Δ = 1.0) over the whole plausible sd range up to 1.5 kt. Its population also includes a normal season's hurricanes, not mostly weak storms.
+- **The reason is robustness to the unknown sd.** Option 1 is decisive only if the sd is near its one H9-derived anchor. Option 3 keeps power at about 0.7–1.0 for Δ = 1.0 up to sd 1.5 kt, which is this draft's own grid cap, not a known bound; at sd 2.0 and n = 16 it is 0.47. Its population also has more hurricanes, though it is still mostly sub-hurricane: about 9 + 14 named storms, with about 8 hurricanes.
+- **For comparison at sd 1.0 and Δ = 1.0:** option 1 at n ≈ 9 has power of about 0.74, against 0.96 for option 3 at n = 16. The 0.74 is interpolated between `power_output.txt`'s n = 8 (0.67) and n = 10 (0.80) rows, since n = 9 is not in the grid; the 0.96 is its n = 16 row.
 - **Its cost is a year, and changing decision 1's wording.**
 - **Option 1 is the better choice** if John weighs 2026 timing above robustness, or judges the sd likely near 0.5. If the sd is in fact about 0.5, option 3 buys little power for its year.
 - **This recommendation was formed after seeing the 2026 counts.** The counts are model-blind (labels, not predictions), and John asked for them. Whichever option John picks, the test stays valid for its pre-registered population, because the list rule is applied mechanically and nothing is tuned to any storm (§3).
@@ -280,6 +281,11 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 ## 7. What gets written (later, by the pass driver; nothing now)
 
 - **Driver and report:** `scripts/run_2026.py` and `scripts/report_2026.py`, specification only here. They are written in the protocol PR, tested on synthetic data and reviewed by hc-adversary before the protocol is committed.
+- **Label input (new code; the build has none today).** The build reads fixes only from `config.HURDAT2_CACHE_PATH` = `data/interim/hurdat2_atlantic.txt` (`config.py:35`). `download_hurdat2` uses that cache on a hit and ignores `--hurdat2-url` (`hurdat2.py:103-113`). That file holds no test-season storm, and it is protected and never refreshed. No b-deck or a-deck reader exists. So the protocol PR also writes:
+  - for route C, a pinned, season-specific HURDAT2 path (like H-EP's B-v2-2 cache);
+  - for route A, a snapshot reader;
+  - the OFCL τ0 a-deck fallback reader.
+  - Like the driver, this code is tested on synthetic data and reviewed with it. Its blobs are pinned at §8 step 2 with the rest, before the commit, so it is neither unpinned nor in conflict with the `src` pin.
 - **Sealed root:** builds go to `data/2026_sealed/` (as H-EP's `data/hep_sealed/`), reachable only through `--processed-root`.
 - **Outputs:**
   - `results/final_2026/{F,V}/ensemble_2026.csv`;
@@ -308,7 +314,7 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
      - Δ, the decision rule and the EP choice;
      - the list rule;
      - the members files' blob hashes;
-     - the blob hashes of the driver, the report, `ensemble_eval.py` and `src/hurricane_intensity/*.py`.
+     - the blob hashes of the driver, the report, the label-input code (§7), `ensemble_eval.py` and `src/hurricane_intensity/*.py`.
    - **Under option 3, the same commit adds the 2027 protections:**
      - an I4-style row for 2027 ("no 2027 storm imagery downloaded or cropped");
      - a `test_no_2027_id_in_any_list`;
@@ -327,7 +333,7 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
      - check.py's I4 check and the FEATURES.md I4 row are reworded: no `*2026` ID in any `storms_*.txt` **except** the named test list, and no `data/processed/*2026*`, with `data/2026_sealed/` the only place 2026 crops may exist;
      - under option 3, the same applies for 2027.
    - **Nothing is changed in any test now;** this draft only states the amendment.
-5. **Build** into `data/2026_sealed/` (I4's lift for this build, under step 4's yes).
+5. **Build** into `data/2026_sealed/` (I4's lift for this build, under step 4's yes). The build reads labels only through the pinned label input (§7). `data/interim/hurdat2_atlantic.txt` is neither refreshed nor used for test seasons.
    - Then the NaN exclusion step, with carry-forward (as H-EP gate 7), and the GOES-19 check (§3).
    - Frames are counted per storm, and rule 3 drops are committed. Still no model runs.
 6. **Domain shift:** the test set vs H9, before any model runs.
