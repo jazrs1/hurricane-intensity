@@ -2878,19 +2878,22 @@ SECONDARY (alpha 0.05, uncorrected; reported beside the verdicts, never replacin
 ```
 
 - John's note, recorded before the look (his phase-2 yes was read at
-  21:49 EDT, before the first H9 evaluation at 22:00): "Control is not
-  BUDGET-LIMITED at 2x or 4x, while atlantic still is at 4x (12/20), so
-  the S1/S2 comparison at 4x remains asymmetric in training."
-- "At this budget" readings (design §3): control 1x is BUDGET-LIMITED
-  (12/20), so P1's baseline (native 1x) is read "at this budget".
-  Atlantic 2x (13/20) and 4x (12/20) are BUDGET-LIMITED, so P2, S1 and
-  S2 are read "at this budget". The atlantic arm was still budget-limited
-  at 6600 steps; F-31 does not extend.
+  21:49 EDT, before the first H9 evaluation at 22:00): "control is not
+  BUDGET-LIMITED at 2× or 4×, while atlantic still is at 4× (12/20), so
+  the S1/S2 comparison at 4× remains asymmetric in training."
+- Reading (design §3 line 142, §7 line 304): as printed, P2 (4x) and
+  the P2 sensitivities (2x, smoothed 4x) carry BUDGET-LIMITED and are
+  read "at this budget". P1 carries no qualifier (control 4x 5/20); its
+  BETTER is read per §7: the frozen recipe was budget-limited at 1640
+  steps, on H9, for this code version (control 1x 12/20). S1/S2 are
+  secondaries and carry no qualifier; their training asymmetry is John's
+  pre-look note above. The atlantic arm was still budget-limited at 6600
+  steps; F-31 does not extend.
 - Per-storm and ensemble figures: reports/decisions/F31-result.md and
   results/f31/analysis.
 - Committed files (all except this entry), SHA-256 of the committed bytes,
   sorted by path; SHA-256 of this 422-line listing, LF-terminated:
-  17f497f0b2eeb6c206cda0872c42a1702b76bcd43fb2d1dd4fa90e23e8b5d14a
+  dad9f871c48cf04dd8f79f70b654ab58da2d582e0ec978c4e77895099612d893
   - 15f0379a56967c94b2340f32122ece3610364b906f38c4254b455e9f49f930f4  logs/f31/atlantic_seed10.log
   - e0b0a8b75719f43ac1fdc97dcc57100998ecc9b0b346f3281354cf72a3971f54  logs/f31/atlantic_seed10_e12_eval_h9.log
   - 4151d887dd5a000144073a6640be1d637f218f56852ca660386af4c04d090a90  logs/f31/atlantic_seed10_e25_eval_h9.log
@@ -3137,7 +3140,7 @@ SECONDARY (alpha 0.05, uncorrected; reported beside the verdicts, never replacin
   - 5c107475096aaa771bc22890ea508d7e4f5a4c91c6a082539c0a62db122ff5bc  logs/f31/runs/control_seed27.json
   - 580d52d0274d562f00eb61c16fe4fe5f34c054ead7cfa6452367e9b257b49336  logs/f31/runs/control_seed28.json
   - 1d34bf58b6f24e782596a441273139661ff2b42177b023a41511eeceafd1319b  logs/f31/runs/control_seed29.json
-  - bf5d26740c96990426ed295328a9ca4ed5b182facc70489b3f1077570bdd950a  reports/decisions/F31-result.md
+  - 37b6ff2d4f361cbe193a606001409f85010d946eb26b3fbbeb71c4eb376be48b  reports/decisions/F31-result.md
   - ad8737146aa60320edc228ed52041c6576ec0b7a4fb6b9e3494254d32284c7fd  results/f31/analysis/budget_curve.csv
   - 96f9dcf1146ebe7dbdf86bf32bc98150665eca84da43b85a38e017a8b8c92cd0  results/f31/analysis/ensemble.csv
   - 170b1a9525d1994917e8370473a3dd52d7e45c00d74a65fcb64a87c4ee1295f5  results/f31/analysis/per_run.csv

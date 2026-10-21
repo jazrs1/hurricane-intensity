@@ -103,6 +103,11 @@ The frozen ensemble's committed figure is 8.571. That comparison is unpaired and
   - the 165 H9 CSVs and evaluation logs;
   - the phase-2 marker;
   - the analysis outputs, all -text;
-  - a decisions.md results entry with the verbatim output and John's pre-look note. The note sits beside the "at this budget" readings: control 1× (P1's baseline) and atlantic 2× and 4× (P2, S1, S2).
+  - a decisions.md results entry with the verbatim output and John's pre-look note.
+- **How "at this budget" applies** (design §3 line 142 and §7 line 304; corrected after hc-adversary item 29):
+  - **As printed:** P2 (4×) and the P2 sensitivities (2×, smoothed 4×) carry BUDGET-LIMITED.
+  - **P1:** control 4× is 5/20, so P1 carries no qualifier. Its BETTER is read per §7: the frozen recipe was budget-limited at 1640 steps, on H9, for this code version (control 1× 12/20).
+  - **S1/S2:** these are secondaries and carry no qualifier. Their training asymmetry is John's pre-look note.
+  - An earlier mapping put control 1× on P1 and atlantic 2×/4× on S1/S2. It came from the item-28 review and went beyond the pre-registration; it is withdrawn.
 - Review: hc-adversary, then John.
 - The 40 train logs and the kept checkpoints are outside phase-2's outputs. Whether to commit the train logs is a question for the PR, following N5's practice.
