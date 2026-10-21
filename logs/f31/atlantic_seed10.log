@@ -1,0 +1,73 @@
+RUN arm=atlantic seed=10 order=2 list=storms_train_n5_atlantic.txt val=storms_val_expanded.txt epochs=52
+START 2026-10-20T15:35:02-04:00 | 2026/10/20 15:35:02.230, 37, 457 MHz, 23.50 W
+device: cuda
+train storms: ['AL142018', 'AL142024', 'AL052019', 'AL062020', 'AL092021', 'AL142021', 'AL102023', 'AL012024', 'AL042024', 'AL062018', 'AL092019', 'AL132019', 'AL262020', 'AL292020', 'AL122021', 'AL062022', 'AL202023', 'AL092024', 'AL182024', 'AL072021', 'AL272020', 'AL282020', 'AL082018', 'AL162018', 'AL032018', 'AL062024', 'AL102019', 'AL102024', 'AL132024', 'AL172020', 'AL052024', 'AL152023', 'AL082020', 'AL092020', 'AL132018', 'AL142023', 'AL152022', 'AL052021', 'AL052022', 'AL132022', 'AL162022', 'AL162024', 'AL022018', 'AL022019', 'AL052023', 'AL082021', 'AL092018', 'AL142020', 'AL162020', 'AL252020']
+val storms:   ['AL192020', 'AL162023', 'AL132020', 'AL202020', 'AL082023']
+seed: 10  checkpoint: models/f31/atlantic/seed10.pt  loss: l1  circular_mask: False  rotate: False
+after exclusion: 4048
+after exclusion: 940
+frame list: results/n5_atlantic/frame_list_atlantic.txt: 4044 frames from 50 storms
+train samples: 4044  val samples: 940
+epoch 1: train 31.39 kt  val 25.65 kt
+  saved
+epoch 2: train 20.84 kt  val 19.06 kt
+  saved
+epoch 3: train 13.75 kt  val 11.29 kt
+  saved
+epoch 4: train 9.84 kt  val 11.32 kt
+epoch 5: train 8.61 kt  val 18.86 kt
+epoch 6: train 7.80 kt  val 9.19 kt
+  saved
+epoch 7: train 7.80 kt  val 9.56 kt
+epoch 8: train 6.50 kt  val 8.58 kt
+  saved
+epoch 9: train 6.62 kt  val 8.61 kt
+epoch 10: train 5.48 kt  val 8.87 kt
+epoch 11: train 6.01 kt  val 8.80 kt
+epoch 12: train 5.89 kt  val 8.47 kt
+  saved
+epoch 13: train 5.34 kt  val 8.56 kt
+epoch 14: train 5.36 kt  val 11.41 kt
+epoch 15: train 4.98 kt  val 9.09 kt
+epoch 16: train 4.97 kt  val 10.72 kt
+epoch 17: train 4.92 kt  val 8.20 kt
+  saved
+epoch 18: train 4.54 kt  val 10.08 kt
+epoch 19: train 4.55 kt  val 8.20 kt
+epoch 20: train 4.34 kt  val 8.64 kt
+epoch 21: train 3.95 kt  val 8.29 kt
+epoch 22: train 4.43 kt  val 9.83 kt
+epoch 23: train 4.01 kt  val 9.87 kt
+epoch 24: train 3.76 kt  val 9.90 kt
+epoch 25: train 3.54 kt  val 7.82 kt
+  saved
+epoch 26: train 3.71 kt  val 8.17 kt
+epoch 27: train 3.49 kt  val 8.82 kt
+epoch 28: train 3.49 kt  val 9.11 kt
+epoch 29: train 3.65 kt  val 7.56 kt
+  saved
+epoch 30: train 3.62 kt  val 9.59 kt
+epoch 31: train 3.42 kt  val 7.66 kt
+epoch 32: train 3.49 kt  val 7.86 kt
+epoch 33: train 4.04 kt  val 8.77 kt
+epoch 34: train 3.46 kt  val 8.00 kt
+epoch 35: train 4.35 kt  val 9.56 kt
+epoch 36: train 3.53 kt  val 10.95 kt
+epoch 37: train 3.48 kt  val 8.01 kt
+epoch 38: train 3.10 kt  val 8.20 kt
+epoch 39: train 3.42 kt  val 7.74 kt
+epoch 40: train 3.50 kt  val 7.94 kt
+epoch 41: train 3.12 kt  val 7.83 kt
+epoch 42: train 3.18 kt  val 7.96 kt
+epoch 43: train 2.95 kt  val 9.04 kt
+epoch 44: train 3.19 kt  val 8.15 kt
+epoch 45: train 3.49 kt  val 8.13 kt
+epoch 46: train 3.04 kt  val 7.78 kt
+epoch 47: train 3.16 kt  val 7.21 kt
+  saved
+epoch 48: train 2.89 kt  val 10.96 kt
+epoch 49: train 3.29 kt  val 8.13 kt
+epoch 50: train 3.52 kt  val 8.53 kt
+epoch 51: train 2.94 kt  val 12.86 kt
+epoch 52: train 2.64 kt  val 7.35 kt
+END 2026-10-20T15:41:49-04:00 | 2026/10/20 15:41:49.891, 47, 2910 MHz, 90.57 W

@@ -1,0 +1,27 @@
+checkpoint: models/f31/control/seed13_epochs/epoch_50.pt
+held-out storms: ['AL092022', 'AL172022', 'AL032021', 'AL022024', 'AL132023', 'AL182021', 'AL072022', 'AL122024', 'AL312020']
+after exclusion: 1752
+circular mask: False
+held-out samples: 1752
+overall MAE:      8.73 kt
+true fixes only:  8.80 kt  (n=315)
+
+TD      180 samples   MAE   8.72 kt   bias  +7.88 kt
+TS      506 samples   MAE   7.14 kt   bias  +0.18 kt
+Cat 1   264 samples   MAE   7.56 kt   bias  -1.20 kt
+Cat 2   149 samples   MAE   9.35 kt   bias  -0.33 kt
+Cat 3   274 samples   MAE   9.51 kt   bias  -1.35 kt
+Cat 4   348 samples   MAE  10.54 kt   bias  -6.05 kt
+Cat 5    31 samples   MAE  14.48 kt   bias -14.48 kt
+            count       mean
+storm_name                  
+BERYL          27   7.546430
+FIONA          31   8.326793
+IAN            48  10.754147
+IOTA           21   9.716843
+KIRK           38   4.359672
+LEE            58   6.103074
+NICOLE         12  10.495585
+SAM            29   5.760077
+
+wrote results/f31/control_seed13_e50_h9.csv  (1752 rows)
