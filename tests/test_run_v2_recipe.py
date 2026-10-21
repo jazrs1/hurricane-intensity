@@ -100,6 +100,10 @@ def fake_repo(tmp_path):
     for rel in (R.TRAIN_LIST, R.VAL_LIST) + R.FORBIDDEN_LISTS:  # the real lists, comments and all
         shutil.copy(CHECKOUT / rel, root / rel)
     (root / "prot.json").write_text(json.dumps(prot), encoding="utf-8")
+    pkg = root / R.SRC_DIR  # the pinned package's files (guard 2 checks nothing else is in the folder)
+    (pkg / "__pycache__").mkdir(parents=True)
+    for name in R.SRC_BLOBS:
+        (pkg / name).write_text("# synthetic\n", encoding="utf-8")
     return root
 
 
@@ -648,7 +652,7 @@ def test_a_finished_run_is_skipped_and_partial_ones_refuse_until_aborted(tmp_pat
 @pytest.mark.slow
 def test_a_record_that_fails_a_check_refuses_launch_and_can_be_aborted(trained):
     rewrite_record(trained, 33, native_epoch=1)
-    with pytest.raises(R.LaunchError, match=r"guard 6: training records that fail a check .*seeds \[33\]"):
+    with pytest.raises(R.LaunchError, match=r"guard 6: training records that fail a check.*seeds \[33\]"):
         train(trained)
     R.abort_run(33, "bad record", trained, git=fake_git(trained), expected=prot_of(trained))
     runner = train(trained)
@@ -657,7 +661,7 @@ def test_a_record_that_fails_a_check_refuses_launch_and_can_be_aborted(trained):
 
 @pytest.mark.slow
 def test_records_made_at_another_commit_refuse_launch(trained):
-    with pytest.raises(R.LaunchError, match="made at another commit"):
+    with pytest.raises(R.LaunchError, match=r"or are stale .*seeds \[30, 31"):
         train(trained, git=fake_git(trained, head="1" * 40, first_parent=("1" * 40,)))
 
 
@@ -811,15 +815,16 @@ def test_unfreeze_moves_the_members_file_aside_and_launch_reopens(frozen):
     assert R.unfreeze("again", frozen, git=fake_git(frozen)).endswith("freeze_2")
 
 
-ENTRY = "# decisions\n\n## 2026-12-14 v2 Atlantic ensemble frozen\n"
+ENTRY = ("# decisions\n\n2026-12-14, 10:05. v2 Atlantic ensemble frozen (launch commit L, 10 members). The\n"
+         "members file's blob SHA-256 is ...\n")  # decisions.md's own entry form
 
 
 @pytest.mark.slow
 @pytest.mark.parametrize("kw, match", [
     (dict(fetch_rc=1), "git fetch origin failed"),
     (dict(on_origin=(R.MEMBERS,)), "the freeze PR has merged"),
-    (dict(decisions={"HEAD": ENTRY}), "HEAD's logs/decisions.md already holds"),
     (dict(decisions={"origin/phase2-experiments": ENTRY}), "origin/phase2-experiments's logs/decisions.md already"),
+    (dict(decisions={"HEAD": ENTRY, "origin/phase2-experiments": ENTRY}), "already holds .*the freeze PR has merged"),
     (dict(origin_tree=("results/hep/x.csv",)), "H-EP or clean-test output exists"),
     (dict(tree_rc=128), "can't read origin/phase2-experiments's tree"),
 ])
@@ -831,12 +836,14 @@ def test_unfreeze_refusals(frozen, kw, match):
 
 @pytest.mark.slow
 def test_unfreeze_refuses_later_outputs_on_disk_and_a_quoted_phrase_is_not_the_entry(frozen):
-    git = fake_git(frozen, decisions={"HEAD": "The freeze PR adds a decisions entry, \"v2 Atlantic ensemble frozen\".\n"})
+    git = fake_git(frozen, decisions={"origin/phase2-experiments":
+                                      "2026-12-01, 09:00. Plan. The freeze PR adds an entry, \"v2 Atlantic ensemble\n"
+                                      "frozen\", later; a body line naming v2 Atlantic ensemble frozen is not it.\n"})
     (frozen / "results/final_2026").mkdir(parents=True)
     with pytest.raises(R.LaunchError, match="H-EP or clean-test output exists: \\['results/final_2026'\\]"):
         R.unfreeze("x", frozen, git=git)
     (frozen / "results/final_2026").rmdir()
-    R.unfreeze("x", frozen, git=git)  # the quoted phrase in a body line is not the entry's heading
+    R.unfreeze("x", frozen, git=git)  # the title in a body line, or under another entry's title, is not the entry
     with pytest.raises(R.LaunchError, match="nothing to withdraw"):
         R.unfreeze("x", frozen, git=git)
 
@@ -913,3 +920,163 @@ def test_plan_runs_nothing_and_the_cli_refuses_bad_arguments(capsys, monkeypatch
                  ["evaluate"]):
         with pytest.raises(SystemExit):
             R.main(argv)
+
+
+# ---- item 34: D1 (a record verifies at its own commit), D2, C1, C2, F1 -------------------------------------------
+OTHER = "0ther" * 8
+
+
+def docs_head(root, **kw):
+    """HEAD = OTHER, a later commit on the chain that differs from the records' commit only in the decisions docs."""
+    return fake_git(root, head=OTHER, first_parent=(OTHER, COMMIT), changed=("logs/decisions.md",), **kw)
+
+
+@pytest.mark.slow
+def test_d1_at_a_docs_only_head_abort_run_refuses_a_verified_seed_and_launch_skips_it(trained):
+    git, prot = docs_head(trained), prot_of(trained)
+    with pytest.raises(R.LaunchError, match="abort-run: seed 33 has a record that passes"):
+        R.abort_run(33, "re-roll", trained, git=git, expected=prot)  # hc-adversary's probe 1: re-roll at head=OTHER
+    runner = train(trained, git=git)
+    assert runner.calls == []
+    assert R.run_state(trained, 33, git, prot, {OTHER, COMMIT}) == "trained"
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("drift", ["src/hurricane_intensity/dataset.py", "scripts/train.py", "storms_val_expanded.txt"])
+def test_d1_code_drift_makes_every_record_stale(trained, drift):
+    git, prot = fake_git(trained, head=OTHER, first_parent=(OTHER, COMMIT), changed=(drift,)), prot_of(trained)
+    assert R.run_state(trained, 30, git, prot, {OTHER, COMMIT}) == "stale"
+    with pytest.raises(R.LaunchError, match=r"or are stale .*seeds \[30, 31, 32"):
+        train(trained, git=git)
+    assert R.abort_run(30, "stale", trained, git=git, expected=prot).endswith("seed30_attempt1")
+
+
+@pytest.mark.slow
+def test_d1_a_record_whose_commit_is_off_the_chain_is_stale(trained):
+    git, prot = fake_git(trained, head=OTHER, first_parent=(OTHER,), changed=("logs/decisions.md",)), prot_of(trained)
+    assert R.run_state(trained, 30, git, prot, {OTHER}) == "stale"
+    R.abort_run(30, "off the chain", trained, git=git, expected=prot)
+
+
+@pytest.mark.slow
+def test_d1_no_new_run_is_trained_at_another_commit_than_the_verified_records(trained):
+    R.abort_run(36, "bad", trained, git=fake_git(trained, head=OTHER, first_parent=(OTHER, COMMIT),
+                                                 changed=("scripts/train.py",)), expected=prot_of(trained))
+    with pytest.raises(R.LaunchError, match=f"guard 6: verified records come from launch commit .*relaunch at {COMMIT}"):
+        train(trained, git=docs_head(trained))
+    runner = train(trained)  # at the records' own commit
+    assert runner.calls == [R.train_cmd(PY, 36)]
+
+
+@pytest.mark.slow
+def test_d1_abort_run_refuses_when_the_chain_cannot_be_read(trained):
+    with pytest.raises(R.LaunchError, match="git fetch origin failed"):
+        R.abort_run(30, "x", trained, git=fake_git(trained, fetch_rc=1), expected=prot_of(trained))
+
+
+@pytest.mark.slow
+def test_d2_an_entry_on_head_only_does_not_block_unfreeze(frozen):
+    assert R.unfreeze("x", frozen, git=fake_git(frozen, decisions={"HEAD": ENTRY})).endswith("freeze_1")
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("stage", ["verify", "freeze"])
+@pytest.mark.parametrize("kw, match", [
+    (dict(blobs={R.TRAIN_PY: b"other"}), "guard 2: HEAD's scripts/train.py"),
+    (dict(src={**R.SRC_BLOBS, "dataset.py": "0" * 40}), r"guard 2: .*differs: \['dataset.py'\]"),
+    (dict(first_parent=("9" * 40,)), "is not on the first-parent chain"),
+])
+def test_c1_verify_and_freeze_apply_the_code_guards_and_the_chain(trained, stage, kw, match):
+    with pytest.raises(R.LaunchError, match=match):
+        getattr(R, stage)(trained, git=fake_git(trained, **kw), expected=prot_of(trained))
+    assert not (trained / R.MEMBERS).exists()
+
+
+def direct_ctx(root):
+    return dict(commit=COMMIT, expected=prot_of(root), forbidden=set(), git=fake_git(root), chain={COMMIT})
+
+
+def direct_hooks(root):
+    return dict(runner=FakeRunner(root), revalidate_fn=reval_from(), snapshot=lambda: "gpu", same_weights_fn=same_bytes)
+
+
+def test_c1_train_one_refuses_to_overwrite(tmp_path):
+    root = fake_repo(tmp_path)
+    (root / "models/v2_recipe").mkdir(parents=True)
+    (root / R.run_paths(30)["native_checkpoint"]).write_bytes(b"old")
+    hooks = direct_hooks(root)
+    with pytest.raises(R.LaunchError, match="refusing to overwrite"):
+        R.train_one(30, direct_ctx(root), root, hooks)
+    assert hooks["runner"].calls == [] and (root / R.run_paths(30)["native_checkpoint"]).read_bytes() == b"old"
+
+
+@pytest.mark.skipif(not hasattr(__import__("_winapi"), "CreateJunction") if sys.platform == "win32" else True,
+                    reason="needs a Windows junction")
+def test_c1_an_epoch_dir_resolving_outside_the_repo_is_refused(tmp_path):
+    import _winapi
+    root = fake_repo(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    hooks = direct_hooks(root)
+    inner = hooks["runner"]
+
+    def runner(cmd, **k):  # train.py's --epoch-dir turns out to be a junction to a folder outside the repo
+        _winapi.CreateJunction(str(outside), str(root / R.run_paths(30)["epoch_dir"]))
+        return inner(cmd, **k)
+    hooks["runner"] = runner
+    with pytest.raises(R.LaunchError, match="resolves to .*outside .*nothing deleted"):
+        R.train_one(30, direct_ctx(root), root, hooks)
+    assert len(list(outside.iterdir())) == 99
+
+
+@pytest.mark.slow
+def test_c1_kept_files_and_the_members_file_are_read_only(trained):
+    for s in SEEDS:
+        for k in ("train_log", "native_checkpoint"):
+            assert not os.stat(trained / R.run_paths(s)[k]).st_mode & stat.S_IWRITE, (s, k)
+    R.freeze(trained, git=fake_git(trained), expected=prot_of(trained))
+    assert not os.stat(trained / R.MEMBERS).st_mode & stat.S_IWRITE
+
+
+def test_c1_train_one_makes_its_kept_files_read_only(tmp_path):
+    root = fake_repo(tmp_path)
+    R.train_one(30, direct_ctx(root), root, direct_hooks(root))
+    for k in ("train_log", "native_checkpoint"):
+        assert not os.stat(root / R.run_paths(30)[k]).st_mode & stat.S_IWRITE, k
+
+
+@pytest.mark.parametrize("entry, is_dir", [("extra.py", False), ("old_dataset.pyc", False), ("sub", True)])
+def test_f1_an_untracked_or_ignored_entry_in_the_package_folder_refuses(tmp_path, entry, is_dir):
+    root = fake_repo(tmp_path)
+    p = root / R.SRC_DIR / entry
+    p.mkdir() if is_dir else p.write_text("x", encoding="utf-8")
+    with pytest.raises(R.LaunchError, match=f"guard 2: .*untracked or ignored entries \\['{re.escape(entry)}'\\]"):
+        train(root)
+
+
+@pytest.mark.slow
+def test_c2_unfreeze_retrain_refreeze_on_the_freeze_branch(frozen):
+    """design §4's path, by the module docstring's steps: B is the freeze branch, L = COMMIT."""
+    prot, B = prot_of(frozen), "b" * 40
+    outputs = tuple(v for s in SEEDS for k, v in R.run_paths(s).items() if k in ("train_log", "record"))
+    on_b = dict(head=B, first_parent=(COMMIT,), changed=outputs + (R.MEMBERS, "logs/decisions.md"),
+                decisions={"HEAD": ENTRY})
+    # 1. on B: unfreeze (the entry is only on B's HEAD, the members file only tracked on B)
+    R.unfreeze("seed 34's log was found damaged", frozen, git=fake_git(frozen, **on_b))
+    # the defect: seed 34's record no longer verifies
+    rewrite_record(frozen, 34, native_epoch=1)
+    on_b2 = dict(on_b, changed=on_b["changed"] + ("logs/v2_recipe/aborted/freeze_1/abort.json",))
+    with pytest.raises(R.LaunchError, match="guard 1: .* is not on the first-parent chain"):
+        train(frozen, git=fake_git(frozen, **on_b2))  # a launch on B itself refuses
+    with pytest.raises(R.LaunchError, match="abort-run: seed 33 has a record that passes"):
+        R.abort_run(33, "x", frozen, git=fake_git(frozen, **on_b2), expected=prot)
+    # 3-4. reset --mixed L: HEAD = L, the records stay on disk untracked; 5. abort-run the failed seed at L
+    R.abort_run(34, "record fails check_training", frozen, git=fake_git(frozen), expected=prot)
+    # 6. launch at L retrains seed 34 alone; 7. verify and freeze
+    runner = train(frozen)
+    assert runner.calls == [R.train_cmd(PY, 34)]
+    assert record(frozen, 34)["aborted_attempts"] == ["logs/v2_recipe/aborted/seed34_attempt1/abort.json"]
+    R.verify(frozen, git=fake_git(frozen), expected=prot)
+    R.freeze(frozen, git=fake_git(frozen), expected=prot)
+    # 8-9. back on B: the records still verify there
+    R.verify(frozen, git=fake_git(frozen, **on_b2), expected=prot)

@@ -11,8 +11,10 @@
 The recipe is the frozen ensemble's configuration at F-31's 4x budget: storms_train_expanded.txt (2081 frames after
 excluded_crops.txt), storms_val_expanded.txt (940), 99 epochs = analyze_n5.epochs_for(2081, 4 x 1640) (66 batches,
 6534 steps), native selection (train.py's own --out, the first strict minimum of validation MAE), seeds 30-39.
-Nothing is evaluated on any held-out set: the driver starts no subprocess but train.py, with exactly the design §6
-argument list. The members file is never handed to any tool as an output path (design §4).
+Nothing is evaluated on any held-out set: the only command handed to the runner is train.py, with exactly the design
+§6 argument list. Besides it, the driver starts only git, nvidia-smi (the GPU snapshot in each log's header and footer)
+and guard 9's child-import probe (a `python -c` that imports hurricane_intensity and prints where from). The members
+file is never handed to any tool as an output path (design §4).
 
 Imports (design §6): only scripts/run_n5.py and scripts/analyze_n5.py, each hashed (CRLF read as LF) against its pin
 before it is executed, then compiled and executed from exactly the hashed bytes, with __file__ set first (run_n5
@@ -23,8 +25,9 @@ flagged are copied from analyze_f31.py (a test checks that the copies agree with
 launch refuses before the first run unless (design §6):
   1. the tracked tree is clean; this driver, run_n5.py, analyze_n5.py and train.py equal their HEAD blobs; after
      `git fetch origin`, HEAD is on origin/phase2-experiments' first-parent chain (so it is pushed);
-  2. HEAD's train.py, run_n5.py and analyze_n5.py are the pinned blobs, and src/hurricane_intensity/ at HEAD holds
-     exactly fc71b98's nine .py blobs;
+  2. HEAD's train.py, run_n5.py and analyze_n5.py are the pinned blobs, src/hurricane_intensity/ at HEAD holds
+     exactly fc71b98's nine .py blobs, and nothing else (untracked or ignored, except __pycache__/) is in that folder on
+     disk, where it could shadow a pinned module;
   3. the 14 protected files match the COORDINATOR.md block (and analyze_n5.PROTECTED); checked again before and
      after every run;
   4. HEAD's excluded_crops.txt, storms_train_expanded.txt and storms_val_expanded.txt are fc71b98's blobs, and
@@ -32,7 +35,11 @@ launch refuses before the first run unless (design §6):
   5. the train and validation lists are analyze_n5's CONTROL_IDS and VAL_IDS, share no ID with H9, the 2025 test or
      H-EP, and name no 2026 storm;
   6. every output path is under models/v2_recipe/ or logs/v2_recipe/, or is the members file; no unfinished run,
-     unverifiable record or pending abort is on disk (a seed<s>.pt exists only with a record that verifies);
+     unverifiable or stale record, or pending abort is on disk (a seed<s>.pt exists only with a record that verifies).
+     A record verifies ("trained") iff it passes every training-only check at its OWN commit, that commit is on
+     origin/phase2-experiments' first-parent chain, and HEAD differs from it only in the decisions docs and the v2
+     outputs; otherwise it is stale, launch refuses it and abort-run may move it aside. A verified record is skipped,
+     but no new run is trained while any verified record's commit is not HEAD (one launch commit, design §4);
   7. each command is exactly design §6's train.py list for its seed, with no held-out, sealed or 2026 argument;
   8. no members file exists: on disk, tracked, or on origin/phase2-experiments;
   9. the root is the main checkout (a .git directory, not a worktree's .git file); a child python imports
@@ -48,6 +55,26 @@ Aborts move files unchanged to logs/v2_recipe/aborted/seed<s>_attempt<k>/ or abo
 abort.json there with every file's SHA-256 and status "pending"; the status becomes "complete" once all are moved, and
 a pending abort is finished by running the same command again (every other writing stage refuses while one is
 pending).
+
+Unfreeze, retrain and re-freeze while the freeze PR is under review (design §4). Operator steps; every one runs in the
+main checkout (guard 9). B is the freeze branch (the records, logs, members file and freeze entry are committed on it),
+L the records' launch commit (on origin's first-parent chain):
+  1. on B:  python scripts/run_v2_recipe.py unfreeze --reason TEXT
+            (refuses unless, after a fetch, neither the members file nor the freeze entry is on origin)
+  2. on B:  git add -A logs/v2_recipe results/v2_recipe && git commit     (B drops the members file in a new commit)
+  3.        git switch --detach && git reset --mixed L
+            (HEAD and the index move to L; the working tree is untouched, so B's records, logs and abort files stay on
+            disk, now untracked, byte for byte: they are -text)
+  4.        git restore logs/decisions.md
+            (discards only the working copy of a committed file; B's commit keeps the freeze entry)
+  5. at L:  python scripts/run_v2_recipe.py abort-run SEED --reason TEXT   (the failed run only; a verified one refuses)
+  6. at L:  python scripts/run_v2_recipe.py launch        (guard 1 holds at L; retrains that seed alone, skips the rest)
+  7. at L:  python scripts/run_v2_recipe.py verify && python scripts/run_v2_recipe.py freeze
+  8.        git reset --mixed B && git switch B && git restore logs/decisions.md
+            (back on B with the working tree untouched; decisions.md gets B's committed copy back)
+  9. on B:  git add -A logs/v2_recipe results/v2_recipe, name both attempts in the freeze entry, git commit, git push
+Nothing untracked is deleted at any step, and nothing is force-pushed. A launch on B itself refuses (guard 1: B is not
+on origin's first-parent chain).
 """
 import argparse
 import hashlib
@@ -98,7 +125,8 @@ LOCK = "logs/v2_recipe/run_v2.lock"
 MEMBERS = "results/v2_recipe/members_sha256.txt"
 OUTPUT_ROOTS = ("models/v2_recipe/", "logs/v2_recipe/")
 DECISIONS = "logs/decisions.md"
-FROZEN_ENTRY = re.compile(r"^#+ .*v2 Atlantic ensemble frozen", re.M)  # the freeze entry's heading (design §4)
+FROZEN_TITLE = "v2 Atlantic ensemble frozen"  # the freeze entry's title (design §4, as amended for item 34)
+FROZEN_ENTRY = re.compile(r"^\d{4}-\d{2}-\d{2}, \d{2}:\d{2}\. .*" + re.escape(FROZEN_TITLE), re.M)  # decisions.md's form
 LATER_OUTPUTS = ("results/hep", "data/hep_sealed", "results/final_2026", "data/2026_sealed")  # H-EP or clean test
 COORDINATOR = "COORDINATOR.md"
 HASH_HEADING = "## Protected hashes (check.py source of truth)"
@@ -339,15 +367,33 @@ def load_record(root, seed):
         raise DesignError(f"{rel} is not JSON ({e})") from None
 
 
-def run_state(root, seed, commit, expected):
-    """fresh (nothing on disk), partial (files but no record), bad_record (a record that fails a check) or trained."""
+def drift_beyond_outputs(git, commit):
+    """The paths in which HEAD differs from commit other than the decisions docs and the v2 outputs (empty: the same
+    code and data). A failed diff counts as drift."""
+    if git(["rev-parse", "HEAD"]).stdout.decode().strip() == commit:
+        return []
+    r = git(["diff", "--no-renames", "-z", "--name-only", commit, "HEAD"], check=False)
+    if r.returncode != 0:
+        return [f"<git diff {commit} HEAD failed>"]
+    return sorted(p for p in r.stdout.decode("utf-8").split("\0")
+                  if p and not (doc_path(p) or p.startswith("logs/v2_recipe/") or p == MEMBERS))
+
+
+def run_state(root, seed, git, expected, chain):
+    """fresh (nothing on disk), partial (files but no record), bad_record (a record that fails a check at its own
+    commit), stale (it passes, but its commit is off origin's first-parent chain `chain`, or HEAD's code differs from
+    it) or trained."""
     p = run_paths(seed)
     if not (Path(root) / p["record"]).exists():
         return "partial" if any((Path(root) / v).exists() for v in p.values()) else "fresh"
     try:
-        check_training(load_record(root, seed), seed, root, commit, expected)
+        rec = load_record(root, seed)
+        commit = str(rec.get("commit"))
+        check_training(rec, seed, root, commit, expected)
     except DesignError:
         return "bad_record"
+    if commit not in chain or drift_beyond_outputs(git, commit):
+        return "stale"
     return "trained"
 
 
@@ -408,12 +454,19 @@ def git_blob(git, spec):
     return r.stdout.decode().strip() if r.returncode == 0 else None
 
 
-def first_parent(git, commit, guard):
-    """After a fetch, commit is on origin/phase2-experiments' first-parent chain (a merge commit of a reviewed PR)."""
+def first_parent_chain(git, guard):
+    """origin/phase2-experiments' first-parent chain, after a fetch (refused if the fetch or the read fails)."""
     if git(["fetch", "origin"], check=False).returncode != 0:
-        raise LaunchError(f"guard {guard}: git fetch origin failed; can't check {commit} against the remote")
-    chain = git(["rev-list", "--first-parent", UPSTREAM], check=False)
-    if chain.returncode != 0 or commit not in chain.stdout.decode().split():
+        raise LaunchError(f"guard {guard}: git fetch origin failed; can't check commits against the remote")
+    r = git(["rev-list", "--first-parent", UPSTREAM], check=False)
+    if r.returncode != 0:
+        raise LaunchError(f"guard {guard}: can't read the first-parent chain of {UPSTREAM}")
+    return set(r.stdout.decode().split())
+
+
+def first_parent(git, commit, guard, chain=None):
+    """commit is on origin/phase2-experiments' first-parent chain (a merge commit of a reviewed PR)."""
+    if commit not in (first_parent_chain(git, guard) if chain is None else chain):
         raise LaunchError(f"guard {guard}: {commit} is not on the first-parent chain of {UPSTREAM}; launch only from "
                           "a pushed merge commit of a reviewed PR")
 
@@ -435,6 +488,13 @@ def code_and_data_guards(root, git, expected):
     for rel, pin in ((TRAIN_PY, TRAIN_PY_SHA256), (RUN_N5, RUN_N5_SHA256), (ANALYZE_N5, ANALYZE_N5_SHA256)):
         if git_sha(git, f"HEAD:{rel}") != pin:
             raise LaunchError(f"guard 2: HEAD's {rel} is not the pinned blob {pin[:12]}...")
+    pkg = Path(root) / SRC_DIR
+    if not pkg.is_dir():
+        raise LaunchError(f"guard 2: {SRC_DIR}/ is missing on disk")
+    shadow = sorted(f.name for f in pkg.iterdir() if f.name not in SRC_BLOBS and not (f.name == "__pycache__" and f.is_dir()))
+    if shadow:
+        raise LaunchError(f"guard 2: {SRC_DIR}/ holds untracked or ignored entries {shadow}, which could shadow a "
+                          "pinned module; move them out")
     tree = {}
     for ln in git(["ls-tree", "HEAD", f"{SRC_DIR}/"]).stdout.decode().splitlines():
         meta, name = ln.split("\t", 1)
@@ -512,17 +572,23 @@ def preflight(root, git, expected, cuda_ok, child_import):
         raise LaunchError(f"guard 6: unfinished aborts {pending}; run the same abort command again to finish them")
     check_output_paths(planned_outputs())
     commit = git(["rev-parse", "HEAD"]).stdout.decode().strip()
-    states = {s: run_state(root, s, commit, expected) for s in SEEDS}
-    bad = [s for s, st in states.items() if st == "bad_record"]
+    chain = first_parent_chain(git, 1)
+    first_parent(git, commit, 1, chain)
+    states = {s: run_state(root, s, git, expected, chain) for s in SEEDS}
+    bad = [s for s, st in states.items() if st in ("bad_record", "stale")]
     if bad:
-        raise LaunchError(f"guard 6: training records that fail a check (or were made at another commit than HEAD): "
-                          f"seeds {bad}; move each aside with `run_v2_recipe.py abort-run SEED --reason ...`")
+        raise LaunchError(f"guard 6: training records that fail a check, or are stale (their commit is off the "
+                          f"first-parent chain or HEAD's code differs from it): seeds {bad}; move each aside with "
+                          "`run_v2_recipe.py abort-run SEED --reason ...`")
     partial = [s for s, st in states.items() if st == "partial"]
     if partial:
         raise LaunchError(f"guard 6: unfinished runs have files on disk: seeds {partial}; move each aside with "
                           "`run_v2_recipe.py abort-run SEED --reason ...`")
-    first_parent(git, commit, 1)
-    return dict(commit=commit, expected=expected, forbidden=forbidden, git=git, states=states)
+    others = sorted({load_record(root, s).get("commit") for s, st in states.items() if st == "trained"} - {commit})
+    if others and any(st == "fresh" for st in states.values()):
+        raise LaunchError(f"guard 6: verified records come from launch commit {others}, not HEAD {commit}; train the "
+                          f"remaining runs only at that commit (one launch commit, design §4): relaunch at {others[0]}")
+    return dict(commit=commit, expected=expected, forbidden=forbidden, git=git, states=states, chain=chain)
 
 
 # ---- training ----------------------------------------------------------------------------------------------------
@@ -620,7 +686,7 @@ def launch(root=ROOT, *, git=None, expected=None, runner=subprocess.run, revalid
         print(f"HEAD {ctx['commit']}; train.py {TRAIN_PY_SHA256[:12]}... (pinned); seeds {SEEDS[0]}-{SEEDS[-1]}",
               flush=True)
         for s in SEEDS:
-            if run_state(root, s, ctx["commit"], expected) == "trained":
+            if run_state(root, s, git, expected, ctx["chain"]) == "trained":
                 print(f"order {order_of(s)}: seed {s} already trained; skipped", flush=True)
                 continue
             train_one(s, ctx, root, hooks)
@@ -646,14 +712,10 @@ def verified_records(root, git, expected):
         raise LaunchError(f"the 10 records come from more than one launch commit: {commits}")
     launch_commit = commits[0]
     first_parent(git, launch_commit, 1)
-    head = git(["rev-parse", "HEAD"]).stdout.decode().strip()
-    if head != launch_commit:
-        changed = [p for p in git(["diff", "--no-renames", "-z", "--name-only", launch_commit, "HEAD"]).stdout
-                   .decode("utf-8").split("\0") if p]
-        other = sorted(p for p in changed if not (doc_path(p) or p.startswith("logs/v2_recipe/") or p == MEMBERS))
-        if other:
-            raise LaunchError(f"HEAD differs from the launch commit {launch_commit} in more than the decisions docs "
-                              f"and the v2 outputs: {other[:5]}")
+    other = drift_beyond_outputs(git, launch_commit)
+    if other:
+        raise LaunchError(f"HEAD differs from the launch commit {launch_commit} in more than the decisions docs "
+                          f"and the v2 outputs: {other[:5]}")
     rows = []
     for s in SEEDS:
         try:
@@ -753,8 +815,8 @@ def abort_run(seed, reason, root=ROOT, *, git=None, expected=None):
         frozen = frozen_evidence(root, git)
         if frozen:
             raise LaunchError(f"abort-run: v2 is frozen ({frozen}); `unfreeze` first (only before the freeze PR merges)")
-        commit = git(["rev-parse", "HEAD"]).stdout.decode().strip()
-        if run_state(root, seed, commit, expected) == "trained":
+        chain = first_parent_chain(git, "abort-run")
+        if run_state(root, seed, git, expected, chain) == "trained":
             raise LaunchError(f"abort-run: seed {seed} has a record that passes every check; finished runs are not "
                               "aborted")
         k = len(abort_files(root, seed)) + 1
@@ -791,12 +853,12 @@ def unfreeze(reason, root=ROOT, *, git=None):
         if git(["cat-file", "-e", f"{UPSTREAM}:{MEMBERS}"], check=False).returncode == 0:
             raise LaunchError(f"unfreeze: {MEMBERS} is on {UPSTREAM}: the freeze PR has merged, so v2 is frozen for "
                               "good; report a defect in decisions.md instead")
-        for ref in ("HEAD", UPSTREAM):
-            r = git(["show", f"{ref}:{DECISIONS}"], check=False)
-            if r.returncode != 0:
-                raise LaunchError(f"unfreeze: can't read {ref}'s {DECISIONS}; refusing")
-            if FROZEN_ENTRY.search(r.stdout.decode("utf-8", "replace")):
-                raise LaunchError(f"unfreeze: {ref}'s {DECISIONS} already holds the 'v2 Atlantic ensemble frozen' entry")
+        r = git(["show", f"{UPSTREAM}:{DECISIONS}"], check=False)  # origin only: B's own HEAD carries the entry
+        if r.returncode != 0:
+            raise LaunchError(f"unfreeze: can't read {UPSTREAM}'s {DECISIONS}; refusing")
+        if FROZEN_ENTRY.search(r.stdout.decode("utf-8", "replace")):
+            raise LaunchError(f"unfreeze: {UPSTREAM}'s {DECISIONS} already holds the '{FROZEN_TITLE}' entry: the freeze "
+                              "PR has merged")
         later = later_outputs(root, git)
         if later:
             raise LaunchError(f"unfreeze: H-EP or clean-test output exists: {later[:3]}; refusing")
