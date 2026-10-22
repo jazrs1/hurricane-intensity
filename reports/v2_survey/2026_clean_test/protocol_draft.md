@@ -240,6 +240,7 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 - **What Δ is:** the smallest gain in mean per-storm MAE that would justify replacing a frozen, tested reference. A replacement costs new I3/I6 pins, a new site build and a new reference figure, and it breaks the 2025 test's comparability for the deployed model.
 - **Δ = 1.0 kt (decided, §10 item 3).** That is a judgment of what gain is worth a switch; no external figure fixes it. The alternative considered was Δ = 0.5 kt.
 - **F-31's H9 gain, 0.48 kt, is below Δ** (John). So a null is the expected outcome, and it does not mean the recipe failed.
+- **Note (coordinator's, adopted by John 2026-10-21 with decision rule (a)):** expected outcome: not BETTER, so no replacement. The likely reading is SIGNIFICANT BUT BELOW SESOI if sd ≈ 0.5; at sd ≥ 1, NULL is the most common reading. Under the decided rule, a true 0.48 kt gain still reads BETTER about 1 time in 3 to 1 in 5 at sd 1–1.5 (n 16–23; hc-adversary's simulation, t-approximation).
 - **Label noise is not the argument.** It is shared by both models in a paired comparison and averages over frames. So best-track uncertainty does not set Δ.
 
 **Power over storms** (`power.py`; output `power_output.txt`):
@@ -374,9 +375,9 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 ## 10. Decided (John, 2026-10-21; his words verbatim)
 
 1. **The option:** "Option 3: pool 2026 and 2027 in one scoring run. Decision 1 now reads "confirmed on the 2026–2027 clean test"." (Read first.)
-2. **Labels:** "2026 scored on the HURDAT2 update (it arrives before scoring under option 3). 2027 on operational best track from a hashed December 2027 snapshot, caveat stated. Yes to the hashed December 2026 operational snapshot as backup." (§2.) Version and trigger rule: coordinator's wording, for John's confirmation.
+2. **Labels:** "2026 scored on the HURDAT2 update (it arrives before scoring under option 3). 2027 on operational best track from a hashed December 2027 snapshot, caveat stated. Yes to the hashed December 2026 operational snapshot as backup." (§2.) Version and trigger rule (the latest `hurdat2-1851-2026-*.txt` on the saved step 4 listing; the December 2026 backup if and only if there is none): confirmed by John, 2026-10-21 (decisions.md 20:38 entry).
 3. **SESOI:** "Smallest effect worth acting on: 1.0 kt. State in the protocol that F-31's H9 gain (0.48 kt) is below it, so a null is the expected outcome and does not mean the recipe failed." (§6.)
-4. **Decision rule:** "as recommended": replace only on BETTER (§5).
+4. **Decision rule:** "as recommended": replace only on BETTER (§5). Confirmed by John on 2026-10-21 ("BETTER rule (a) plus your note") after the BETTER-reach trade-off was shown to him; the note is in §6.
 5. **2026 EP storms:** "as recommended": excluded (§4).
 6. **The hold:** "as recommended": the pass waits until E3 is settled (§8 step 3).
 7. **The I4 amendment at step 4** (§8): "noted; ask me at the list step." **Still open:** it needs John's yes when the list is committed.
