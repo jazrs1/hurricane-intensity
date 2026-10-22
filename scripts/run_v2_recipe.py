@@ -56,16 +56,26 @@ abort.json there with every file's SHA-256 and status "pending"; the status beco
 a pending abort is finished by running the same command again (every other writing stage refuses while one is
 pending).
 
+The freeze PR (design §4-§5) commits the 10 records, the 10 train logs, the members file and the decisions.md entry.
+Its own check, written in the freeze PR and not here (open point 7), will bind at least:
+  - the entry's first line is exactly "YYYY-MM-DD, HH:MM. v2 Atlantic ensemble frozen", unwrapped (FROZEN_ENTRY, which
+    unfreeze matches on origin);
+  - the entry names the members file's blob SHA-256;
+  - the entry names every logs/v2_recipe/aborted/*/abort.json in the PR.
+
 Unfreeze, retrain and re-freeze while the freeze PR is under review (design §4). Operator steps; every one runs in the
 main checkout (guard 9). B is the freeze branch (the records, logs, members file and freeze entry are committed on it),
-L the records' launch commit (on origin's first-parent chain):
+L the records' launch commit (on origin's first-parent chain).
+Precondition: B holds only the freeze commits, on top of L or of a commit that differs from L only in the decisions
+docs. Otherwise step 3 leaves B's other changes as working-tree edits of tracked files, and guard 1 refuses (fail-safe).
+If B also changed a tracked reports/decisions/*.md that exists at L, step 4 restores that path too.
   1. on B:  python scripts/run_v2_recipe.py unfreeze --reason TEXT
             (refuses unless, after a fetch, neither the members file nor the freeze entry is on origin)
   2. on B:  git add -A logs/v2_recipe results/v2_recipe && git commit     (B drops the members file in a new commit)
   3.        git switch --detach && git reset --mixed L
             (HEAD and the index move to L; the working tree is untouched, so B's records, logs and abort files stay on
             disk, now untracked, byte for byte: they are -text)
-  4.        git restore logs/decisions.md
+  4.        git restore logs/decisions.md   (and any tracked reports/decisions/*.md that B changed and L has)
             (discards only the working copy of a committed file; B's commit keeps the freeze entry)
   5. at L:  python scripts/run_v2_recipe.py abort-run SEED --reason TEXT   (the failed run only; a verified one refuses)
   6. at L:  python scripts/run_v2_recipe.py launch        (guard 1 holds at L; retrains that seed alone, skips the rest)
