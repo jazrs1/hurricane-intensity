@@ -3399,3 +3399,46 @@ read, and no compute, by this entry.
   selection rule stated explicitly, the 2025 rule marked as inferred,
   the 0.48 kt sentence); then the v2 launch PR (driver and tests), to
   hc-adversary and then John.
+
+2026-10-21, 20:38. PR #34 approved with a fail-closed condition, v2
+training approved, and PR #32's three decisions: John's reply to the
+coordinator's packages (the time is the first clock read after the
+reply arrived). No training, evaluation, H9 or H-EP read, and no
+compute, by this entry.
+- Sources: reports/decisions/PR34.md and reports/decisions/PR32-r3.md
+  (the coordinator's packages; untracked; each pre-checked by
+  hc-adversary).
+- John's reply, verbatim (relayed by the coordinator):
+  "PR #34:
+  (a) Yes, merge pinned to 01c5a3c, provided the GitHub-only freeze
+  check refuses when GitHub can't be reached or read (fail closed).
+  Confirm that with a test before merging; if it's missing, add it as
+  a tightening commit.
+  (b) Yes, train v2 (seeds 30–39) under the conditions you listed.
+  Send one status when training and verification finish.
+  PR #32: merge pinned to 294d5af; confirm "latest 2026 HURDAT2 file
+  on NHC's list at the list step" with the December 2026 backup only if
+  there is none; BETTER rule (a) plus your note.
+  Run the full check on whichever merges second, as planned."
+- PR #32 merged at 20:38 pinned to
+  294d5af4ec74a437b00e4ce23e0c7607344e3008, after check.py --full
+  passed on its merge tree. This entry's PR records in
+  protocol_draft.md: the version and trigger rule as confirmed (§10
+  item 2), the decision rule (a) as confirmed (§10 item 4), and the
+  coordinator's note beside John's SESOI sentence (§6), as adopted.
+- The conditions of (b), from reports/decisions/PR34.md: the launch
+  commit is the PR #34 merge plus the pre-launch entry's docs-only
+  merge, with nothing else landing in between; every pin in the
+  pre-launch entry equals the package's (train.py afceb4b1, the nine
+  fc71b98 src blobs, excluded_crops cc9dfcff, lists 12a20a14 /
+  ead8004f, run_n5 2ebd8cea, analyze_n5 679e2169); FAST and FULL pass
+  on the launch commit. The yes covers retraining a run that fails a
+  training-only check (abort-run, design §2), recorded with its failed
+  attempt and reported in the freeze PR; any other refusal stops and
+  goes back to John.
+- PR #34's merge waits for the fail-closed test (a tightening commit)
+  and check.py --full on its new merge tree.
+- What this does not change: the frozen ensemble stays the reported
+  model; the 2025 Atlantic test set stays spent; I4 (no 2026 imagery)
+  stands; H-EP stays sealed under protocol.md 3901f4cf; no H9
+  evaluation of v2.
