@@ -145,7 +145,7 @@
   - the 10 training records;
   - the 10 train logs;
   - the members file;
-  - a decisions.md entry, "v2 Atlantic ensemble frozen". It holds the members file's **blob** SHA-256 (from `git show` bytes), the 10 member SHA-256s, the launch commit and the train list.
+  - a decisions.md entry titled exactly "v2 Atlantic ensemble frozen", in decisions.md's own entry form (`YYYY-MM-DD, HH:MM. v2 Atlantic ensemble frozen…`). It holds the members file's **blob** SHA-256 (from `git show` bytes), the 10 member SHA-256s, the launch commit and the train list.
 - **After the freeze PR merges:**
   - the member files are read-only;
   - they are never retrained, fine-tuned, re-selected or replaced.
@@ -155,7 +155,7 @@
 **A defect found while the freeze PR is under review (guard 8's procedure):**
 - **The command.** `run_v2_recipe.py unfreeze --reason "<text>"` is the only way to remove the members file. It refuses unless:
   - the members file is not on `origin/phase2-experiments` (the freeze PR is unmerged). This is decided only **after a `git fetch origin`**, and unfreeze refuses if the fetch fails;
-  - neither HEAD's nor `origin/phase2-experiments`' `logs/decisions.md` already holds the "v2 Atlantic ensemble frozen" entry;
+  - `origin/phase2-experiments`' `logs/decisions.md` does not already hold the "v2 Atlantic ensemble frozen" entry (checked on origin only: the freeze branch's own HEAD carries the entry under review, so a HEAD check would always refuse there; amended after hc-adversary item 34, for John's yes);
   - no H-EP or clean-test output exists.
 - **What it does:**
   - it moves the file to `logs/v2_recipe/aborted/freeze_<n>/members_sha256.txt`, with an `abort.json` (reason, time, the file's SHA-256, status `complete`);
