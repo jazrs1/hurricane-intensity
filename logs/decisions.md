@@ -3442,3 +3442,68 @@ compute, by this entry.
   model; the 2025 Atlantic test set stays spent; I4 (no 2026 imagery)
   stands; H-EP stays sealed under protocol.md 3901f4cf; no H9
   evaluation of v2.
+
+2026-10-21, 21:03. v2 recipe pre-launch: the pins the v2 Atlantic training
+runs under (reports/v2_survey/v2_recipe/design.md §9 step 3). Nothing is
+trained by this entry; training is `run_v2_recipe.py launch` in the main
+checkout, at the merge of this entry's docs-only PR, under John's yes and
+reports/decisions/PR34.md's conditions.
+- Every hash below was read from git on the PR #34 merge commit be2a6f473776876b176e9fa40160518be463207a
+  (`git rev-parse be2a6f473776876b176e9fa40160518be463207a:<path>` for the blob id; SHA-256 of the
+  `git show be2a6f473776876b176e9fa40160518be463207a:<path>` bytes), not copied from the design. Each
+  equals the design's and the driver's pin.
+- Design: reports/v2_survey/v2_recipe/design.md, as merged with its
+  amendment cc3d537: blob 11089a489764fcff414799c0654c5e03b590a513,
+  SHA-256 48aff23cd75d068e404ba3ef0de6a448c9256b58700916f5b2c946afc82b5315.
+- Driver: scripts/run_v2_recipe.py (as at f6c039e): blob
+  6ae848ea788e5d99d4ca17f76d48e0318e0c6195, SHA-256
+  d51d9511c71fe8f648a914409be43cefb33307820df8aa55d11b4659eebb5fb7.
+- Imported, hashed before they run:
+  - scripts/run_n5.py: blob 2ebd8cea65b996aee6f4acf8ef262f4a65a1c229,
+    SHA-256 e8f13e06b80c29101ef1a4efaeac7aaa17e5922f0a8bebdc26a19f270d6d3ed7;
+  - scripts/analyze_n5.py: blob 679e21696b6592e36a0ff12ee7d7acb4622dd565,
+    SHA-256 0130641583cf09c8abb5791b9ea9467fd6410b953bc8a57c3a2ae68fb3bb1288.
+- scripts/train.py: blob 500bbc1e2ff6465dc645138e1904f0819f5b3e96, SHA-256
+  afceb4b19ea7d8c732c6f26b7d52e4b3b6d313d58153e2d0518887a3a6db231f.
+- src/hurricane_intensity/*.py, the nine blobs at fc71b98 (blob, SHA-256):
+  - __init__.py 7a6fe6399245c5e368ffd7f648d8aff589527f21,
+    928e490ccd10efccf941662dec33551e54a39233e60a229e758bf91b2cbe93e3;
+  - config.py 305d3c4947141fe97fcb3634b3b22d614894a889,
+    642caef3efc7564639a20600cbf21062538b4c1c35d3dd37934ef161b949a81a;
+  - crop.py 101be8fcc4be79ec9d9523cf2d8107f7eb1075a7,
+    25e93d1ab045c7545d939dbf633f9a89365a2fde9cc1c4fe50d74beecd58f8f9;
+  - dataset.py 458ed363d48b50b672b69792827cb5b82c6a316b,
+    f31f25f01392d4546cdb0b6bdd37317e1cff138e962ff24c0a39663726b2ba13;
+  - goes_index.py bba3b98f65838b68028bf545d833e6e70fd78815,
+    350a0bb714129928c769dc05413eb5f412fbc3c006021c5cd99cf0b3891b49df;
+  - hurdat2.py 11dee801471a6ed5b86a6872bbdf840f6e447dfa,
+    a91bd2ab02dc2d05fcb0c4d64018de293516fd7c7d5a4fd7169bf982ecde80ed;
+  - pipeline.py 58746c606bd3b3beb3ad5c6d5d271ee4abd11305,
+    0db33a3e885367dea65021cfdcf5b6cf595c97446bbf50bb329065ce35a863ac;
+  - projection.py 29cc9b6c08ecd93d58c773165b606b8688fb5b6d,
+    d4faa06d2a8824582c1c67fa427a28cf3c0736f2c573f160a83204603c8e1d75;
+  - splits.py 355f5f63e37b3f31c504c71dce7e745560c7a0f9,
+    399b2c1e47f2a5d57eda2cd00ffb68af7a17a5403cba36ff31e0bda0c34c192a.
+  No file is added or removed (the folder holds exactly these nine).
+- excluded_crops.txt: blob cc9dfcff4036fcbefe5d2ec1a6488fa2feef8f5f, SHA-256
+  102009773f843410149f8f8cadeb1b3c981252fcb8d7c53cc8d43e018df00cea.
+- Lists: storms_train_expanded.txt blob
+  12a20a1499cafa50a753a6f5f7da3f4439c8fa8f (SHA-256
+  b94fb5e2f117d56c7f30dca526587a139ecc1a608a0c85920816cb0baf5502ca);
+  storms_val_expanded.txt blob ead8004f39712f43f9f787e1851de6092c35abab
+  (SHA-256 75b449e0324dbc67dd58e80df3fc43ed561fe6e0d49edfa101bd01df00ec3b90).
+- `git diff fc71b98 be2a6f473776876b176e9fa40160518be463207a -- src scripts/train.py excluded_crops.txt
+  storms_train_expanded.txt storms_val_expanded.txt` is empty.
+- Runs: seeds 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, in that order
+  (order 1-10); 99 epochs x 66 batches = 6534 steps each
+  (epochs_for(2081, 4 x 1640)); native selection; 2081 train and 940
+  validation frames.
+- Disclosure (design §4), by line only: while drafting the design's r1,
+  hc-survey's search of reports/v2_survey/hep/protocol.md (SHA-256
+  3901f4cf41856c40e4c08a533011106ae78067a7301c7e27fbd3e8cd30624c7f) also
+  displayed its l.84-88 and l.101. No v2 choice depends on them; every
+  recipe item was fixed by F-31 and John. From r2 on, protocol.md was read
+  by line range only.
+- What this does not change: nothing is read from H9, H-EP or 2026; the
+  frozen ensemble stays the reported model; v2 is frozen only by its
+  freeze PR (design §4).
