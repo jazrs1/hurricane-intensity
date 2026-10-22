@@ -3508,7 +3508,7 @@ reports/decisions/PR34.md's conditions.
   frozen ensemble stays the reported model; v2 is frozen only by its
   freeze PR (design §4).
 
-2026-10-21, 23:25. v2 Atlantic ensemble frozen, pending its freeze PR
+2026-10-21, 23:25. v2 Atlantic ensemble frozen
 (reports/v2_survey/v2_recipe/design.md §4-§5): ten members, seeds 30-39,
 trained at one launch commit and verified. v2 is frozen only when this
 freeze PR merges into phase2-experiments; until then it is not frozen.
@@ -3560,5 +3560,6 @@ freeze PR merges into phase2-experiments; until then it is not frozen.
   re-selected or replaced; a defect found later is reported here, and any
   fix is a new ensemble under a new design.
 - What this does not change: nothing was read from H9, H-EP or 2026, and
-  no member was evaluated; the frozen ensemble stays the reported model.
-  v2 becomes eligible as E3's comparator; E3's design declares it.
+  no member was evaluated on any held-out set; the frozen ensemble stays
+  the reported model. Once this PR merges, v2 is eligible as E3's
+  comparator (design §4); E3's design declares it.
