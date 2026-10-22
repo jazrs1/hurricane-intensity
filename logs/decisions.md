@@ -3563,3 +3563,56 @@ freeze PR merges into phase2-experiments; until then it is not frozen.
   no member was evaluated on any held-out set; the frozen ensemble stays
   the reported model. Once this PR merges, v2 is eligible as E3's
   comparator (design §4); E3's design declares it.
+
+2026-10-22, 00:03. PR #37 approved: John's yes to the v2 freeze, and a
+gate on the freeze-PR check script. No training, evaluation, H9 or H-EP
+read, and no compute, by this entry.
+- Source: reports/decisions/PR37.md (the coordinator's package;
+  untracked; pre-checked by hc-adversary).
+- John's reply, verbatim (relayed by the coordinator):
+  "PR #37: yes, merge pinned to 2db0ccc. v2 is frozen. After the merge,
+  move the main checkout back to phase2-experiments without touching
+  files and confirm the members file hash 558b781b… and all ten
+  checkpoint hashes still match. Log the six freeze-check-script gaps as
+  a gate: fixed and adversary-reviewed before that script is reused or
+  any re-freeze."
+- PR #37 merged at 00:03 pinned to
+  2db0ccca09c9838079ce10f8fe9274faec77b963, as 8514451 (parents 2b4948e
+  and 2db0ccc), after check.py --full passed on its tree. v2 is frozen:
+  the "2026-10-21, 23:25. v2 Atlantic ensemble frozen" entry and
+  results/v2_recipe/members_sha256.txt are on phase2-experiments, so
+  run_v2_recipe.py unfreeze refuses from now on.
+- After the merge: the main checkout was moved from v2-freeze to
+  phase2-experiments by `git fetch origin
+  phase2-experiments:phase2-experiments` and `git switch
+  phase2-experiments`. The SHA-256, modification time and mode of all 31
+  v2 files (21 committed outputs, 10 checkpoints) were identical before
+  and after. The members file's SHA-256 on disk and in git is
+  558b781bc87e892b640994cdefc309059fcc786ac861e9ac34850ebb7815ad29, and
+  `sha256sum -c` of it passes for all ten models/v2_recipe/seed30-39.pt,
+  which are read-only.
+- Gate (John): the freeze-PR check script (uncommitted; SHA-256
+  05261b043f17e37cdb739117dcd86a7a62517a866260fb97ca52dd01d5d057d1) is
+  not reused, and no re-freeze happens, until its six gaps are fixed and
+  hc-adversary has reviewed the fix. The gaps (hc-adversary item 37;
+  none is present in PR #37, each checked directly):
+  - M1: the allowed-path pattern admits any path under logs/v2_recipe/
+    and results/v2_recipe/; anchor it to the design §5 forms.
+  - M3: the entry-title match allows text before the title; require the
+    title right after the timestamp.
+  - M4: the ten member SHA-256s are checked as substrings, so swapped
+    seed-hash pairs pass; compare parsed pairs with the members file.
+  - M5: an aborted/ directory without an abort.json passes; require
+    one in every aborted directory, committed or on disk.
+  - M6: it checks only that the launch commit is an ancestor of the
+    merge-base; require the merge-base to be the launch commit, or the
+    difference to be decisions docs only.
+  - M7: check-attr reads the working tree's .gitattributes, and no
+    clean tracked tree is asserted; use the index or assert a clean
+    tree.
+- What this does not change: the frozen ensemble
+  (models/storms/expanded/seed0-9.pt) stays the reported model; main
+  stays at fbb39c4; no v2 member has been evaluated on any held-out set;
+  v2 meets held-out data only in the 2026–2027 clean test, under its
+  protocol, committed before any clean-test build and before the H-EP
+  pass.
