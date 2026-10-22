@@ -112,9 +112,11 @@ def prot_of(root):
 
 
 def fake_git(root=None, dirty=False, differs=(), fetch_rc=0, head=COMMIT, first_parent=(COMMIT,), blobs=None,
-             ids=None, src=None, tracked=(), on_origin=(), decisions=None, origin_tree=(), tree_rc=0, changed=()):
+             ids=None, src=None, tracked=(), on_origin=(), decisions=None, origin_tree=(), tree_rc=0, changed=(),
+             show_rc=None):
     """git for the synthetic repo. blobs/ids override `show`/`rev-parse` of HEAD:<path>; src overrides the
-    src/hurricane_intensity listing; decisions maps a ref to its logs/decisions.md text."""
+    src/hurricane_intensity listing; decisions maps a ref to its logs/decisions.md text, and show_rc a ref to a failing
+    return code for that read."""
     blobs = {**REAL_BLOBS, **(blobs or {})}
     ids = {**REAL_IDS, **(ids or {})}
     src = R.SRC_BLOBS if src is None else src
@@ -144,7 +146,8 @@ def fake_git(root=None, dirty=False, differs=(), fetch_rc=0, head=COMMIT, first_
         if args[0] == "show":
             ref, rel = args[1].split(":", 1)
             if rel == "logs/decisions.md":
-                return SimpleNamespace(stdout=decisions[ref].encode(), returncode=0)
+                rc = (show_rc or {}).get(ref, 0)
+                return SimpleNamespace(stdout=b"" if rc else decisions[ref].encode(), returncode=rc)
             assert ref == "HEAD", args
             return SimpleNamespace(stdout=blobs[rel], returncode=0)
         if args == ["rev-parse", "HEAD"]:
@@ -827,7 +830,12 @@ ENTRY = ("# decisions\n\n2026-12-14, 10:05. v2 Atlantic ensemble frozen (launch 
     (dict(decisions={"HEAD": ENTRY, "origin/phase2-experiments": ENTRY}), "already holds .*the freeze PR has merged"),
     (dict(origin_tree=("results/hep/x.csv",)), "H-EP or clean-test output exists"),
     (dict(tree_rc=128), "can't read origin/phase2-experiments's tree"),
-])
+    # fail closed (John's merge condition): the fetch succeeds but origin's decisions.md can't be read
+    (dict(show_rc={"origin/phase2-experiments": 128}), "can't read origin/phase2-experiments's logs/decisions.md"),
+    # the origin ref is missing: cat-file -e's non-zero reads as "members not on origin", so a later read must refuse
+    (dict(show_rc={"origin/phase2-experiments": 128}, tree_rc=128), "can't read origin/phase2-experiments's"),
+], ids=["fetch_fails", "members_on_origin", "entry_on_origin", "entry_on_both", "later_output_on_origin",
+        "tree_unreadable", "decisions_unreadable", "origin_ref_missing"])
 def test_unfreeze_refusals(frozen, kw, match):
     with pytest.raises(R.LaunchError, match=match):
         R.unfreeze("x", frozen, git=fake_git(frozen, **kw))
