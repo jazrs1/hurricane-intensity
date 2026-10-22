@@ -3507,3 +3507,58 @@ reports/decisions/PR34.md's conditions.
 - What this does not change: nothing is read from H9, H-EP or 2026; the
   frozen ensemble stays the reported model; v2 is frozen only by its
   freeze PR (design §4).
+
+2026-10-21, 23:25. v2 Atlantic ensemble frozen, pending its freeze PR
+(reports/v2_survey/v2_recipe/design.md §4-§5): ten members, seeds 30-39,
+trained at one launch commit and verified. v2 is frozen only when this
+freeze PR merges into phase2-experiments; until then it is not frozen.
+- Launch commit L: 2b4948e54b001747c9fedbfc26a7e2e6885536b8, the PR #36
+  merge (the PR #34 merge be2a6f4 plus the pre-launch entry, nothing else
+  in between). Training ran 21:27 to 23:01 in the main checkout; every
+  record's commit is L. `run_v2_recipe.py verify` passed: 10 records, no
+  tie, no abort. Freeze ran at 23:22.
+- Members file: results/v2_recipe/members_sha256.txt, blob SHA-256
+  558b781bc87e892b640994cdefc309059fcc786ac861e9ac34850ebb7815ad29
+  (SHA-256 of the `git show 4b91baa:results/v2_recipe/members_sha256.txt`
+  bytes; the file is LF, so its file hash is the same).
+- The 10 members, models/v2_recipe/seed<s>.pt (SHA-256):
+  - seed30 b1f819777e40840d9ddbaeeca62f2328611287e8bf47dc70f0476e59784ef2b2
+  - seed31 efd5e13808aa22cf490f12530f244044d145d5369c1aa40c22340447a0d95457
+  - seed32 e2eaeb571775214c6185324414f1897ebe9663a754ac45c184ffcdf3fd55655c
+  - seed33 0f9b429ffde4abd4fe44fb32480d50de3b1b3b89ba53c55b364d9418d4ce7233
+  - seed34 01230f9f1630e063e8443b1756ebf6850179251c8978fe1e716b8cf7f9849594
+  - seed35 09d79a00230abe8393fb0675169f403600a412b755b42d612cd6a6001ed31841
+  - seed36 7a41b2b4d27c613e635c85e07df96ffb6b921698ae647cbff0f015832d87b692
+  - seed37 9df9ac91475d88d34a60267d70d1d95d363b8490b2300a43df121dcfdda21f6b
+  - seed38 ba87bc056ccdf5debe43d95fa669087d950a65b59b34e907ce9166f952dd305a
+  - seed39 fc7301049ef1ea6739660f865778a9e5c0c7e9697a5f3ef693975e976c3b2911
+- Train list: storms_train_expanded.txt, blob
+  12a20a1499cafa50a753a6f5f7da3f4439c8fa8f (at L). Selection used
+  storms_val_expanded.txt, blob ead8004f39712f43f9f787e1851de6092c35abab.
+- Aborted attempts: no aborted attempts. The PR commits no
+  logs/v2_recipe/aborted/*/abort.json, and every record's
+  aborted_attempts is empty.
+- Committed with this entry (byte-for-byte, -text): the 10 records
+  logs/v2_recipe/runs/seed30-39.train.json, the 10 train logs
+  logs/v2_recipe/seed30-39.log and the members file.
+- Validation, the selection set, not an estimate (design §3), from the
+  verify output: pick epoch / validation MAE at the pick (kt): seed 30
+  95 / 8.0034; 31 69 / 8.1579; 32 78 / 8.1747; 33 67 / 7.7087; 34 89 /
+  8.0453; 35 88 / 7.7990; 36 84 / 7.9814; 37 67 / 7.8400; 38 89 / 7.9914;
+  39 68 / 8.0488. Under-training flag (pick > 0.85 x 99): 4/10, seeds 30,
+  34, 35 and 38.
+- Every later use passes exactly `--checkpoints models/v2_recipe/seed30.pt
+  ... models/v2_recipe/seed39.pt` (ascending) and `--expect-sha
+  results/v2_recipe/members_sha256.txt`, and never the members file as
+  `--sha-out`.
+- What still blocks unfreeze (design §4): while this PR is unmerged,
+  `run_v2_recipe.py unfreeze --reason` may still withdraw the members file.
+  It refuses, after a `git fetch origin`, once origin/phase2-experiments
+  holds the members file or this entry (so for good once this PR merges),
+  if the fetch fails, or if any H-EP or clean-test output exists. After the
+  merge the members are read-only and are never retrained, fine-tuned,
+  re-selected or replaced; a defect found later is reported here, and any
+  fix is a new ensemble under a new design.
+- What this does not change: nothing was read from H9, H-EP or 2026, and
+  no member was evaluated; the frozen ensemble stays the reported model.
+  v2 becomes eligible as E3's comparator; E3's design declares it.
