@@ -3616,3 +3616,21 @@ read, and no compute, by this entry.
   v2 meets held-out data only in the 2026–2027 clean test, under its
   protocol, committed before any clean-test build and before the H-EP
   pass.
+
+2026-10-26, 18:15. Preprocessing pinned for evaluation, and the v2
+pin test: John's decisions. No training, evaluation or compute by this
+entry.
+- John, verbatim (relayed by the coordinator): "Agreed on the pin-test
+  change. Add to the 2026–2027 protocol (docs-only, you may merge): v2
+  and the frozen ensemble are always evaluated with preprocessing from
+  their pinned commits, or the run must first prove byte-identical crops
+  between pinned and current code for every evaluated storm. Same rule
+  for E3's comparator. Tell me when B-v2-2 merges so I can rebase
+  fix-antimeridian."
+- The pin-test change (B-v2-2's PR): run_v2_recipe.py's SRC_BLOBS stay
+  the fc71b98 pins; test_pins_match_the_committed_blobs asserts them
+  against fc71b98, not HEAD. With src changed, launch still refuses
+  (guard 2; guard 8, since v2 is frozen).
+- The preprocessing rule is recorded in
+  reports/v2_survey/2026_clean_test/protocol_draft.md §1 and §10 by
+  this entry's PR.

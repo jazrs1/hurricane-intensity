@@ -78,6 +78,7 @@
 - **Evaluation:** both are evaluated the same way: the unweighted mean of 10 members per frame (`ensemble_eval.py --expect-sha <members file>`, with `--checkpoints` exactly as listed in each members file). There is no recalibration, weighting, member selection or test-time augmentation.
 - **Code pinned at commit:** `ensemble_eval.py`, `src/hurricane_intensity/*.py` (including `dataset.py` preprocessing) and the pass driver and report scripts are pinned by blob hash at the protocol commit (§8 step 2). Each is required equal at the pass. A year can pass under option 3, and nothing else would stop drift.
 - **`best_model.pt`:** out (as in H-EP §1).
+- **Preprocessing pinned to each model's own commit (John, 2026-10-26):** V and F are always evaluated with preprocessing from their pinned commits (V: fc71b98's `src/hurricane_intensity/*.py`, as pinned in the v2 pre-launch entry; F: its training commit, named by blob hash at the protocol commit, §8 step 2). Otherwise the run must first prove that pinned and current code produce byte-identical crops for every evaluated storm, and refuse if any differs. The same rule applies to E3's comparator.
 - **V must be frozen before the protocol is committed.** V's freeze entry is committed first, and the protocol is never committed with an open slot.
 
 ## 2. Labels: decided (§10 item 2): route C for 2026, route A for 2027
@@ -384,6 +385,8 @@ John asked for "wait for the post-season HURDAT2 update vs. use operational best
 8. **Subtropical-only storms and re-scoring:** "as recommended": no subtropical-only storms (§3), and no declared re-scoring against final HURDAT2 (§2).
 
 **F-40** (John): "the 2026–2027 protocol must state its storm selection rule explicitly and say the 2025 rule was inferred (HURDAT2 peak ≥64 kt)." Done in §3, "Storm selection rule".
+
+**Preprocessing rule** (John, 2026-10-26): "v2 and the frozen ensemble are always evaluated with preprocessing from their pinned commits, or the run must first prove byte-identical crops between pinned and current code for every evaluated storm. Same rule for E3's comparator." Done in §1.
 
 ## Files in this draft
 
