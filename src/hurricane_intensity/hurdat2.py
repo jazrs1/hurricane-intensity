@@ -153,6 +153,13 @@ def _is_atlantic_cache(path: Path) -> bool:
     return path.exists() and atlantic.exists() and os.path.samefile(path, atlantic)
 
 
+def _write_new(path: Path, data: bytes) -> None:
+    """Write `data` to a fresh file: a stale file (or a link) at `path` is unlinked, never written through."""
+    path.unlink(missing_ok=True)
+    with open(path, "xb") as f:
+        f.write(data)
+
+
 def fetch_pinned_hurdat2(url: str, sha256: str, cache_path: Path) -> Path:
     """Return a verified local copy of one pinned HURDAT2 file (B-v2-2).
 
@@ -165,7 +172,8 @@ def fetch_pinned_hurdat2(url: str, sha256: str, cache_path: Path) -> Path:
     """
     cache_path = Path(cache_path)
     meta_path = _source_meta_path(cache_path)
-    if _is_atlantic_cache(cache_path) or _is_atlantic_cache(meta_path):
+    partial = cache_path.with_name(cache_path.name + ".partial")
+    if any(_is_atlantic_cache(p) for p in (cache_path, meta_path, partial)):
         raise ValueError(f"{cache_path}: refusing to use the protected Atlantic HURDAT2 cache")
     if cache_path.name != url.rsplit("/", 1)[-1]:
         raise ValueError(f"{cache_path}: the cache filename must be the pinned file's name ({url})")
@@ -185,19 +193,10 @@ def fetch_pinned_hurdat2(url: str, sha256: str, cache_path: Path) -> Path:
         raise ValueError(f"{url} has SHA-256 {got}, pinned {sha256}; refusing (nothing written)")
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    partial = cache_path.with_name(cache_path.name + ".partial")
-    partial.write_bytes(resp.content)  # raw bytes: the pin is of the bytes NHC serves
+    _write_new(partial, resp.content)  # raw bytes: the pin is of the bytes NHC serves
     os.replace(partial, cache_path)
-    meta_path.write_text(
-        json.dumps(
-            {
-                "url": url,
-                "sha256": got,
-                "fetched_at": datetime.now(timezone.utc).isoformat(),
-            }
-        ),
-        encoding="utf-8",
-    )
+    meta = {"url": url, "sha256": got, "fetched_at": datetime.now(timezone.utc).isoformat()}
+    _write_new(meta_path, json.dumps(meta).encode("utf-8"))
     logger.info("Cached pinned HURDAT2 file to %s (%d bytes)", cache_path, len(resp.content))
     return cache_path
 

@@ -146,6 +146,30 @@ def test_fetch_refuses_a_hard_link_to_the_atlantic_cache(env, served):
     assert served["calls"] == []
 
 
+@pytest.mark.parametrize("suffix", [".partial", ".source.json"])
+def test_fetch_refuses_a_stale_side_file_hard_linked_to_the_atlantic_cache(env, served, suffix):
+    """hc-adversary item 40 D1: the .partial (or meta) file is written, so a link there must be refused too."""
+    atlantic = config.HURDAT2_CACHE_PATH  # the stand-in for the protected file
+    before = atlantic.read_bytes()
+    os.link(atlantic, env / (config.HURDAT2_EP_CACHE_PATH.name + suffix))
+    with pytest.raises(ValueError, match="protected Atlantic"):
+        hurdat2.fetch_ep_hurdat2()
+    assert atlantic.read_bytes() == before and served["calls"] == []
+    assert not config.HURDAT2_EP_CACHE_PATH.exists()
+
+
+@pytest.mark.parametrize("suffix", [".partial", ".source.json"])
+def test_fetch_replaces_a_stale_side_file_without_writing_through_it(env, served, suffix):
+    """A stale side file linked to any other file is unlinked and recreated; the other file keeps its bytes."""
+    other = env.parent / "other.txt"
+    other.write_bytes(b"other bytes\n")
+    os.link(other, env / (config.HURDAT2_EP_CACHE_PATH.name + suffix))
+    path = hurdat2.fetch_ep_hurdat2()
+    assert path.read_bytes() == NEPAC and other.read_bytes() == b"other bytes\n"
+    assert json.loads(hurdat2._source_meta_path(path).read_text(encoding="utf-8"))["sha256"] == NEPAC_SHA
+    assert not path.with_name(path.name + ".partial").exists()
+
+
 def test_fetch_refuses_a_cache_not_named_as_the_pinned_file(env, served):
     with pytest.raises(ValueError, match="pinned file's name"):
         hurdat2.fetch_pinned_hurdat2(EP_URL, NEPAC_SHA, env / "hurdat2_ep.txt")
