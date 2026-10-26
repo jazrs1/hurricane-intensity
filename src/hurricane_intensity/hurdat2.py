@@ -18,8 +18,10 @@ max sustained wind (kt), min central pressure (mb).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -133,6 +135,96 @@ def download_hurdat2(
     )
     logger.info("Cached HURDAT2 file to %s (%d bytes)", cache_path, len(resp.text))
     return cache_path
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _is_atlantic_cache(path: Path) -> bool:
+    """True if `path` is the protected Atlantic cache (same path, or a link to the same file)."""
+    path, atlantic = Path(path), Path(config.HURDAT2_CACHE_PATH)
+    if path.resolve() == atlantic.resolve():
+        return True
+    return path.exists() and atlantic.exists() and os.path.samefile(path, atlantic)
+
+
+def fetch_pinned_hurdat2(url: str, sha256: str, cache_path: Path) -> Path:
+    """Return a verified local copy of one pinned HURDAT2 file (B-v2-2).
+
+    For the basin files (config.HURDAT2_EP_*), not the Atlantic one: there
+    is no URL resolution and no force/refresh. The cache file must carry the
+    pinned NHC filename and may never be the Atlantic cache. A cached copy is
+    re-hashed and refused on mismatch, never overwritten. A fresh download is
+    hashed before anything is written, so a wrong file never reaches disk;
+    the SHA-256 is recorded in the .source.json next to it.
+    """
+    cache_path = Path(cache_path)
+    meta_path = _source_meta_path(cache_path)
+    if _is_atlantic_cache(cache_path) or _is_atlantic_cache(meta_path):
+        raise ValueError(f"{cache_path}: refusing to use the protected Atlantic HURDAT2 cache")
+    if cache_path.name != url.rsplit("/", 1)[-1]:
+        raise ValueError(f"{cache_path}: the cache filename must be the pinned file's name ({url})")
+
+    if cache_path.exists():
+        got = _sha256_file(cache_path)
+        if got != sha256:
+            raise ValueError(f"{cache_path} has SHA-256 {got}, pinned {sha256}; refusing (not overwritten)")
+        print(f"HURDAT2: using pinned cached file at {cache_path} (SHA-256 {got})")
+        return cache_path
+
+    print(f"HURDAT2: downloading pinned file {url}")
+    resp = requests.get(url, timeout=60)
+    resp.raise_for_status()
+    got = hashlib.sha256(resp.content).hexdigest()
+    if got != sha256:
+        raise ValueError(f"{url} has SHA-256 {got}, pinned {sha256}; refusing (nothing written)")
+
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    partial = cache_path.with_name(cache_path.name + ".partial")
+    partial.write_bytes(resp.content)  # raw bytes: the pin is of the bytes NHC serves
+    os.replace(partial, cache_path)
+    meta_path.write_text(
+        json.dumps(
+            {
+                "url": url,
+                "sha256": got,
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    logger.info("Cached pinned HURDAT2 file to %s (%d bytes)", cache_path, len(resp.content))
+    return cache_path
+
+
+def fetch_ep_hurdat2() -> Path:
+    """The pinned East Pacific (nepac) HURDAT2, fetched once into its own cache."""
+    return fetch_pinned_hurdat2(config.HURDAT2_EP_URL, config.HURDAT2_EP_SHA256, config.HURDAT2_EP_CACHE_PATH)
+
+
+def verify_pinned_hurdat2(path: Path) -> Path:
+    """Check an explicitly given HURDAT2 path (--hurdat2-path) before it is read.
+
+    Only pinned basin files are accepted, by filename and SHA-256. The
+    Atlantic cache is refused here: Atlantic builds use the default path.
+    """
+    pins = {Path(config.HURDAT2_EP_CACHE_PATH).name: config.HURDAT2_EP_SHA256}
+    path = Path(path)
+    if _is_atlantic_cache(path):
+        raise ValueError(f"{path}: the Atlantic cache is not a --hurdat2-path file; omit --hurdat2-path")
+    if path.name not in pins:
+        raise ValueError(f"{path}: not a pinned HURDAT2 file (pinned: {sorted(pins)})")
+    if not path.is_file():
+        raise FileNotFoundError(f"{path}: fetch it first with scripts/fetch_hurdat2_ep.py")
+    got = _sha256_file(path)
+    if got != pins[path.name]:
+        raise ValueError(f"{path} has SHA-256 {got}, pinned {pins[path.name]}; refusing")
+    return path
 
 
 def _parse_lat(raw: str) -> float:

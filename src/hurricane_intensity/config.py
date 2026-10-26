@@ -34,6 +34,14 @@ HURDAT2_DEFAULT_URL = "https://www.nhc.noaa.gov/data/hurdat/hurdat2-1851-2025-02
 NHC_DATA_PAGE_URL = "https://www.nhc.noaa.gov/data/"
 HURDAT2_CACHE_PATH = INTERIM_DIR / "hurdat2_atlantic.txt"
 
+# East Pacific (nepac) HURDAT2 (B-v2-2). Unlike the Atlantic file this is
+# never auto-resolved: one exact NHC file, pinned by filename and SHA-256 (the
+# file H-EP's protocol pins), cached under its own NHC filename so it can
+# never collide with HURDAT2_CACHE_PATH. See hurdat2.fetch_pinned_hurdat2.
+HURDAT2_EP_URL = "https://www.nhc.noaa.gov/data/hurdat/hurdat2-nepac-1949-2025-092926.txt"
+HURDAT2_EP_SHA256 = "caece626f7038db64a803a73f5985b563693f0130f3ff16b4b0a0a93c7aa0507"
+HURDAT2_EP_CACHE_PATH = INTERIM_DIR / "hurdat2-nepac-1949-2025-092926.txt"
+
 # Best-track "status" codes to keep. This excludes EX (extratropical) and
 # other post-tropical remnant stages, so a storm's track is automatically
 # trimmed to its tropical/subtropical lifetime without hardcoding dates --
