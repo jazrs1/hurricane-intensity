@@ -97,18 +97,29 @@ def run_pipeline(
     force_hurdat2_refresh: bool = False,
     include_statuses: tuple[str, ...] = config.DEFAULT_INCLUDE_STATUSES,
     bucket: str = config.GOES_BUCKET,
+    hurdat2_path: Path | None = None,
 ) -> Path:
     """Run the full pipeline for one storm. Returns the manifest CSV path.
 
     `bucket` selects the satellite (noaa-goes16, noaa-goes19, ...); it is
     used both to find the nearest scan and to download it.
+
+    `hurdat2_path` reads a pinned basin file (e.g. the East Pacific one from
+    hurdat2.fetch_ep_hurdat2) instead of the Atlantic cache: it is checked by
+    filename and SHA-256, and download_hurdat2 is never called. It cannot be
+    combined with hurdat2_url or force_hurdat2_refresh.
     """
+    if hurdat2_path is not None and (hurdat2_url is not None or force_hurdat2_refresh):
+        raise ValueError("hurdat2_path cannot be combined with hurdat2_url or force_hurdat2_refresh")
+    if hurdat2_path is not None:
+        hurdat2_path = hurdat2.verify_pinned_hurdat2(hurdat2_path)
     atcf_id = atcf_id.strip().upper()
     out_dir = Path(out_root) / atcf_id
     crops_dir = out_dir / "crops"
     crops_dir.mkdir(parents=True, exist_ok=True)
 
-    hurdat2_path = hurdat2.download_hurdat2(url=hurdat2_url, force=force_hurdat2_refresh)
+    if hurdat2_path is None:
+        hurdat2_path = hurdat2.download_hurdat2(url=hurdat2_url, force=force_hurdat2_refresh)
     storm_name, fixes = hurdat2.parse_storm(atcf_id, hurdat2_path, include_statuses)
 
     grid = build_sample_grid(fixes, sample_interval)

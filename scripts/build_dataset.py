@@ -71,6 +71,16 @@ def parse_args() -> argparse.Namespace:
         help="Re-download HURDAT2 even if a cached copy exists.",
     )
     p.add_argument(
+        "--hurdat2-path",
+        default=None,
+        help=(
+            "A pinned basin HURDAT2 file to read instead of the Atlantic cache, "
+            f"e.g. {config.HURDAT2_EP_CACHE_PATH} (fetch it with "
+            "scripts/fetch_hurdat2_ep.py). Checked by filename and SHA-256. "
+            "Not combinable with --hurdat2-url or --force-hurdat2-refresh."
+        ),
+    )
+    p.add_argument(
         "--include-statuses",
         default=",".join(config.DEFAULT_INCLUDE_STATUSES),
         help=(
@@ -92,7 +102,10 @@ def parse_args() -> argparse.Namespace:
         default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
     )
-    return p.parse_args()
+    args = p.parse_args()
+    if args.hurdat2_path is not None and (args.hurdat2_url is not None or args.force_hurdat2_refresh):
+        p.error("--hurdat2-path cannot be combined with --hurdat2-url or --force-hurdat2-refresh")
+    return args
 
 
 def main() -> None:
@@ -116,6 +129,7 @@ def main() -> None:
         force_hurdat2_refresh=args.force_hurdat2_refresh,
         include_statuses=include_statuses,
         bucket=args.bucket,
+        hurdat2_path=args.hurdat2_path,
     )
 
 

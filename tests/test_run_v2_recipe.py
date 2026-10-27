@@ -267,14 +267,14 @@ def test_commands_are_the_design_argument_lists():
 
 
 def test_pins_match_the_committed_blobs():
-    """The pins are F-31's: train.py, run_n5.py and analyze_n5.py at HEAD, and the src, excluded_crops and list
-    blobs at fc71b98, which HEAD still holds."""
+    """The pins are F-31's: train.py, run_n5.py and analyze_n5.py at HEAD, the src blobs at fc71b98, and the
+    excluded_crops and list blobs at fc71b98, which HEAD still holds. src is checked at fc71b98 only (B-v2-2): v2 is
+    frozen, so HEAD's src may move on; launch then refuses (test_launch_refuses_at_the_real_heads_src)."""
     for rel, pin in ((R.TRAIN_PY, R.TRAIN_PY_SHA256), (R.RUN_N5, R.RUN_N5_SHA256), (R.ANALYZE_N5, R.ANALYZE_N5_SHA256),
                      (R.EXCLUDED_CROPS, R.EXCLUDED_CROPS_SHA256)):
         assert hashlib.sha256(REAL_BLOBS[rel]).hexdigest() == pin, rel
+    assert {Path(ln.split("\t")[1]).name: ln.split()[2] for ln in REAL["ls-tree"]["fc71b98"]} == R.SRC_BLOBS
     for ref in ("fc71b98", "HEAD"):
-        out = REAL["ls-tree"][ref]
-        assert {Path(ln.split("\t")[1]).name: ln.split()[2] for ln in out} == R.SRC_BLOBS, ref
         for rel, pin in ((R.EXCLUDED_CROPS, R.EXCLUDED_CROPS_BLOB), (R.TRAIN_LIST, R.TRAIN_LIST_BLOB),
                          (R.VAL_LIST, R.VAL_LIST_BLOB)):
             assert REAL["rev-parse"][(ref, rel)] == pin, (ref, rel)
@@ -396,6 +396,20 @@ def test_launch_guards_refuse_before_any_run(tmp_path, kw, match):
     runner = FakeRunner(root)
     with pytest.raises(R.LaunchError, match=match):
         train(root, git=fake_git(root, **kw), runner=runner)
+    assert runner.calls == [] and not (root / "models/v2_recipe").exists()
+
+
+def test_launch_refuses_at_the_real_heads_src(tmp_path):
+    """With the real HEAD's src listing (and the members file on origin, as it is), launch refuses at guard 2 or 8.
+    If HEAD's src differs from fc71b98, guard 2 alone refuses it too."""
+    head_src = {Path(ln.split("\t")[1]).name: ln.split()[2] for ln in REAL["ls-tree"]["HEAD"]}
+    root = fake_repo(tmp_path)
+    runner = FakeRunner(root)
+    with pytest.raises(R.LaunchError, match=r"guard (2|8)"):
+        train(root, git=fake_git(root, src=head_src, on_origin=(R.MEMBERS,)), runner=runner)
+    if head_src != R.SRC_BLOBS:
+        with pytest.raises(R.LaunchError, match=r"guard 2: .*differs"):
+            train(root, git=fake_git(root, src=head_src), runner=runner)
     assert runner.calls == [] and not (root / "models/v2_recipe").exists()
 
 
