@@ -3634,3 +3634,22 @@ entry.
 - The preprocessing rule is recorded in
   reports/v2_survey/2026_clean_test/protocol_draft.md §1 and §10 by
   this entry's PR.
+
+2026-10-26, 20:35. PR #40 (B-v2-2) approved, and the East Pacific
+HURDAT2 download plan: John's decisions. No download, training,
+evaluation or compute by this entry.
+- John, verbatim (relayed by the coordinator): "1. PR #40: yes, merge
+  pinned to d709546. 2. Download: not now, but not tied to the H-EP
+  pass either. E3's training build needs East Pacific labels for its
+  training storms, and the H-EP pass comes after E3 is frozen. Plan
+  instead: download before the first East Pacific training build, and
+  make the East Pacific HURDAT2 reader refuse the six H-EP IDs (and
+  Octave/Raymond 2025) unless called from the sealed H-EP pass, with
+  tests. Add that as a gate in HEP.md before gate 7 and assign it after
+  E3's design is approved. E3's design stage must not read the file.
+  Then tell me when to rebase fix-antimeridian."
+- PR #40 merged at 20:35 pinned to
+  d709546f88908044ffa5944a0b42499548885add, as 331ac19, after check.py
+  --full passed on its merge tree. The nepac file is not on disk.
+- The gate is recorded in reports/decisions/HEP.md as item (d) under
+  "Required before gate 7" by this entry's PR.

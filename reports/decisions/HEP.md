@@ -80,6 +80,11 @@ Erick EP052025, Flossie EP062025, Kiko EP112025, Priscilla EP162025, Jova EP1120
          - EP082020 Douglas: 1.9°;
          - CP012025 Iona: 4.5°.
        - The six H-EP storms are all at least 20.5° from 180°.
+     - (d) **B-v2-2b (John, 2026-10-26): a gate before gate 7. OPEN; assigned only after E3's design is approved.**
+       - The East Pacific HURDAT2 reader refuses the six H-EP storm IDs, and Octave and Raymond 2025, unless it is called from the sealed H-EP pass. Tests show the refusal, and show the sealed-pass call is the only exception.
+       - Timing of the download (John): not tied to the H-EP pass. The pinned nepac file (hurdat2-nepac-1949-2025-092926.txt, caece626…0507) is downloaded before the first East Pacific training build (E3's), after this gate's reader refusal has merged.
+       - E3's design stage must not read the file.
+
 8. **The pass, when you call it.**
 9. **Spend in code,** plus the check.py pin.
 
