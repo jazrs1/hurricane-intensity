@@ -56,11 +56,11 @@ def build_sample_grid(fixes: pd.DataFrame, interval: str) -> pd.DataFrame:
 
     lat = np.interp(t_all, t_fix, fixes["lat"].to_numpy())
     lon_fix = fixes["lon"].to_numpy(dtype=float)
-    # 0 for each step that doesn't cross 180 deg, +-360 for one that does, so lon_fix + offset is exact for an
-    # uncrossed track.
+    # 0 for each step that doesn't cross 180 deg, +-360 for one that does. Fixes with no offset are used as they
+    # are (not + 0.0, which would turn a -0.0 fix into +0.0), so an uncrossed track is bit-identical.
     step = 360.0 * np.round((lon_diff(lon_fix[1:], lon_fix[:-1]) - (lon_fix[1:] - lon_fix[:-1])) / 360.0)
     offset = np.concatenate([[0.0], np.cumsum(step)])
-    lon = lon_diff(np.interp(t_all, t_fix, lon_fix + offset), 0.0)
+    lon = lon_diff(np.interp(t_all, t_fix, np.where(offset != 0.0, lon_fix + offset, lon_fix)), 0.0)
     wind_kt = np.interp(t_all, t_fix, fixes["wind_kt"].to_numpy())
 
     exact_set = set(exact_times)

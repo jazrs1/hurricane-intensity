@@ -35,7 +35,8 @@ def position_at(fixes, times):
     lat = np.where(inside, np.interp(t, t_fix, fixes["lat"].to_numpy()), np.nan)
     lon_fix = fixes["lon"].to_numpy(dtype=float)  # unwrapped and re-wrapped as build_sample_grid does (B-v2-1)
     step = 360.0 * np.round((lon_diff(lon_fix[1:], lon_fix[:-1]) - (lon_fix[1:] - lon_fix[:-1])) / 360.0)
-    lon_u = lon_fix + np.concatenate([[0.0], np.cumsum(step)])
+    offset = np.concatenate([[0.0], np.cumsum(step)])
+    lon_u = np.where(offset != 0.0, lon_fix + offset, lon_fix)  # no + 0.0 on an uncrossed fix (keeps -0.0)
     lon = np.where(inside, lon_diff(np.interp(t, t_fix, lon_u), 0.0), np.nan)
     return lat, lon
 
