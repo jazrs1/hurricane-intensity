@@ -172,3 +172,5 @@ No stratum edge or new stratum is chosen after the freeze.
 - No forbidden path was opened. A `data/interim` read (Atlantic HURDAT2, peak winds) was refused by the sandbox and not performed.
 - H-EP is **mentioned** without labels, angles or frame counts at `src/hurricane_intensity/config.py:39`, `src/hurricane_intensity/dataset.py:15`, `scripts/check.py:84–98`, and in v2 design §3 (protocol §2f/§6 references).
 - `scripts/check.py:94–97` shows one EP fix (EP052023, 2023-08-06 06Z, GOES-18) with label 130 kt. Read before knowing whether it is in the H-EP set; listed for completeness. It is a 2023 storm, so it may be an E3 training candidate under §5.
+- **Satellite provenance (hc-adversary item 43b):** H-EP's GOES-18 rule (protocol N2) was itself set from the H-EP storms' geography (positions, not labels). E3 inherits only the sensor, and no H-EP label or viewing-angle value. §5a's reasons for GOES-18 stand without it.
+- **Binding on the positions-only reader PR (§9; item 43b):** (1) it returns (time, lat, lon) only, and wind is parsed internally but never returned or logged; (2) it uses every fix, with no status trim, because status is label-like.
