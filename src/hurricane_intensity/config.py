@@ -42,6 +42,16 @@ HURDAT2_EP_URL = "https://www.nhc.noaa.gov/data/hurdat/hurdat2-nepac-1949-2025-0
 HURDAT2_EP_SHA256 = "caece626f7038db64a803a73f5985b563693f0130f3ff16b4b0a0a93c7aa0507"
 HURDAT2_EP_CACHE_PATH = INTERIM_DIR / "hurdat2-nepac-1949-2025-092926.txt"
 
+# H-EP sealing in the reader (HEP.md gate (d), B-v2-2b). hurdat2.parse_storm
+# refuses the H-EP storms (read from HEP_LIST at call time, never copied here)
+# and their concurrency exclusions, except on the sealed build's call path:
+# run_pipeline into HEP_SEALED_DIR (H-EP protocol §5). The concurrency IDs are
+# Octave EP152025 and Raymond EP172025, concurrent with an H-EP storm under the
+# 650 km box rule; tests/test_list_invariants.py keeps them out of training.
+HEP_LIST = PROJECT_ROOT / "storms_holdout_hep.txt"
+HEP_CONCURRENT_IDS = ("EP152025", "EP172025")
+HEP_SEALED_DIR = DATA_DIR / "hep_sealed"
+
 # Best-track "status" codes to keep. This excludes EX (extratropical) and
 # other post-tropical remnant stages, so a storm's track is automatically
 # trimmed to its tropical/subtropical lifetime without hardcoding dates --

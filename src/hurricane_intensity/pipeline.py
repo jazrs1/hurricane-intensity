@@ -114,13 +114,23 @@ def run_pipeline(
     if hurdat2_path is not None:
         hurdat2_path = hurdat2.verify_pinned_hurdat2(hurdat2_path)
     atcf_id = atcf_id.strip().upper()
+    sealed = None
+    if atcf_id in hurdat2.sealed_ids():
+        # H-EP gate (d): the sealed build is the one call path that reads a sealed storm. It checks the
+        # output root, the ID and the pinned file before anything is written.
+        sealed = hurdat2._parse_sealed_hep_storm(
+            atcf_id, hurdat2_path if hurdat2_path is not None else config.HURDAT2_CACHE_PATH,
+            include_statuses, out_root)
     out_dir = Path(out_root) / atcf_id
     crops_dir = out_dir / "crops"
     crops_dir.mkdir(parents=True, exist_ok=True)
 
-    if hurdat2_path is None:
-        hurdat2_path = hurdat2.download_hurdat2(url=hurdat2_url, force=force_hurdat2_refresh)
-    storm_name, fixes = hurdat2.parse_storm(atcf_id, hurdat2_path, include_statuses)
+    if sealed is not None:
+        storm_name, fixes = sealed
+    else:
+        if hurdat2_path is None:
+            hurdat2_path = hurdat2.download_hurdat2(url=hurdat2_url, force=force_hurdat2_refresh)
+        storm_name, fixes = hurdat2.parse_storm(atcf_id, hurdat2_path, include_statuses)
 
     grid = build_sample_grid(fixes, sample_interval)
     logger.info(

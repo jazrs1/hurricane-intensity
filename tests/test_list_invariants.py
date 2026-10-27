@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from hurricane_intensity import config
 from hurricane_intensity.splits import load_splits, load_storm_list
 
 TEST_2025 = {"AL042025", "AL052025", "AL072025", "AL082025", "AL092025", "AL132025"}
@@ -32,7 +33,9 @@ OVERLAP_ALLOWLIST = {"storms_train.txt": {"AL022024", "AL132023"}}
 # disjointness check, so a storm can't enter training under its other basin's ID.
 ALIASES = {"AL022022": "EP042022", "AL132022": "EP182022"}  # Bonnie, Julia
 # Priscilla EP162025 (H-EP) overlaps these two under the 650 km box rule (hep_concurrency.csv): never in training.
-HEP_CONCURRENT = {"EP152025": "Octave", "EP172025": "Raymond"}
+# The IDs live in config.HEP_CONCURRENT_IDS (Octave, Raymond), which the HURDAT2 reader also refuses (gate (d)).
+HEP_CONCURRENT = set(config.HEP_CONCURRENT_IDS)
+assert HEP_CONCURRENT == {"EP152025", "EP172025"}
 # Never listed anywhere: Bonnie under either ID (its EP ID is the one in use, unlisted), and Julia's EP ID.
 NEVER_LISTED = {"AL022022", "EP042022", "EP182022"}
 
