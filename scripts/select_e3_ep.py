@@ -215,11 +215,13 @@ def ep_frames(fixes, interval, sat, vza_cap, tracks):
     n_grid = len(grid)
     over = vza_deg(grid["lat"], grid["lon"], sat["sub_lon"]) > vza_cap
     grid = grid[~over]
+    n_post_vza = len(grid)
     if sat["operational_from"]:  # §5a: GOES-West from this date
         grid = grid[pd.DatetimeIndex(grid["time"]) >= pd.Timestamp(sat["operational_from"], tz="UTC")]
     n_pre_gate = len(grid)
     grid = grid[~gate_mask(grid, tracks)].reset_index(drop=True)
     counts = {"frames_grid": n_grid, "frames_dropped_vza": int(over.sum()),
+              "frames_dropped_pre_operational": n_post_vza - n_pre_gate,
               "frames_dropped_concurrent": n_pre_gate - len(grid), "frames_kept": len(grid)}
     return grid, counts
 

@@ -258,6 +258,9 @@ def test_selection_rule(env):
     assert rows["EP022023"]["eligible"] is False and rows["EP022023"]["reason"] == "peak below floor"
     assert rows["EP012023"]["peak_kt"] == 60.0 and rows["EP012023"]["frames_grid"] == 23
     assert rows["EP032023"]["frames_dropped_vza"] > 0
+    for r in rows.values():
+        assert r["frames_grid"] == (r["frames_dropped_vza"] + r["frames_dropped_pre_operational"]
+                                    + r["frames_dropped_concurrent"] + r["frames_kept"])
     eligible = [i for i in ids if rows[i]["eligible"]]
     assert rec["hash_order"] == sorted(eligible, key=lambda s: hashlib.sha256(s.encode()).hexdigest())
     assert rec["selected"] == rec["hash_order"]  # 1963 not reached: all are used
