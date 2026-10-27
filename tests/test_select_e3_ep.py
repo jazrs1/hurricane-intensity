@@ -23,6 +23,7 @@ _spec = importlib.util.spec_from_file_location("select_e3_ep", ROOT / "scripts" 
 S = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(S)
 
+EXPANDED_TRAIN_FRAMES = S.EXPANDED_TRAIN_FRAMES  # before the env fixture patches it
 FAKE_HEP = "EP902023"  # stand-in for an H-EP storm; concurrent with EP042023
 EXCLUDED = [FAKE_HEP, *config.HEP_CONCURRENT_IDS]
 SENTINEL = "SENTINELNAME"
@@ -97,6 +98,7 @@ def env(tmp_path, monkeypatch, main_root):
     monkeypatch.setattr(config, "HURDAT2_EP_CACHE_PATH", ep)
     monkeypatch.setattr(config, "HEP_LIST", hep_list)
     monkeypatch.setattr(config, "HEP_SEALED_DIR", tmp_path / "data" / "hep_sealed")
+    monkeypatch.setattr(S, "EXPANDED_TRAIN_FRAMES", 5 + 7)  # the fixture's train frames (real: 2081)
     monkeypatch.setattr(goes_index, "make_anonymous_s3_client", lambda: None)
 
     def no_download(*a, **k):
@@ -111,7 +113,7 @@ def env(tmp_path, monkeypatch, main_root):
     (lists / "val.txt").write_text("AL032099\n")
     (lists / "control.txt").write_text("AL012099\nAL032099\n")
     processed = tmp_path / "processed"
-    manifest(processed / "AL012099", "AL012099", "2099-07-01", "1h", 10)
+    manifest(processed / "AL012099", "AL012099", "2099-07-01", "1h", 5)  # the minimum: 5 hourly frames, 4 h
     c2 = manifest(processed / "AL022099", "AL022099", "2099-07-05", "3h", 8)
     manifest(processed / "AL032099", "AL032099", "2099-07-09", "1h", 5)
     (lists / "excluded.txt").write_text(c2[0] + "\n")
@@ -257,7 +259,9 @@ def test_the_gate_fails_closed_without_an_excluded_storm(env, monkeypatch, tmp_p
 def test_selection_rule(env):
     out, rec = run(env)
     ri = rec["rule_inputs"]
-    assert ri["interval"] == "3h" and ri["min_frames"] == 7 and ri["min_peak_kt"] == 45.0
+    assert ri["interval"] == "3h" and ri["min_frames"] == 5 and ri["min_peak_kt"] == 45.0
+    assert (ri["min_frames_storm"], ri["min_frames_storm_interval"], ri["ep_min_frames"]) == ("AL012099", "1h", 2)
+    assert rec["ep_frames_note"] == "ep_frames = grid frames, pre-build"
     assert ri["atlantic_intervals"] == {"AL012099": "1h", "AL022099": "3h"}
     assert ri["vza_cap_deg"] == pytest.approx(float(np.max(S.vza_deg(40.0, -50.0, -75.2))))
     ids = [r["id"] for r in rec["candidates"]]
@@ -277,6 +281,34 @@ def test_selection_rule(env):
     assert 0 < lo <= hi < ri["vza_cap_deg"]
     body = [ln for ln in out.splitlines() if not ln.startswith("#")]
     assert body == ["AL012099", "AL022099", "AL032099", *rec["selected"]] and out.endswith("\n") and "\r" not in out
+
+
+def test_the_frame_floor_is_duration_matched():
+    assert S.ep_frame_floor(25, "1h", "3h") == 9  # AL012024: 24 h at 1h -> 9 frames at 3h
+    assert S.ep_frame_floor(26, "1h", "3h") == 9 and S.ep_frame_floor(28, "1h", "3h") == 10
+    assert S.ep_frame_floor(7, "3h", "3h") == 7 and S.ep_frame_floor(1, "1h", "3h") == 1
+
+
+def test_the_real_manifests_give_a_floor_of_9_and_2081_frames(main_root):
+    """Read-only, on the main checkout's built manifests: the inputs the real run will use."""
+    from hurricane_intensity.splits import load_storm_list
+    val = load_storm_list(ROOT / "storms_val_expanded.txt")
+    train = [s for s in load_storm_list(ROOT / "storms_train_expanded.txt") if s not in val]
+    excluded = set((ROOT / "excluded_crops.txt").read_text().split())
+    m = {s: pd.read_csv(main_root / "data" / "processed" / s / "manifest.csv") for s in train}
+    frames = {s: int((d["crop_path"].notna() & ~d["crop_path"].isin(excluded)).sum()) for s, d in m.items()}
+    assert sum(frames.values()) == EXPANDED_TRAIN_FRAMES == 2081  # the unpatched constant
+    n_min = min(frames.values())
+    (storm,) = [s for s in train if frames[s] == n_min]
+    assert (storm, n_min, S.grid_interval(m[storm])) == ("AL012024", 25, "1h")
+    assert S.ep_frame_floor(n_min, S.grid_interval(m[storm]), "3h") == 9
+
+
+def test_a_train_frame_total_other_than_2081_is_refused(env, monkeypatch):
+    monkeypatch.setattr(S, "EXPANDED_TRAIN_FRAMES", 5 + 7 + 1)
+    with pytest.raises(ValueError, match="sum to 12, not 13"):
+        S.main(env["argv"])
+    assert not env["out"].exists()
 
 
 def test_the_cap_adds_whole_storms_in_hash_order(env, monkeypatch):

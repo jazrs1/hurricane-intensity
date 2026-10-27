@@ -190,13 +190,33 @@ def atlantic_reference(train_list, val_list, control_list, atlantic_hurdat2, pro
     added_steps = {intervals[s] for s in added}
     if len(added_steps) != 1:  # §5 sampling row: "3-hourly per the list header" (the expanded arm's new storms)
         raise ValueError(f"the expanded list's added storms disagree on the sample interval: {sorted(added_steps)}")
-    ref = {"vza_cap_deg": vza_max, "min_peak_kt": min(peaks.values()), "min_frames": min(frames.values()),
-           "interval": added_steps.pop(), "atlantic_train_frames": sum(frames.values()),
+    if sum(frames.values()) != EXPANDED_TRAIN_FRAMES:  # §5 cap row: 1963 = 4044 - 2081 assumes this total
+        raise ValueError(f"the train storms' post-exclusion frames sum to {sum(frames.values())}, "
+                         f"not {EXPANDED_TRAIN_FRAMES}; refusing")
+    ep_interval = added_steps.pop()
+    n_min = min(frames.values())
+    # §5 minimum-frames row (option (c), duration-matched; decided by John, 2026-10-27): the Atlantic floor is
+    # a duration, (n_min - 1) steps of that storm's own interval (AL012024: 25 hourly frames, about 24 h),
+    # expressed at the EP interval. Duration equivalence is the reason; the 1963-frame target is a consequence
+    # of the frames this admits, not the reason for it. If several storms share the minimum, the shortest
+    # duration sets the floor.
+    floor_storm = min((s for s in train if frames[s] == n_min), key=lambda s: pd.Timedelta(intervals[s]))
+    ep_floor = ep_frame_floor(n_min, intervals[floor_storm], ep_interval)
+    ref = {"vza_cap_deg": vza_max, "min_peak_kt": min(peaks.values()), "min_frames": n_min,
+           "min_frames_storm": floor_storm, "min_frames_storm_interval": intervals[floor_storm],
+           "ep_min_frames": ep_floor,
+           "interval": ep_interval, "atlantic_train_frames": sum(frames.values()),
            "atlantic_train_storms": len(train), "atlantic_val_storms": len(val),
            "atlantic_intervals": intervals, "atlantic_peaks_kt": peaks, "atlantic_frames": frames}
     # design "Open": every Atlantic train storm meets its own floors (by construction).
     assert all(peaks[s] >= ref["min_peak_kt"] and frames[s] >= ref["min_frames"] for s in train)
     return ref
+
+
+def ep_frame_floor(n_min, atl_interval, ep_interval):
+    """floor((n_min - 1) x atl_interval / ep_interval) + 1: the Atlantic minimum's duration in EP frames
+    (§5 minimum-frames row, option (c)). 25 frames at 1h -> 9 frames at 3h."""
+    return int(((n_min - 1) * pd.Timedelta(atl_interval)) // pd.Timedelta(ep_interval)) + 1
 
 
 # --- the EP frames ----------------------------------------------------------------------------------------------
@@ -263,7 +283,7 @@ def select(nepac, satellite, ref):
         reasons = []
         if row["peak_kt"] < ref["min_peak_kt"]:
             reasons.append("peak below floor")
-        if counts["frames_kept"] < ref["min_frames"]:
+        if counts["frames_kept"] < ref["ep_min_frames"]:
             reasons.append("frames below floor")
         row.update(eligible=not reasons, reason="; ".join(reasons) or None)
         rows.append(row)
@@ -365,6 +385,7 @@ def main(argv=None):
         "hash_order": sorted([r["id"] for r in rows if r["eligible"]], key=storm_hash),
         "selected": selected,
         "ep_frames": n_ep,
+        "ep_frames_note": "ep_frames = grid frames, pre-build",
         "vza_tertile_edges_deg": vza_tertiles(kept, a.satellite),
         "hard_gate": "passed: no kept frame overlaps",
     }

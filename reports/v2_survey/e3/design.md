@@ -103,7 +103,7 @@ Applied later by a reviewed script (`scripts/select_e3_ep.py`, not written). Thi
 | Satellite | §5a: **`noaa-goes18`** (recommended) | §5a |
 | VZA handling | drop EP **fixes** whose viewing zenith angle from the §5a satellite (fix lat/lon, the satellite's nominal sub-point: 137.2° W for GOES-18) exceeds the **maximum GOES-16 VZA (75.2° W) over the fixes of the 19 Atlantic train + 5 val storms**, computed by the script with the same formula. No other angle handling | Keeps EP inputs inside the angle range the comparator was trained and selected on (training and validation data) |
 | Intensity floor | storm's peak best-track intensity ≥ the **minimum peak over the 19 Atlantic train storms** (`storms_train_expanded.txt` minus its 5 val storms; Atlantic HURDAT2 cache) | same intensity floor as the comparator's training storms; val storms are excluded because they are the selection set, not training data |
-| Minimum frames | ≥ the **minimum per-storm post-exclusion frame count over the same 19 train storms** | same floor, same set |
+| Minimum frames | ≥ the **minimum per-storm post-exclusion frame count over the same 19 train storms, duration-matched to the EP interval**: ep_floor = floor((N_min − 1) × that storm's interval / EP interval) + 1, computed from the manifests (AL012024: 25 frames at 1h ≈ 24 h → **9** at 3h). Inputs and ep_floor are written to the record | duration equivalence: the Atlantic floor (25 hourly frames ≈ 24 h) expressed at the 3-hourly EP cadence; decided by John, 2026-10-27 (option (c)). The 1963-frame target is a consequence of what this floor admits, not the reason for it |
 | Bad crops | EP crops failing the existing NaN/exclusion check go in `excluded_crops_e3.txt` | as `excluded_crops.txt` |
 | Order and cap | eligible storms sorted by SHA-256 of the ID string; add whole storms in that order until EP frames ≥ **1963** (= 4044 − 2081) | Target makes E3's train size equal F-31's atlantic arm (4044), the only larger-data size with prior evidence (F-31, at 52 epochs; §2). Hash order is fixed before any storm is seen, so no intensity or angle preference enters. Without a cap, all eligible EP storms could outnumber Atlantic frames several times and raise steps further (99 epochs over many more frames), outside any prior finding |
 
@@ -159,7 +159,7 @@ No stratum edge or new stratum is chosen after the freeze.
 0. This design approved by John, after hc-adversary.
 1. EP HURDAT2 downloaded under gate (d); John's antimeridian fix merged; the positions-only reader path for the concurrency gate merged (§5).
 2. `select_e3_ep.py` + tests (reviewed PR); run; `storms_train_e3.txt`, record, `excluded_crops_e3.txt` committed.
-3. EP crop build (reviewed); check.py FAST and `--full` PASS.
+3. EP crop build (reviewed); check.py FAST and `--full` PASS. The selection record's `ep_frames` are grid frames, counted before the build. The build re-applies the §5 frame floor to the built frames and reports the built total. It does not reselect storms.
 4. Launch PR: E3 driver (v2's, with §1 pins, 99 epochs, seeds 40–49, no evaluation stage) + tests; hc-adversary and John.
 5. Training after John's yes. No H9, H-EP or 2026 read.
 6. Freeze PR (§7).
