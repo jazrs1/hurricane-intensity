@@ -15,7 +15,7 @@ _spec.loader.exec_module(check)
 
 
 def test_pins():
-    assert (check.MAIN_SHA, check.REVIEWED_SITE_SHAS) == ("fbb39c4", ("0f54536", "41f8d94"))
+    assert (check.MAIN_SHA, check.REVIEWED_SITE_SHAS) == ("fbb39c4", ("0f54536", "7092cf1"))
 
 
 class Repo:
