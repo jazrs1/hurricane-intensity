@@ -28,7 +28,19 @@ def lon_diff(a, b) -> np.ndarray:
     re-wraps a longitude into [-180, 180) (180.0E becomes -180.0).
     """
     d = np.asarray(a, dtype=float) - np.asarray(b, dtype=float)
-    return np.where((d >= -180.0) & (d < 180.0), d, (d + 180.0) % 360.0 - 180.0)
+    w = np.where((d >= -180.0) & (d < 180.0), d, (d + 180.0) % 360.0 - 180.0)
+    # Just below -180 (e.g. nextafter(-180, -inf)), (d + 180) % 360 rounds to 360.0, giving +180.0.
+    return np.where(w >= 180.0, -180.0, w)
+
+
+def unwrap_lon(lon_fix) -> np.ndarray:
+    """Fix longitudes made continuous along the track: each fix is offset by the multiple of 360 deg that undoes
+    every 180 deg crossing before it (lon_diff decides each step). Fixes with no offset are returned as they are
+    (not + 0.0, which would turn a -0.0 fix into +0.0), so an uncrossed track is bit-identical."""
+    lon_fix = np.asarray(lon_fix, dtype=float)
+    step = 360.0 * np.round((lon_diff(lon_fix[1:], lon_fix[:-1]) - (lon_fix[1:] - lon_fix[:-1])) / 360.0)
+    offset = np.concatenate([[0.0], np.cumsum(step)])
+    return np.where(offset != 0.0, lon_fix + offset, lon_fix)
 
 
 def build_sample_grid(fixes: pd.DataFrame, interval: str) -> pd.DataFrame:
@@ -55,12 +67,7 @@ def build_sample_grid(fixes: pd.DataFrame, interval: str) -> pd.DataFrame:
     t_all = (all_times - first).total_seconds().to_numpy()
 
     lat = np.interp(t_all, t_fix, fixes["lat"].to_numpy())
-    lon_fix = fixes["lon"].to_numpy(dtype=float)
-    # 0 for each step that doesn't cross 180 deg, +-360 for one that does. Fixes with no offset are used as they
-    # are (not + 0.0, which would turn a -0.0 fix into +0.0), so an uncrossed track is bit-identical.
-    step = 360.0 * np.round((lon_diff(lon_fix[1:], lon_fix[:-1]) - (lon_fix[1:] - lon_fix[:-1])) / 360.0)
-    offset = np.concatenate([[0.0], np.cumsum(step)])
-    lon = lon_diff(np.interp(t_all, t_fix, np.where(offset != 0.0, lon_fix + offset, lon_fix)), 0.0)
+    lon = lon_diff(np.interp(t_all, t_fix, unwrap_lon(fixes["lon"].to_numpy(dtype=float))), 0.0)
     wind_kt = np.interp(t_all, t_fix, fixes["wind_kt"].to_numpy())
 
     exact_set = set(exact_times)

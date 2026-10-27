@@ -339,3 +339,20 @@ def test_concurrency_boxes_far_pair_across_180(lon1, lon2):
     # 10 deg apart at 18N: 1059 km > 650 km, so the boxes must not overlap. Passes today; a fix must keep it.
     assert 1000.0 < 10.0 * C.KM_PER_DEG * np.cos(np.radians(18.0))
     assert not bool(C.boxes_overlap(18.0, lon1, 18.0, lon2))
+
+
+# --- lon_diff at the edge of its range -----------------------------------------------------------------------
+
+@pytest.mark.parametrize("a, b", [(0.0, np.nextafter(180.0, np.inf)), (np.nextafter(-180.0, -np.inf), 0.0)],
+                         ids=["difference-just-below-minus-180", "value-just-below-minus-180"])
+def test_lon_diff_never_returns_plus_180(a, b):
+    """(d + 180) % 360 rounds to 360.0 for d just below -180, which would give +180.0; the guard maps it to -180."""
+    assert float(a) - float(b) < -180.0
+    assert float(pipeline.lon_diff(a, b)) == -180.0
+
+
+def test_lon_diff_stays_in_range_next_to_every_seam():
+    edges = np.array([-540.0, -360.0, -180.0, 0.0, 180.0, 360.0, 540.0])
+    d = np.concatenate([np.nextafter(edges, -np.inf), edges, np.nextafter(edges, np.inf)])
+    out = pipeline.lon_diff(d, 0.0)
+    assert ((out >= -180.0) & (out < 180.0)).all(), out[(out < -180.0) | (out >= 180.0)]

@@ -11,7 +11,7 @@ pipeline builds its sample grid. Nothing here downloads or writes anything.
 import numpy as np
 import pandas as pd
 
-from hurricane_intensity.pipeline import lon_diff
+from hurricane_intensity.pipeline import lon_diff, unwrap_lon
 
 KM_PER_DEG = 111.32
 BOX_KM = 650.0  # 600 km crop box + 50 km margin (N4, A4)
@@ -33,10 +33,7 @@ def position_at(fixes, times):
     t = (pd.DatetimeIndex(times) - pd.Timestamp(0, tz="UTC")).total_seconds().to_numpy()
     inside = (t >= t_fix[0]) & (t <= t_fix[-1])
     lat = np.where(inside, np.interp(t, t_fix, fixes["lat"].to_numpy()), np.nan)
-    lon_fix = fixes["lon"].to_numpy(dtype=float)  # unwrapped and re-wrapped as build_sample_grid does (B-v2-1)
-    step = 360.0 * np.round((lon_diff(lon_fix[1:], lon_fix[:-1]) - (lon_fix[1:] - lon_fix[:-1])) / 360.0)
-    offset = np.concatenate([[0.0], np.cumsum(step)])
-    lon_u = np.where(offset != 0.0, lon_fix + offset, lon_fix)  # no + 0.0 on an uncrossed fix (keeps -0.0)
+    lon_u = unwrap_lon(fixes["lon"].to_numpy(dtype=float))  # unwrapped and re-wrapped as build_sample_grid does
     lon = np.where(inside, lon_diff(np.interp(t, t_fix, lon_u), 0.0), np.nan)
     return lat, lon
 
