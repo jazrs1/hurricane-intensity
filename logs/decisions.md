@@ -3653,3 +3653,34 @@ evaluation or compute by this entry.
   --full passed on its merge tree. The nepac file is not on disk.
 - The gate is recorded in reports/decisions/HEP.md as item (d) under
   "Required before gate 7" by this entry's PR.
+
+2026-10-26, 20:55. E3 drafter and design rule: John's decisions after
+an exposure to H-EP label facts. No training, evaluation, download or
+compute by this entry.
+- What happened: the coordinator pointed hc-survey (assigned the E3
+  design) at reports/decisions/HEP.md for a gate that was not yet merged.
+  hc-survey read HEP.md l.1-12 and l.29-85 (blob ac4a38f7), whose §2
+  holds H-EP label facts, and stopped before writing anything. Its
+  by-line disclosure: HEP.md l.48, l.51 and l.52 (label facts), l.62 and
+  l.82 (other H-EP facts), plus its earlier protocol.md l.84-88 and
+  l.101. hc-adversary advised a fresh drafter, because every E3 choice
+  is still open.
+- John, verbatim (relayed by the coordinator): "E3: (a), a fresh
+  subagent with only the spec and rules, nothing from HEP.md or the
+  protocol's label lines. Add a design rule: every E3 choice (high-end
+  handling, VZA handling, EP training-storm selection, reporting strata)
+  must be justified from training/validation data or prior findings,
+  never from H-EP storm properties; hc-adversary checks each
+  justification. Record in the decisions log that John, the coordinator
+  and the H-EP selection (N1) were already exposed to these facts, so
+  the fresh drafter reduces but does not remove exposure. hc-survey
+  stays off E3. Token rules apply to the subagent."
+- Exposure on record: John, the coordinator and the H-EP selection
+  (N1) were already exposed to the H-EP label facts. The fresh drafter
+  reduces this exposure but does not remove it.
+- Barred from E3 design and review: hc-survey (this exposure) and
+  hc-reviewer (gate 6, 2026-10-21). hc-adversary has not read these
+  lines and reviews E3.
+- The E3 drafter is a fresh coordinator subagent, given the spec and
+  rules only, and barred from reports/decisions/, reports/v2_survey/hep/,
+  logs/decisions.md and any H-EP or nepac path.
