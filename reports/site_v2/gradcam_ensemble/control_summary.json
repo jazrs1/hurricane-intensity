@@ -61,5 +61,7 @@
       "png_max_abs_diff": 0
     }
   ],
-  "passed": true
+  "passed": true,
+  "high_cam_share_median": 0.40087890625,
+  "peak_to_coldest_px_median": 52.88605524505438
 }

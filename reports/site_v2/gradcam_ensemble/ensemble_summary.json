@@ -29,5 +29,7 @@
     }
   },
   "orig_mean_r": 0.5748907350256608,
-  "mean_r_minus_orig": -0.06089896788063487
+  "mean_r_minus_orig": -0.06089896788063487,
+  "high_cam_share_median": 0.24237683354591838,
+  "peak_to_coldest_px_median": 31.096586198657462
 }

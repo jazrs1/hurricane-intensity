@@ -155,6 +155,8 @@ def summarize(df):
     return dict(n=int(len(df)), n_valid=int(r.notna().sum()), mean_r=float(r.mean()), median_r=float(r.median()),
                 frac_r_negative=float((r < 0).mean()), iou_minus_chance_mean=float(iou.mean()),
                 frac_iou_below_chance=float((iou < 0).mean()),
+                high_cam_share_median=float((df["high_cam_px"] / gradcam.FRAME_SIZE ** 2).median()),
+                peak_to_coldest_px_median=float(df["peak_to_coldest_dist_px"].median()),
                 per_storm={s: dict(n=int(len(g)), mean_r=float(g["pearson_r_cam_vs_cold"].mean()),
                                    median_r=float(g["pearson_r_cam_vs_cold"].median()))
                            for s, g in df.groupby("storm_id")})

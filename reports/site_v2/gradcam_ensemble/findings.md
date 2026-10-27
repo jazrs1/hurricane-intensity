@@ -53,8 +53,9 @@ These predictions match `pred` in `results/ensemble/expanded10_h9.csv` for the s
 
 - **Alignment:** the ensemble's attribution still sits on the coldest cloud tops far more than chance (r > 0 in
   98.7% of frames). But its correlation is lower than the single model's.
-- **Shape:** its maps are tighter and more central. That fits a lower all-pixel correlation together with a higher
-  IoU against chance, though this survey does not show it is the cause.
+- **Shape:** its maps are tighter and more central. Tightness does not explain the lower r: within each survey, a
+  larger highlighted area goes with a *lower* r (correlation of area with r: −0.18 for `best_model.pt`, −0.32 for the
+  ensemble), per hc-adversary 48b. No explanation for the lower r is offered.
 - **Status:** these are held-out development storms for the ensemble, not a test.
 
 Files:
