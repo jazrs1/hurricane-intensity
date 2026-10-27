@@ -75,3 +75,44 @@ Numbers this rewrite didn't touch (Michael's frames, the method steps 01–05 an
 ## Figures
 
 `scripts/export_site_v2.py` regenerates `site/figures/heldout_scatter.png` and `heldout_scatter_narrow.png` (in `make_scatter.py`'s style and at the same pixel sizes) and the `pred` fields of `site/frames/ian.json`, from `results/ensemble/expanded10_h9.csv` only. It runs no model, and reads no 2025, East Pacific or 2026 data. The Ian frame PNGs and every Grad-CAM image are unchanged; the Grad-CAM section is labelled as the original model (best_model.pt).
+
+## README
+
+`README.md` (rewritten to match the site at a410230). Same abbreviations as above, plus S = `results/storms/findings.md`. Where a README number is also on the site, the site row above is the source and is named here.
+
+| README text | Value | Source |
+|---|---|---|
+| intro | ten networks, averaged | E:10, E:14 (seeds 0–9); site "method 06" row |
+| intro | 2,081 crops, 19 storms, 2018–2024, after exclusion | site "standfirst" rows; S:151 |
+| intro, results | six 2025 storms, 1,045 frames, GOES-19 | F:29; site "lead" row |
+| intro | 9.78 kt vs 12.13 kt, same frames | F:42; site "metric 1/2" rows |
+| intro, where it fails | category 5 about 16 kt low (2025), 19 kt (H9) | F:70 (−15.75); E:45 (−18.85) |
+| Michael figure | category 5 at landfall; middle label interpolated | site Michael caption (unchanged from the previous page) |
+| dataset | 10-minute scan window, 600 km box | `src/hurricane_intensity/config.py`:69, 71 |
+| dataset | resized to 224 by 224 | site method step 02 |
+| model | 180–320 K, labels / 185 kt | `src/hurricane_intensity/dataset.py`:9–10, 147 |
+| model | L1, Adam 1e-4, batch 32, 25 epochs, validation-selected checkpoint | S:151 (25 x 66), S:155–157 |
+| model | frozen by hash | E:14–16 (`members_sha256.txt`) |
+| splits | training 19 storms, 2,081 frames | D:1443–1445; S:151 |
+| splits | validation 5 storms, 940 frames | S:157–158; D:1446 |
+| splits | H9 9 storms, 1,752 frames | E:18; S:158 |
+| splits | 2025 test 6 storms, 1,045 frames | F:29; `storms_test_2025.txt` |
+| splits | H9 8.57 kt, optimistic | E:28; site "scatter caption" row |
+| testing | frozen and checked by hash before the run, run once | F:3–9 |
+| results table | frames, MAE, bias, original MAE by category | F:35, F:64–70; site "category table" rows |
+| results caption | better or equal in every category | F:58 |
+| where it fails | Melissa 165 kt, training max 160, eight frames above 160 got 133–143 | D:2105–2106; F:107 |
+| where it fails | weak systems about +8 / +4 kt | F:64–65 |
+| where it fails | 2025 1.2 kt above H9; GOES-19 vs GOES-16 | F:42, F:52, F:126–128 |
+| phase 2 | 9.00 lucky run; 33 reruns, mean 10.05, one in 33 | D:403–405; site "33 reruns" row |
+| phase 2 | 19 vs 9 storms: −1.6 kt, +5.4 kt high-end bias, three tests pass | S:23, 29, 30; site row |
+| phase 2 | 19 → 50 storms: +0.53 kt, not significant, under-trained | D:2481, D:2483; site row |
+| phase 2 | four times longer: −0.99 kt, 20 paired seeds, on H9; new ensemble frozen, tested only in 2026–2027 | D:2850; D:3511; D:3616; site rows |
+| phase 2 | East Pacific in progress; test set sealed | D:3638; D:3343; site row |
+| phase 2 | pre-registration (phase 2 only); separate AI review session recomputes | site "phase-2 design" row |
+| reproducing | Python 3.12 or later; `is_junction` | `pyproject.toml`:9; `check_nan.py`:44 |
+| reproducing | FAST under 3 minutes, no network; `--full` | `scripts/check.py`:4–5 |
+| reproducing | phase-2 storms at 3-hourly sampling | `storms_train_expanded.txt`:1–2 |
+| reproducing | PyTorch, torchvision, matplotlib unpinned | `requirements.txt`, `requirements-dev.txt` (neither lists them) |
+
+Removed from the previous README as superseded or untraced: the 9.00 / 9.50 kt headline and its category table, 15 storms and 2,092 crops, the crop-shape ranges, the six-NaN-crop account, the Dvorak comparison, the training GPU and Python 3.13, the category 1 analysis, and the class-imbalance plan under "What I would do next".

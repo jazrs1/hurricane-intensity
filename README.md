@@ -1,19 +1,20 @@
 # Estimating hurricane intensity from GOES infrared imagery
 
-This project trains a CNN to predict a tropical cyclone's maximum sustained
-wind speed from a single GOES-16 infrared satellite image. Labels come from
-NOAA's HURDAT2 best track database. The dataset covers 15 Atlantic storms
-between 2018 and 2024.
+Ten convolutional networks, averaged, estimate a tropical cyclone's maximum
+sustained wind from a single infrared satellite frame. Labels come from
+NOAA's HURDAT2 best track. The networks were trained on 2,081
+storm-centered crops from 19 Atlantic storms between 2018 and 2024, after
+removing frames with missing data.
 
-On three storms the model never saw during training or checkpoint selection,
-it gets a mean absolute error of **9.00 kt** (9.50 kt if you only score against
-real 6-hourly HURDAT2 observations rather than interpolated ones). Operational
-Dvorak estimates are usually quoted at 10-12 kt against best track, so that is
-roughly comparable.
+The ensemble was frozen, then run once on the six Atlantic storms of 2025,
+which nothing in the work had touched: 1,045 frames, all from GOES-19, a
+newer satellite than any training frame. Its mean absolute error is
+**9.78 kt**, against **12.13 kt** for the original single model on the same
+frames. It still guesses low on the strongest storms, by about 16 kt at
+category 5.
 
-The number hides a real problem, though. The model consistently guesses too low
-on strong storms, by about 19 kt at Category 4. That is discussed further down
-and it is the more interesting part of the result.
+The write-up, with an hour-by-hour scrubber through Hurricane Ian, is at
+<https://hurricane.johnazer.com>.
 
 <p align="center">
 <img src="figures/michael_35kt.png" width="32%">
@@ -22,165 +23,164 @@ and it is the more interesting part of the result.
 </p>
 
 Hurricane Michael over roughly three days in October 2018, from a
-disorganized tropical storm to a Category 5 at landfall: 35 kt at 7 Oct
-12:00 UTC, an interpolated 112 kt at 10 Oct 01:00, and the 10 Oct 17:30
-landfall fix at 140 kt. Every frame is centered on the HURDAT2 best-track
-position and shown exactly as the network receives it, so cold cloud tops
-are dark.
+disorganized tropical storm to a category 5 at landfall. Every frame is
+centered on the best-track position and shown exactly as the network
+receives it, so cold cloud tops are dark. The middle label is interpolated
+between six-hourly fixes; the outer two are true fixes.
 
 ## Building the dataset
 
-The two data sources do not line up. HURDAT2 gives you a storm's position and
-intensity every 6 hours as a text file. GOES gives you a full-disk image of a
-third of the planet every 10-15 minutes as NetCDF. Most of the work here is
-matching them.
+HURDAT2 gives a storm's position and intensity every six hours as text.
+GOES gives a full-disk image every few minutes as NetCDF. Most of the
+work is matching them.
 
-I sample hourly, which means most samples fall between HURDAT2 fixes. Center
-position and wind speed are linearly interpolated for those, and every sample
-carries a flag saying whether it came from a real fix or an interpolation. That
-flag matters at evaluation time, since scoring against interpolated labels is
-partly scoring against my own interpolation.
+Samples fall between best-track fixes, so center position and wind speed
+are linearly interpolated, and every sample carries a flag saying whether
+it came from a real fix or an interpolation. Scoring against interpolated
+labels is partly scoring against the interpolation, so results are also
+reported on fixes only.
 
-For each sample time I take the nearest full-disk scan within 10 minutes and
-record the actual offset. At hourly sampling there are plenty of candidate
-scans, so widening the window would mostly pull in frames where the storm has
-moved far enough to sit off-center. Anything with no scan in range gets skipped
-and logged rather than substituted.
+For each sample time the pipeline takes the nearest full-disk ABI band 13
+scan within 10 minutes and records the offset. Anything with no scan in
+range is skipped and logged, not substituted.
 
-The cropping is the part that took the longest to get right. ABI data is not
-on a lat/lon grid. It sits on a fixed angular grid in geostationary projection,
-where the coordinates are scan angles measured from the satellite, so a pixel
-is a direction the instrument was pointing rather than a box on the ground.
-Cutting a 600 km box around a given lat/lon means transforming into that
-coordinate system first, using the projection parameters stored in each file
-rather than constants I picked.
+ABI data sits on a fixed angular grid in geostationary projection, so
+cutting a 600 km box around a latitude and longitude means transforming
+into the satellite's scan-angle coordinates first, using the projection
+parameters stored in each file. Ground distance per pixel changes with
+viewing angle, so crops are not a fixed pixel size; they are resized to
+224 by 224 when loaded.
 
-One consequence is that crops are not a fixed pixel size. Ground distance per
-pixel changes with viewing angle, so a box near Florida covers a different
-number of pixels than the same box near the Cape Verde islands. Across 2,092
-crops there are about 600 distinct shapes, from 173 to 289 pixels tall and 273
-to 326 wide. They all get resized to 224x224 when loaded.
-
-Six crops turned out to contain NaN pixels. All six were at 05:00Z, spread
-across three storms in three different years, which is the GOES-16 daily
-housekeeping window when full-disk scans are degraded. I generate an exclusion
-list by scanning for NaN rather than filtering on the hour, so the same check
-picks up anything else bad later.
+Frames with missing data (NaN pixels) are found by `check_nan.py`, which
+scans every crop rather than filtering on the hour, and are listed in
+`excluded_crops.txt`.
 
 ## The model
 
-ResNet-18 with ImageNet weights, final layer swapped for a single regression
-output. Brightness temperature is clamped to 180-320 K, scaled to 0-1, and
-copied across three channels so the pretrained weights see the input shape they
-expect. Wind labels are divided by a fixed 185 kt.
+ResNet-18 with ImageNet weights and a single regression output. Brightness
+temperature is clamped to 180–320 K, scaled to 0–1 and copied across three
+channels; wind labels are divided by a fixed 185 kt. Each network is trained
+with L1 loss, Adam at 1e-4 and batch size 32, for 25 epochs, keeping the
+checkpoint with the lowest validation error.
 
-Trained with L1 loss, Adam at 1e-4, batch size 32, 20 epochs, on an RTX 5070.
-I used L1 rather than MSE because most of the dataset is weak storms whose
-best-track positions and intensities are genuinely uncertain, and squaring the
-error would let a handful of Category 5 frames dominate the gradient.
+The reported model trains this ten times with different seeds and averages
+the ten predictions with equal weight. The ten checkpoints are frozen by
+hash in `results/ensemble/members_sha256.txt`.
 
-## Splitting the data
+## Splitting and testing
 
-Splits are by storm, never by frame. Hourly frames of the same hurricane are
-almost identical images with almost identical labels, so a random row split
-puts Michael's 14:00 frame in training and his 15:00 frame in test. The model
-could then score well by recognizing a particular storm at a particular hour
-instead of learning anything that transfers. The worst part is that this
-failure looks like success, since the leaky version produces better numbers.
+Splits are by storm, never by frame. Hourly frames of the same storm are
+near-duplicates, so a random split would put one hour of a storm in
+training and the next in test, and the leak would look like success.
 
-| Split | Storms | Samples |
-|---|---|---|
-| Train | Michael, Milton, Dorian, Fay, Ida, Nicholas, Idalia, Alberto, Debby | 1,307 |
-| Validation | Sally, Ophelia, Laura | 386 |
-| Held out | Ian, Nicole, Claudette | 393 |
+| Set | Storms | Frames | Role | List |
+|---|---|---|---|---|
+| Training | 19 | 2,081 | fitting | `storms_train_expanded.txt` minus the validation storms |
+| Validation | 5 | 940 | checkpoint selection | `storms_val_expanded.txt` |
+| Held-out development (H9) | 9 | 1,752 | comparing experiments | `storms_holdout_h9.txt` |
+| 2025 test | 6 | 1,045 | one final run | `storms_test_2025.txt` |
 
-The validation storms span tropical storm through Category 4 on purpose. My
-first pick topped out at Category 2, which would have meant choosing the
-checkpoint based almost entirely on how the model handled weak systems. The
-held-out three were fixed before I ran any training and used once.
+The nine held-out development storms (H9) were never trained on, but they
+were used to compare experiments and choose the training setup. They are
+not a test: the ensemble's 8.57 kt there is optimistic.
 
-## Results
+The 2025 storms are the test. The ensemble's checkpoints and the evaluation
+scripts were frozen and checked by hash before the run, and it was run
+once.
 
-Held-out storms, 393 samples: **9.00 kt MAE overall, 9.50 kt on real HURDAT2
-fixes only** (n=77). Those two being close is the check that mattered most,
-since it means interpolated labels are not quietly inflating the score.
+## Results on 2025
 
-| Category | Samples | MAE | Bias |
-|---|---|---|---|
-| TD | 83 | 5.50 kt | +2.38 |
-| TS | 187 | 7.59 kt | -2.74 |
-| Cat 1 | 58 | 15.76 kt | -14.58 |
-| Cat 2 | 9 | 3.96 kt | +0.24 |
-| Cat 3 | 25 | 10.50 kt | +7.68 |
-| Cat 4 | 15 | 19.49 kt | -19.49 |
-| Cat 5 | 4 | 18.25 kt | -18.25 |
+| Category | Frames | MAE (kt) | Bias (kt) | Original model MAE |
+|---|---|---|---|---|
+| Depression | 22 | 7.59 | +7.59 | 8.28 |
+| Storm | 456 | 8.58 | +3.62 | 10.84 |
+| Category 1 | 166 | 9.42 | −6.29 | 10.01 |
+| Category 2 | 129 | 8.78 | −6.42 | 13.28 |
+| Category 3 | 84 | 15.29 | −7.90 | 17.84 |
+| Category 4 | 137 | 9.85 | −6.25 | 12.69 |
+| Category 5 | 51 | 15.81 | −15.75 | 18.43 |
 
-## What is wrong with it
+Bias is the mean signed error, so a negative figure means the ensemble
+guessed low. The ensemble is better than or equal to the original single
+model in every category.
 
-The model underestimates strong storms. Bias is -19.49 kt at Category 4 and
--18.25 at Category 5, which are not small errors relative to the wind speeds
-involved.
+Where it fails:
 
-Part of this is the class balance. Most of the dataset is below hurricane
-strength, so a model minimizing average error does well by staying near the
-middle of the distribution and never committing to an extreme value.
+- **The strongest storms.** It underestimates category 5 by about 16 kt on
+  2025 and 19 kt on H9; averaging ten networks cannot remove a bias they
+  share. Melissa peaked at 165 kt, above anything in training (160), and
+  her eight frames above 160 kt got 133 to 143.
+- **Weak systems** read high, by about 8 kt for depressions and 4 kt for
+  tropical storms.
+- **A new satellite or new storms?** Error on 2025 is 1.2 kt higher than on
+  H9. Every 2025 frame is from GOES-19 and every training frame from
+  GOES-16, so the test can't separate the instrument from the storms.
 
-The bigger reason is that the model only ever sees one frame. A storm that is
-rapidly intensifying and one that is holding steady can look similar in a
-single infrared image, because the signature of intensification is change over
-time. Nothing in the input carries that. I noticed this early while flipping
-through Michael's frames. The image at 12Z on October 7 is labeled 35 kt, but
-everything visually interesting in it is convective bursts telling you what the
-storm is about to become, not what it currently is. More training data will not
-fix that, since it is a property of how the task is set up.
+## Phase 2 in brief
 
-Category 1 is the worst band at 15.76 kt MAE and -14.58 bias, worse than
-Category 2 or 3 despite sitting closer to the bulk of the data. I checked
-whether one storm was responsible and it is not. Ian contributes 46 of those
-samples at 14.8 kt error, Nicole 12 at 19.3 kt. Category 1 is roughly where a
-storm first develops a visible eye, so frames in that range are structurally
-ambiguous in infrared. Some have a ragged eye, some are still a central dense
-overcast. That transition is also where conventional Dvorak analysis is
-hardest.
+The full account is on the site:
+<https://hurricane.johnazer.com/#phase2>.
 
-Two other things I have not resolved. The dataset includes frames from after
-landfall, where a storm's convective structure decays faster than its wind
-field and the surface underneath is land rather than ocean, so the relationship
-between appearance and intensity is different there. And best-track center
-positions for tropical depressions are uncertain by something like 50-100 km,
-a sizeable fraction of the crop width, so the weakest frames may be
-contributing more noise than signal.
+- **The old 9.00 kt headline was a lucky run.** Rerunning that recipe 33
+  times gave a mean of 10.05 kt on the same held-out storms, and only one
+  rerun in 33 did as well. Since then every result is an ensemble or a
+  comparison across many seeds.
+- **More distinct storms helped.** Training on 19 storms instead of 9
+  lowered error on H9 by 1.6 kt and cut the high-end underestimate by
+  5.4 kt, passing all three tests set in advance. The larger set also had
+  more frames, so "more storms" and "more data" can't be fully separated.
+- **More storms again made no difference.** From 19 storms to 50 at the
+  same training budget: 0.53 kt worse, not significant, and the runs were
+  flagged as under-trained, so the reading is "not at this budget".
+- **Longer training helps.** Training four times longer lowered error on
+  H9 by about one knot (0.99) across 20 paired seeds. A new ten-network
+  ensemble trained that way is frozen and waits for its own one-time test
+  on the 2026–2027 storms.
+- **East Pacific, in progress.** Work is under way on adding East Pacific
+  storms to training. A separate East Pacific test set stays sealed under
+  a protocol fixed in advance.
 
-I should also say the 9.00 kt headline benefits from a held-out set that is
-mostly weak storms. There is less room to be wrong at 30 kt than at 140. The
-per-category table is the more honest view.
+Each phase-2 experiment's design, analysis script and pass thresholds were
+committed before any training run, and the outcome is reported as the
+script prints it. A separate AI review session, instructed to break each
+design, recomputes the results before they are accepted.
 
-## What I would do next
+## Reproducing
 
-Add more Category 3-5 storms and see whether the high-end bias shrinks. That
-tests the class imbalance explanation directly, with the current 9.00 kt as a
-baseline. I deliberately did not do this before writing up the result, since
-changing the training data after seeing where the model failed would make the
-number harder to trust.
+Requires Python 3.12 or later (`check_nan.py` uses
+`pathlib.Path.is_junction`).
 
-Beyond that: feeding the network multiple frames or a frame difference so it
-has some temporal context, adding the Band 8/9 water vapor channels (which
-would also give the pretrained weights three real channels instead of three
-copies of one), and running it against live NHC advisories during an active
-storm.
+```
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt -e .
+```
 
+PyTorch, torchvision and matplotlib are not pinned in `requirements.txt`;
+install them for your platform.
 
+Data is not committed. `scripts/build_batch.py --ids-file <list>` rebuilds
+crops from public NOAA sources for the storms in a list; the header of each
+`storms_*.txt` file says how it was built (the ten storms added in phase 2
+use 3-hourly sampling).
 
-## Repository
+`scripts/check.py` runs the repository's invariant checks:
+
+```
+.venv\Scripts\python.exe scripts\check.py          # FAST: under 3 minutes, no network
+.venv\Scripts\python.exe scripts\check.py --full   # every test and the smoke run
+```
+
+Where things live:
 
 ```
 src/hurricane_intensity/   pipeline and dataset class
-scripts/                   build, train, evaluate, previews
-logs/decisions.md          running log of decisions and why I made them
+scripts/                   build, train, evaluate, analyses, site export
+logs/decisions.md          running log of every decision and why
+results/                   committed predictions and findings per experiment
+                           (results/final_2025/findings.md is the 2025 test)
+reports/                   designs, reviews and decision records
+site/                      the published page
 ```
 
-Data is not committed. `scripts/build_batch.py --ids-file storms_train.txt`
-rebuilds it from public NOAA sources.
-
-Requires Python 3.12 or later (`check_nan.py` uses
-`pathlib.Path.is_junction`); developed on 3.13.
+Where each number in this README comes from is listed in
+`reports/site_v2/sources.md`.
