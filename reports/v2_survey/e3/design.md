@@ -12,7 +12,7 @@
 
 | Open item | Recommendation | Section |
 |---|---|---|
-| Budget reading | **Step-matched:** `epochs_for(E3 train frames, 4 × 1640)` | §2 |
+| Budget reading | **Epoch-matched, 99 epochs (decided by John, 2026-10-26)** | §2 |
 | Transfer gap | **(a) none:** E3 vs comparator is a direct H-EP contrast; zero H9 reads of E3 and v2 | §3 |
 | Comparator | **Frozen v2** (`results/v2_recipe/members_sha256.txt`, seeds 30–39); no new Atlantic-only ensemble | §4 |
 | EP training data | Mechanical rule with a tested concurrency gate, EP frames targeted at 1963 (E3 total ≈ 4044, F-31's atlantic-arm size, or fewer if EP data are short) | §5 |
@@ -47,7 +47,7 @@
 
 ## 2. Budget: two readings
 
-| | Step-matched (**recommended**) | Epoch-matched |
+| | Step-matched (drafted recommendation; not chosen) | Epoch-matched (**decided**) |
 |---|---|---|
 | Epochs | `epochs_for(2081 + EP frames, 6560)`; at the §5 cap (4044 frames, 127 batches) **52 epochs, ≈6604 steps**; fewer EP frames give more epochs at the same steps | 99 |
 | Steps vs v2 (6534) | equal to within one epoch's batches (the `epochs_for` rule, as N5 and F-31 arms) | ≈12,500, about 1.9× v2 |
@@ -56,10 +56,15 @@
 | Budget-limited risk | **likely.** F-31's atlantic arm at this exact size and budget (4044 frames, 52 epochs): 12/20 flagged BUDGET-LIMITED | lower, but no repo evidence beyond 4× in either arm |
 | Prior finding at this size and budget | F-31 S1: atlantic arm (4044 frames, 52 ep) beat control (2081, 99 ep) on H9 by 0.21 kt (95% CI [−0.36, −0.05]) while flagged budget-limited. So step-matched with ≈2× frames is not known to be harmful | none |
 
-**Recommendation: step-matched.**
+**Decided (John, 2026-10-26): epoch-matched, 99 epochs.**
+- **Rationale:** F-31 found its atlantic arm at this size (4044 frames, about 52 epochs) BUDGET-LIMITED in 12/20 runs, while v2 at 99 epochs is near-converged (F-31: the frozen recipe is not budget-limited at 2× and 4×). Step-matching would repeat N5's handicap against a converged comparator, which would gain little from E3's extra steps, so the compute confound is mostly moot. "Train to the same convergence criterion" is not defined under native selection and would need new adaptive code.
+- **Reported for both models:** the under-training flag (selected epoch > 0.85 × 99), per member and as a count out of 10, for E3 and v2 (v2: 4/10). An E3 count well above v2's is reported as a remaining budget limit.
+- The drafted recommendation (step-matched) follows, kept for the record.
+
+**Drafted recommendation (not chosen): step-matched.**
 - **Why:** "budget" is steps in every prior design here (`analyze_n5.epochs_for`, TARGET_STEPS; N5; F-31 §2 compared arms of different sizes at equal steps). It keeps v2 a valid comparator, and isolates the data factor.
 - **Carried rule (F-31):** the under-training flag (selected epoch > 0.85 × E) is reported per member, descriptively. If it fires in ≥ 5/10, the freeze entry and the H-EP report read any E3 deficit as "worse **at this budget**", not as harm from EP storms. Not rerun or rescued (N5, F-31 §2).
-- **The exact epoch count** is filled by the launch guard from the built frame count: `epochs_for(N_e3, 6560)`, logged per run (v2 §1: the budget is tied to the frame count).
+- **The epoch count is 99** (decided), whatever the built frame count; the steps follow from the frame count and are logged per run.
 
 ## 3. Transfer gap
 
@@ -155,7 +160,7 @@ No stratum edge or new stratum is chosen after the freeze.
 1. EP HURDAT2 downloaded under gate (d); John's antimeridian fix merged; the positions-only reader path for the concurrency gate merged (§5).
 2. `select_e3_ep.py` + tests (reviewed PR); run; `storms_train_e3.txt`, record, `excluded_crops_e3.txt` committed.
 3. EP crop build (reviewed); check.py FAST and `--full` PASS.
-4. Launch PR: E3 driver (v2's, with §1 pins, `epochs_for(N_e3, 6560)`, seeds 40–49, no evaluation stage) + tests; hc-adversary and John.
+4. Launch PR: E3 driver (v2's, with §1 pins, 99 epochs, seeds 40–49, no evaluation stage) + tests; hc-adversary and John.
 5. Training after John's yes. No H9, H-EP or 2026 read.
 6. Freeze PR (§7).
 7. H-EP protocol edit for §3 (a) and §4's crop-identity proof, before gate 6.
