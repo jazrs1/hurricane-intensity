@@ -1,4 +1,4 @@
-# E3 (Atlantic + East Pacific training): design (r1; not approved; nothing run)
+# E3 (Atlantic + East Pacific training): design (r2: review of PR #43 folded in; not approved; nothing run)
 
 **Status:** design only. No build, download, training or evaluation before John's yes. The selection script, driver and tests come in reviewed PRs (§9).
 
@@ -15,7 +15,8 @@
 | Budget reading | **Step-matched:** `epochs_for(E3 train frames, 4 × 1640)` | §2 |
 | Transfer gap | **(a) none:** E3 vs comparator is a direct H-EP contrast; zero H9 reads of E3 and v2 | §3 |
 | Comparator | **Frozen v2** (`results/v2_recipe/members_sha256.txt`, seeds 30–39); no new Atlantic-only ensemble | §4 |
-| EP training data | Mechanical rule, EP frames targeted at 1963 (E3 total ≈ 4044, F-31's atlantic-arm size) | §5 |
+| EP training data | Mechanical rule with a tested concurrency gate, EP frames targeted at 1963 (E3 total ≈ 4044, F-31's atlantic-arm size, or fewer if EP data are short) | §5 |
+| EP satellite | **GOES-18, 2023–2024** (the scoring sensor; VZA inside the Atlantic training range) | §5a |
 | Everything else | Identical to v2 (one-factor contrast: only the train list changes) | §1 |
 
 ## 1. The recipe: v2 with one change
@@ -38,7 +39,7 @@
 |---|---|
 | `scripts/train.py` | SHA-256 `afceb4b1…231f` (blob `500bbc1e`), F-31's and v2's pin |
 | `src/hurricane_intensity/{__init__,dataset,splits,crop,projection,goes_index}.py` | blob equal to fc71b98's (v2 §1 table) |
-| `src/hurricane_intensity/{config,hurdat2,pipeline}.py` | the blobs at E3's launch commit; the launch PR shows `git diff fc71b98` on them is confined to #40/#41's EP-reader additions, with the Atlantic default paths unchanged |
+| `src/hurricane_intensity/{config,hurdat2,pipeline}.py`, `scripts/concurrency.py` | the blobs at E3's launch commit, **taken after John's pending antimeridian fix merges** (it changes `pipeline.py` and `concurrency.py`); no EP crop is built before that merge. The launch PR shows `git diff fc71b98` on the src files is confined to the EP-reader and antimeridian changes, with the Atlantic default paths unchanged. If those changes alter any Atlantic crop, the §4 byte-identity proof fails and E3 stops |
 | `excluded_crops.txt` | blob `cc9dfcff` (Atlantic frames unchanged); EP exclusions go in a new pinned `excluded_crops_e3.txt`, never in the old file |
 
 - **The learning-rate condition** (v2 §1) carries over: constant Adam, epoch count only a loop bound. Any schedule change reopens the budget.
@@ -48,7 +49,7 @@
 
 | | Step-matched (**recommended**) | Epoch-matched |
 |---|---|---|
-| Epochs | `epochs_for(2081 + EP frames, 6560)`; at the §5 target (≈4044 frames, 127 batches) **52 epochs, ≈6604 steps** | 99 |
+| Epochs | `epochs_for(2081 + EP frames, 6560)`; at the §5 cap (4044 frames, 127 batches) **52 epochs, ≈6604 steps**; fewer EP frames give more epochs at the same steps | 99 |
 | Steps vs v2 (6534) | equal to within one epoch's batches (the `epochs_for` rule, as N5 and F-31 arms) | ≈12,500, about 1.9× v2 |
 | Comparator at that budget | v2 itself (same steps) | v2 matches in epochs only; a step-matched Atlantic-only comparator would be a new ≈190-epoch ensemble, a budget no arm in this repo has run |
 | What a difference means | the effect of the added EP storms at fixed compute | EP storms **and** ≈1.9× compute, confounded. F-31 P1: compute alone moved control H9 MAE by −0.99 kt (1×→4×) |
@@ -90,17 +91,42 @@ Applied later by a reviewed script (`scripts/select_e3_ep.py`, not written). Thi
 |---|---|---|
 | Source | the pinned nepac HURDAT2 (`config.HURDAT2_EP_*`), read through the #41 reader, which refuses the H-EP set and its concurrency exclusions (Octave, Raymond 2025) by ID | gate (d); not a choice |
 | Basin | ID prefix `EP` | E3's question is EP |
-| Years | 2018–2024 | The Atlantic train list spans exactly 2018–2024 (`storms_train_expanded.txt`), so E3 adds no new period; GOES-16 was GOES-East throughout. Not derived from H-EP (the reader gate excludes its IDs regardless) |
+| Years | 2018–2024, then narrowed to the satellite's operational years (§5a: **2023–2024** under the recommendation) | The Atlantic train list spans exactly 2018–2024 (`storms_train_expanded.txt`), so E3 adds no new period. Not derived from H-EP (the reader gate excludes its IDs regardless) |
+| Concurrency (**hard gate**) | drop every EP training frame whose box overlaps, at the same time, the box of any storm in the H-EP set or its concurrency exclusions: `scripts/concurrency.py` (N4 rule: 600 km box + 50 km margin, `boxes_overlap`/`concurrent`, positions interpolated as the pipeline does) | ID exclusion is not enough: the training years overlap the H-EP period, so a concurrent storm's crop can carry H-EP pixels (review_b1 I-1, the Marco/Laura case; N4/A4 precedent). See below |
 | Status fixes | `config.DEFAULT_INCLUDE_STATUSES` (LO TD SD TS SS HU) | Same as every Atlantic build |
 | Sampling, tolerance | the interval and scan tolerance recorded in the Atlantic train manifests (3-hourly per the list header); the script reads them, not this design | same frame construction as the Atlantic data |
-| Satellite | `noaa-goes16` (the default bucket) | Every Atlantic train/val frame and v2's whole training are GOES-16; one sensor keeps sensor out of the contrast. GOES-18 has only check.py F3, n = 1, labelled "NOT EP readiness" |
-| VZA handling | drop EP **fixes** whose GOES-16 viewing zenith angle (from the fix lat/lon, nominal 75.2° W) exceeds the **maximum VZA over the Atlantic train + val fixes**, computed by the script with the same formula. No other angle handling | Keeps EP inputs inside the angle range the comparator was trained and selected on (training data). Also excludes far-west fixes before the antimeridian interpolation issue (check.py F3 comment) can arise |
-| Intensity floor | storm's peak best-track intensity ≥ the **minimum peak over the 24 Atlantic train storms** (Atlantic HURDAT2 cache) | same intensity floor as the comparator's training storms |
-| Minimum frames | ≥ the **minimum per-storm post-exclusion frame count** over the Atlantic train storms | same floor |
+| Satellite | §5a: **`noaa-goes18`** (recommended) | §5a |
+| VZA handling | drop EP **fixes** whose viewing zenith angle from the §5a satellite (fix lat/lon, the satellite's nominal sub-point: 137.2° W for GOES-18) exceeds the **maximum GOES-16 VZA (75.2° W) over the fixes of the 19 Atlantic train + 5 val storms**, computed by the script with the same formula. No other angle handling | Keeps EP inputs inside the angle range the comparator was trained and selected on (training and validation data) |
+| Intensity floor | storm's peak best-track intensity ≥ the **minimum peak over the 19 Atlantic train storms** (`storms_train_expanded.txt` minus its 5 val storms; Atlantic HURDAT2 cache) | same intensity floor as the comparator's training storms; val storms are excluded because they are the selection set, not training data |
+| Minimum frames | ≥ the **minimum per-storm post-exclusion frame count over the same 19 train storms** | same floor, same set |
 | Bad crops | EP crops failing the existing NaN/exclusion check go in `excluded_crops_e3.txt` | as `excluded_crops.txt` |
 | Order and cap | eligible storms sorted by SHA-256 of the ID string; add whole storms in that order until EP frames ≥ **1963** (= 4044 − 2081) | Target makes E3's train size equal F-31's atlantic arm (4044), the only larger-data size with prior evidence at this budget (§2). Hash order is fixed before any storm is seen, so no intensity or angle preference enters. Without a cap, all eligible EP storms could outnumber Atlantic frames several times and push epochs far below 52, outside any prior finding |
 
-The script writes `storms_train_e3.txt` and a record (rule inputs, eligible list, hash order, final frame count); its output is pinned at launch.
+The script writes `storms_train_e3.txt` and a record (rule inputs, eligible list, hash order, final frame count); its output is pinned at launch. If the eligible EP frames total less than 1963, all are used and `epochs_for` sets the epochs; E3's size then lies between F-31's control (2081) and atlantic (4044) arms, both studied at 4× (5/20 and 12/20 flagged).
+
+**Concurrency gate (D1), mechanical and tested:**
+- `select_e3_ep.py` loads the excluded storms' tracks (the H-EP set and its concurrency exclusions) as **(time, lat, lon) only**, through `concurrency.track` on the pinned nepac file, and calls `concurrency.concurrent` against each candidate EP training track at the build sampling grid.
+- Every overlapping training frame is dropped **before** frame counting, the floors and the cap. Whole storms are not dropped unless the floors then fail.
+- **It prints and records no excluded storm's ID, name, wind or position:** only per-candidate counts of dropped frames.
+- **Hard gate:** after selection the script re-runs the test on every kept frame and refuses to write `storms_train_e3.txt` if any overlaps. The launch guard re-runs the same check on the pinned list.
+- **Tests (synthetic tracks):** an overlapping frame is dropped; a frame 651 km away is kept; a non-overlapping time is kept; the refusal fires on an injected overlap; the output contains no excluded-storm field.
+- **Needs:** the #41 reader refuses H-EP IDs outside the sealed pass. The gate needs a reviewed positions-only path (time, lat, lon, no ID or intensity returned) for this one use. That is a reader-gate PR, before step 2 of §9.
+
+## 5a. Satellite for EP training imagery (choice for John)
+
+Protocol fact (from the coordinator, not read here): H-EP imagery is built from `noaa-goes18` for all its storms. That is a property of the scoring platform, not of any test storm. Nominal sub-points: GOES-16 75.2° W, GOES-17/18 137.2° W (GOES-West). Typical EP genesis/track region ≈ 95–135° W.
+
+| Option | Years usable | Frames available | VZA vs Atlantic training (GOES-16 on Atlantic storms) | Transfer confound in E3 − v2 |
+|---|---|---|---|---|
+| GOES-16 (`noaa-goes16`) | 2018–2024 | most (7 seasons); cap 1963 likely reached | **oblique-view proxy:** EP storms 20–60° of longitude from 75.2° W, so many fixes near or past the Atlantic maximum and dropped by the cap; kept fixes cluster at the oblique end | E3 learns EP from a sensor and geometry H-EP is not scored on: train and test views differ for E3's EP data, which understates what EP data could add |
+| **GOES-18 (`noaa-goes18`), recommended** | 2023–2024 (GOES-West from 2023-01-04) | fewest (2 seasons); cap may not be reached (handled above) | near-nadir to moderate for EP, the same geometric regime as GOES-16 on the Atlantic training storms; the cap should drop few fixes | E3 sees the scoring sensor; v2 sees only GOES-16. So E3 − v2 includes "EP storms viewed as H-EP views them". That is the question E3 asks, and it is stated in the report as part of the treatment |
+| GOES-17 (`noaa-goes17`) | 2019–2022 (GOES-West 2019-02-12 to 2023-01-04) | middle (4 seasons) | as GOES-18 | a third sensor, seen by neither the comparator nor H-EP; no read-path check in this repo (check.py F3 covers G18 only) |
+| GOES-17 + GOES-18 (operational West at fix time) | 2019–2024 | most West frames | as GOES-18 | two sensors; GOES-17's band-13 cooling anomaly needs a quality rule this repo has no finding for |
+
+**Recommendation: GOES-18, 2023–2024.**
+- **Why, from train/val data and prior findings:** (1) the VZA cap is defined by the Atlantic train/val geometry, and only a GOES-West view keeps EP fixes inside it without discarding most of the oblique range; (2) the GOES-18 read/crop path has a regression check (check.py F3), GOES-17 none; (3) F-31 S1 says more storms at fixed steps did not hurt at 4044 frames, and §5's floor case (fewer EP frames) lies between two studied sizes, so fewer frames is a smaller risk than an unchecked sensor.
+- **Cost, stated plainly:** fewer EP storms; E3's size is set by the data, not the 1963 target, if short.
+- GOES-16 stays the fallback only by John's choice, never by the script.
 
 ## 6. Reporting strata (E3 vs v2 on H-EP, descriptive beyond the protocol's primary)
 
@@ -108,7 +134,7 @@ The script writes `storms_train_e3.txt` and a record (rule inputs, eligible list
 |---|---|---|
 | Overall | all frames | primary, as N5/F-31 |
 | > 96 kt | best-track > 96 kt | the high-end threshold of N5 and F-31 (S2, S4) |
-| VZA | tertiles of **E3's EP training fixes'** GOES-16 VZA, written to the selection record before freeze | training-data edges; fixed before any H-EP read |
+| VZA | angle from the **§5a satellite (GOES-18 under the recommendation, the same satellite H-EP is scored on)**; edges = tertiles of E3's EP training fixes' VZA from that satellite, written to the selection record before freeze. Each H-EP frame is binned by its own GOES-18 VZA | training-data edges; fixed before any H-EP read; the binned angle is the one each model's scored input was actually viewed at |
 
 No stratum edge or new stratum is chosen after the freeze.
 
@@ -126,7 +152,7 @@ No stratum edge or new stratum is chosen after the freeze.
 ## 9. Prerequisites, in order (none done)
 
 0. This design approved by John, after hc-adversary.
-1. EP HURDAT2 downloaded under gate (d).
+1. EP HURDAT2 downloaded under gate (d); John's antimeridian fix merged; the positions-only reader path for the concurrency gate merged (§5).
 2. `select_e3_ep.py` + tests (reviewed PR); run; `storms_train_e3.txt`, record, `excluded_crops_e3.txt` committed.
 3. EP crop build (reviewed); check.py FAST and `--full` PASS.
 4. Launch PR: E3 driver (v2's, with §1 pins, `epochs_for(N_e3, 6560)`, seeds 40–49, no evaluation stage) + tests; hc-adversary and John.
@@ -137,7 +163,8 @@ No stratum edge or new stratum is chosen after the freeze.
 ## Open / unsure
 
 - Whether v2's launch recorded per-crop hashes for the Atlantic train/val crops (§1); if not, the launch PR adds a rebuild sample.
-- If the H-EP protocol scores EP storms from a satellite other than GOES-16, E3's sensor choice (§5) differs from the test sensor. E3 does not adapt to it: the evaluation platform is the protocol's, and this design did not read it. hc-adversary to confirm.
+- §5a's satellite fact (H-EP built from `noaa-goes18`) comes from the coordinator's review, not from a read of the protocol.
+- How many GOES-18 EP frames survive the floors, VZA cap and concurrency gate is unknown until the script runs; the design accepts any count (§5).
 - Whether every Atlantic train storm meets its own floors trivially (it must, by construction); the script asserts it.
 
 ## Disclosure
