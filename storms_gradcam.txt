@@ -10,8 +10,12 @@
 # produced from this list (scripts/gradcam.py --survey --storms-file
 # storms_gradcam.txt) against the baseline best_model.pt, which was trained
 # on none of the three. That survey holds for the baseline checkpoint only:
-# for any model trained on the expanded set, Beryl and Lee are training data
-# and only Sam is out of sample.
+# for a model trained on storms_train.txt, Beryl and Lee are training data
+# and only Sam is out of sample. The frozen expanded ensemble
+# (storms_train_expanded.txt) was trained on none of the three: all three
+# are in storms_holdout_h9.txt, its development holdout. Its Grad-CAM survey
+# (reports/site_v2/gradcam_ensemble_method.md) uses its own explicit
+# four-storm list, not this file or the --survey default.
 #
 # Until 2026-10-13 these storms were attribution test subjects only, in
 # neither storms_train.txt nor storms_holdout.txt, and were never folded

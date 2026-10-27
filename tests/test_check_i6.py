@@ -1,5 +1,6 @@
-"""I6 in scripts/check.py (PR #47): site/ at HEAD is SITE_SHA's tree, and main / origin/main are MAIN_SHA or a
-descendant of it that is in HEAD's history and has SITE_SHA's site/. Each case runs check_git on a throwaway repo.
+"""I6 in scripts/check.py (PR #47, #48): site/ at HEAD is the last REVIEWED_SITE_SHAS entry's tree, and main /
+origin/main are MAIN_SHA or a descendant of it that is in HEAD's history and has any listed entry's site/. Each case
+runs check_git on a throwaway repo.
 """
 import importlib.util
 import subprocess
@@ -14,7 +15,7 @@ _spec.loader.exec_module(check)
 
 
 def test_pins():
-    assert (check.MAIN_SHA, check.SITE_SHA) == ("fbb39c4", "0f54536")
+    assert (check.MAIN_SHA, check.REVIEWED_SITE_SHAS) == ("fbb39c4", ("0f54536", "7092cf1"))
 
 
 class Repo:
@@ -54,7 +55,7 @@ def repo(tmp_path, monkeypatch):
     r.after = r.commit({"site/index.html": "new site", "a.txt": "3"}, r.site)  # later non-site work
     monkeypatch.setattr(check, "CHECKOUT_ROOT", tmp_path)
     monkeypatch.setattr(check, "MAIN_SHA", r.base)
-    monkeypatch.setattr(check, "SITE_SHA", r.site)
+    monkeypatch.setattr(check, "REVIEWED_SITE_SHAS", (r.site,))
     return r
 
 
@@ -110,6 +111,30 @@ def test_main_not_in_heads_history_fails(repo):
     side = repo.commit({"site/index.html": "new site", "a.txt": "side"}, repo.site)  # reviewed site, other branch
     repo.point(head=repo.after, main=side)
     with pytest.raises(AssertionError, match="main is .*in HEAD=False"):
+        check.check_git(repo.root)
+
+
+def test_main_with_an_older_reviewed_site_passes(repo, monkeypatch):
+    monkeypatch.setattr(check, "REVIEWED_SITE_SHAS", (repo.mid, repo.site))  # mid carries the older reviewed site
+    repo.point(head=repo.after, main=repo.mid)
+    check.check_git(repo.root)
+
+
+def test_main_with_an_unlisted_site_fails(repo, monkeypatch):
+    monkeypatch.setattr(check, "REVIEWED_SITE_SHAS", (repo.mid, repo.site))
+    unlisted = repo.commit({"site/index.html": "unlisted site", "a.txt": "u"}, repo.base)
+    tree = repo.git("rev-parse", f"{repo.after}^{{tree}}")
+    head = repo.git("commit-tree", tree, "-p", repo.after, "-p", unlisted, "-m", "merge")
+    repo.point(head=head, main=unlisted)  # descends from MAIN_SHA and is in HEAD's history
+    with pytest.raises(AssertionError, match=r"main is .*descends=True, in HEAD=True, site matches=False"):
+        check.check_git(repo.root)
+
+
+def test_head_with_an_older_listed_site_fails(repo, monkeypatch):
+    monkeypatch.setattr(check, "REVIEWED_SITE_SHAS", (repo.mid, repo.site))
+    reverted = repo.commit({"site/index.html": "old site", "a.txt": "3"}, repo.after)  # back to the older site
+    repo.point(head=reverted, main=repo.base)
+    with pytest.raises(AssertionError, match="site/ at HEAD .* differs from"):
         check.check_git(repo.root)
 
 

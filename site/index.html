@@ -803,6 +803,36 @@
     </figure>
   </section>
 
+  <section id="gradcam-ensemble">
+    <h2>What the ensemble looks at</h2>
+    <p class="caption">This section shows the ten-network ensemble behind the headline numbers, measured the same way as the original model above.</p>
+    <p>Each of the ten networks gets its own Grad-CAM map, scaled from 0 to 1 as above. The ensemble's map is their average, rescaled the same way. The frames are the same 454 frames above 96 knots from the same four storms. None of the ten networks trained on these storms, but they are held-out development storms, not a test.</p>
+    <p>The ensemble's attribution also overlaps the coldest cloud tops far more than chance. Its mean correlation is +0.51, lower than the original model's +0.57; the medians are +0.53 and +0.61. Six of the 454 frames are negative, against three for the original model.</p>
+    <p>The ensemble's maps are tighter. In the median frame, the region above the overlay's threshold covers 24% of the frame, against 40% for the original model, and its peak sits closer to the coldest pixel.</p>
+    <figure>
+      <div class="frames frames-4">
+        <div>
+          <img src="figures/ensemble_ian_140kt.png" alt="The same Ian frame with the ensemble's Grad-CAM wash, a compact region over the center of the dense overcast." width="224" height="224">
+          <figcaption class="label">Ian, 28 Sep 2022,<br>140 kt</figcaption>
+        </div>
+        <div>
+          <img src="figures/ensemble_beryl_145kt.png" alt="The same Beryl frame with the ensemble's Grad-CAM wash, a compact region over the center of the dense overcast." width="224" height="224">
+          <figcaption class="label">Beryl, 2 Jul 2024,<br>145 kt</figcaption>
+        </div>
+        <div>
+          <img src="figures/ensemble_lee_145kt.png" alt="The same Lee frame with the ensemble's Grad-CAM wash, a compact region over the center of the dense overcast." width="224" height="224">
+          <figcaption class="label">Lee, 8 Sep 2023,<br>145 kt</figcaption>
+        </div>
+        <div>
+          <img src="figures/ensemble_sam_135kt.png" alt="The same Sam frame with the ensemble's Grad-CAM wash, a compact region over the center of the dense overcast." width="224" height="224">
+          <figcaption class="label">Sam, 26 Sep 2021,<br>135 kt</figcaption>
+        </div>
+      </div>
+      <img class="gradcam-legend" src="figures/gradcam_legend.png" alt="Color scale: plasma, transparent below a CAM value of 0.5, ramping through rose to bright yellow at 1.0." width="760" height="76">
+      <p class="caption">Ensemble of ten networks. These are the same four frames as above, with the same color scale and threshold. Attribution again sits on the central deep convection, in a smaller region than the original model's.</p>
+    </figure>
+  </section>
+
   <footer>
     <a href="https://github.com/jazrs1/hurricane-intensity">Source and data pipeline on GitHub</a>
     <a href="https://www.nhc.noaa.gov/data/#hurdat">HURDAT2 best track</a>

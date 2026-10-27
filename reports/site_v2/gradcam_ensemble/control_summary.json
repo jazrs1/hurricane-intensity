@@ -1,0 +1,67 @@
+{
+  "n": 454,
+  "n_valid": 454,
+  "mean_r": 0.5748907350256609,
+  "median_r": 0.6069464872819178,
+  "frac_r_negative": 0.006607929515418502,
+  "iou_minus_chance_mean": 0.2575912607593605,
+  "frac_iou_below_chance": 0.011013215859030838,
+  "per_storm": {
+    "AL022024": {
+      "n": 104,
+      "mean_r": 0.493967349308201,
+      "median_r": 0.5526221022811224
+    },
+    "AL092022": {
+      "n": 47,
+      "mean_r": 0.6292283813249945,
+      "median_r": 0.6476459976850514
+    },
+    "AL132023": {
+      "n": 115,
+      "mean_r": 0.6039791364843701,
+      "median_r": 0.6289094370137056
+    },
+    "AL182021": {
+      "n": 188,
+      "mean_r": 0.5882790146575522,
+      "median_r": 0.601800210566116
+    }
+  },
+  "orig_mean_r": 0.5748907350256608,
+  "mean_r_diff": 1.1102230246251565e-16,
+  "per_frame_r_max_abs_diff": 8.326672684688674e-17,
+  "peaks": [
+    {
+      "stem": "AL092022_20220928T1200Z",
+      "npy_max_abs_diff": 0.0,
+      "npy_bit_identical": true,
+      "png_identical_to_site": true,
+      "png_max_abs_diff": 0
+    },
+    {
+      "stem": "AL022024_20240702T0945Z",
+      "npy_max_abs_diff": 0.0,
+      "npy_bit_identical": true,
+      "png_identical_to_site": true,
+      "png_max_abs_diff": 0
+    },
+    {
+      "stem": "AL132023_20230908T0600Z",
+      "npy_max_abs_diff": 0.0,
+      "npy_bit_identical": true,
+      "png_identical_to_site": true,
+      "png_max_abs_diff": 0
+    },
+    {
+      "stem": "AL182021_20210926T1800Z",
+      "npy_max_abs_diff": 0.0,
+      "npy_bit_identical": true,
+      "png_identical_to_site": true,
+      "png_max_abs_diff": 0
+    }
+  ],
+  "passed": true,
+  "high_cam_share_median": 0.40087890625,
+  "peak_to_coldest_px_median": 52.88605524505438
+}
