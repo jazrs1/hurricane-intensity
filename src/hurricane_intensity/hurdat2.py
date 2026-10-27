@@ -261,7 +261,115 @@ def parse_storm(
     (storm_name, fixes) where fixes is a DataFrame with columns:
         time (UTC, tz-aware pandas Timestamp), lat, lon, wind_kt, status
     sorted by time, with missing-wind rows dropped (logged as a warning).
+
+    Refuses the sealed H-EP storms and their concurrency exclusions, from any
+    file (refuse_sealed). The sealed build reads them only through
+    run_pipeline -> _parse_sealed_hep_storm.
     """
+    refuse_sealed(atcf_id)
+    return _parse_storm(atcf_id, hurdat2_path, include_statuses)
+
+
+def sealed_ids() -> frozenset[str]:
+    """The H-EP storms (config.HEP_LIST, read now) plus their concurrency exclusions.
+
+    Fails closed: a missing or empty list raises rather than sealing nothing.
+    """
+    from .splits import load_storm_list
+
+    hep = load_storm_list(config.HEP_LIST)  # FileNotFoundError if missing
+    if not hep:
+        raise ValueError(f"{config.HEP_LIST} names no storm; refusing to read without the sealed set")
+    return frozenset(hep) | frozenset(config.HEP_CONCURRENT_IDS)
+
+
+def refuse_sealed(atcf_id: str) -> None:
+    """Raise if `atcf_id` is sealed (H-EP gate (d)). The message carries the ID only."""
+    if atcf_id.strip().upper() in sealed_ids():
+        raise SealedStormError(
+            f"{atcf_id.strip().upper()} is sealed (H-EP set or its concurrency exclusions); "
+            "it is read only by the sealed H-EP build (run_pipeline into config.HEP_SEALED_DIR)"
+        )
+
+
+class SealedStormError(ValueError):
+    pass
+
+
+def _parse_sealed_hep_storm(
+    atcf_id: str,
+    hurdat2_path: Path,
+    include_statuses: tuple[str, ...],
+    out_root: Path,
+) -> tuple[str, pd.DataFrame]:
+    """The one exception to refuse_sealed: the sealed H-EP build (protocol §5-6).
+
+    Its only caller is pipeline.run_pipeline (pinned by a test). It re-checks
+    everything itself rather than trusting the caller: the output root is
+    config.HEP_SEALED_DIR, the file is the pinned East Pacific HURDAT2, and the
+    ID is one of the H-EP storms (the concurrency exclusions are never read,
+    not even here).
+    """
+    from .splits import load_storm_list
+
+    atcf_id = atcf_id.strip().upper()
+    if Path(out_root).resolve() != Path(config.HEP_SEALED_DIR).resolve():
+        raise SealedStormError(f"{atcf_id}: the sealed read writes only to {config.HEP_SEALED_DIR}")
+    if atcf_id not in load_storm_list(config.HEP_LIST):
+        raise SealedStormError(f"{atcf_id} is not an H-EP storm; the sealed read is for those only")
+    verify_pinned_hurdat2(hurdat2_path)
+    return _parse_storm(atcf_id, hurdat2_path, include_statuses)
+
+
+def read_positions(atcf_id: str, hurdat2_path: Path) -> pd.DataFrame:
+    """Positions only, for E3's concurrency gate (E3 design §5, §9).
+
+    Returns a DataFrame with exactly the columns time, lat, lon: every fix,
+    no status trim, sorted by time. Wind and status are parsed (the format is
+    checked) but never returned, and nothing is logged or printed. Errors carry
+    the ID and a line number, never a name, wind or status. Sealed IDs are
+    readable here: loading the excluded storms' tracks is this function's
+    purpose. The file must be the pinned East Pacific HURDAT2.
+    """
+    atcf_id = atcf_id.strip().upper()
+    lines = Path(verify_pinned_hurdat2(hurdat2_path)).read_text(encoding="utf-8").splitlines()
+    rows: list[tuple] = []
+    found = False
+    i = 0
+    while i < len(lines) and not found:
+        fields = [f.strip() for f in lines[i].split(",")]
+        if lines[i][:2] in ("AL", "EP", "CP"):
+            try:
+                n = int(fields[2])
+            except (IndexError, ValueError):
+                raise ValueError(f"malformed header line {i + 1} while reading {atcf_id}") from None
+            if fields[0] == atcf_id:
+                found = True
+                for j in range(i + 1, i + 1 + n):
+                    try:
+                        d = [f.strip() for f in lines[j].split(",")]
+                        int(d[6]), d[3]  # wind and status: parsed for format, never kept
+                        rows.append((
+                            pd.to_datetime(f"{d[0]} {d[1]}", format="%Y%m%d %H%M", utc=True),
+                            _parse_lat(d[4]),
+                            _parse_lon(d[5]),
+                        ))
+                    except (IndexError, ValueError):
+                        raise ValueError(f"malformed fix line {j + 1} for {atcf_id}") from None
+            i += n + 1
+        else:
+            i += 1
+    if not found:
+        raise ValueError(f"ATCF id {atcf_id!r} not found in {Path(hurdat2_path).name}")
+    return pd.DataFrame(rows, columns=["time", "lat", "lon"]).sort_values("time").reset_index(drop=True)
+
+
+def _parse_storm(
+    atcf_id: str,
+    hurdat2_path: Path,
+    include_statuses: tuple[str, ...] = config.DEFAULT_INCLUDE_STATUSES,
+) -> tuple[str, pd.DataFrame]:
+    """parse_storm without the sealed-ID refusal. Call parse_storm instead."""
     atcf_id = atcf_id.strip().upper()
     lines = Path(hurdat2_path).read_text(encoding="utf-8").splitlines()
 
