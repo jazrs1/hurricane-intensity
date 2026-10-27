@@ -79,8 +79,8 @@
 
 | Option | Verdict | Why |
 |---|---|---|
-| **Frozen v2** (seeds 30–39, `results/v2_recipe/members_sha256.txt`) | **chosen** | Identical recipe except the train list (§1), at the same step budget (§2). Already frozen before any EP data exists, with zero H9/H-EP reads. John's decision 3 names it |
-| New Atlantic-only ensemble at E3's budget | not needed | Under step-matched it would be the v2 recipe again, a second draw costing ≈1.6 h GPU with nothing gained. Needed only if E3 changed something besides the train list, which §1 forbids, or under epoch-matched (§2) |
+| **Frozen v2** (seeds 30–39, `results/v2_recipe/members_sha256.txt`) | **chosen** | Identical recipe except the train list (§1), at the same 99 epochs (§2, decided: matched in epochs). Already frozen before any EP data exists, with zero H9/H-EP reads. John's decision 3 names it |
+| New Atlantic-only ensemble at E3's budget | not needed | v2 serves at 99 epochs, matched in epochs (§2, decided); a new Atlantic-only ensemble at 99 epochs would be the v2 recipe again, a second draw with nothing gained. Needed only if E3 changed something besides the train list, which §1 forbids |
 
 - **Seed pairing:** none. E3 seeds 40–49 and v2 seeds 30–39 differ (a shared seed would not share an init path across different lists anyway). The contrast is ensemble vs ensemble.
 - **Preprocessing (John's rule 5).** v2's pinned commit (fc71b98) has no EP HURDAT2 reader, so it **cannot build EP crops**. So the H-EP pass takes the second branch: before scoring, it proves the crops it evaluates are byte-identical between current code and each model's pinned crop path, for **every evaluated storm**:
@@ -105,9 +105,9 @@ Applied later by a reviewed script (`scripts/select_e3_ep.py`, not written). Thi
 | Intensity floor | storm's peak best-track intensity ≥ the **minimum peak over the 19 Atlantic train storms** (`storms_train_expanded.txt` minus its 5 val storms; Atlantic HURDAT2 cache) | same intensity floor as the comparator's training storms; val storms are excluded because they are the selection set, not training data |
 | Minimum frames | ≥ the **minimum per-storm post-exclusion frame count over the same 19 train storms** | same floor, same set |
 | Bad crops | EP crops failing the existing NaN/exclusion check go in `excluded_crops_e3.txt` | as `excluded_crops.txt` |
-| Order and cap | eligible storms sorted by SHA-256 of the ID string; add whole storms in that order until EP frames ≥ **1963** (= 4044 − 2081) | Target makes E3's train size equal F-31's atlantic arm (4044), the only larger-data size with prior evidence at this budget (§2). Hash order is fixed before any storm is seen, so no intensity or angle preference enters. Without a cap, all eligible EP storms could outnumber Atlantic frames several times and push epochs far below 52, outside any prior finding |
+| Order and cap | eligible storms sorted by SHA-256 of the ID string; add whole storms in that order until EP frames ≥ **1963** (= 4044 − 2081) | Target makes E3's train size equal F-31's atlantic arm (4044), the only larger-data size with prior evidence at this budget (§2). Hash order is fixed before any storm is seen, so no intensity or angle preference enters. Without a cap, all eligible EP storms could outnumber Atlantic frames several times and raise steps further (99 epochs over many more frames), outside any prior finding |
 
-The script writes `storms_train_e3.txt` and a record (rule inputs, eligible list, hash order, final frame count); its output is pinned at launch. If the eligible EP frames total less than 1963, all are used and `epochs_for` sets the epochs; E3's size then lies between F-31's control (2081) and atlantic (4044) arms, both studied at 4× (5/20 and 12/20 flagged).
+The script writes `storms_train_e3.txt` and a record (rule inputs, eligible list, hash order, final frame count); its output is pinned at launch. If the eligible EP frames total less than 1963, all are used, still at 99 epochs; E3's size then lies between F-31's control (2081) and atlantic (4044) arms, both studied at 4× (5/20 and 12/20 flagged).
 
 **Concurrency gate (D1), mechanical and tested:**
 - `select_e3_ep.py` loads the excluded storms' tracks (the H-EP set and its concurrency exclusions) as **(time, lat, lon) only**, through `concurrency.track` on the pinned nepac file, and calls `concurrency.concurrent` against each candidate EP training track at the build sampling grid.
@@ -151,7 +151,7 @@ No stratum edge or new stratum is chosen after the freeze.
 
 ## 8. Compute (estimate)
 
-- Training ≈ v2's per run (same steps, same val set): ≈7–9 min + ≈2 min revalidation; 10 runs ≈ 1.5–2 h.
+- Training ≈ 1.9× v2's steps per run at 99 epochs (same val set, 99 epochs revalidated): 10 runs ≈ 3–3.5 h.
 - The EP build (download + crops for ≈1963 frames) is separate and comes first.
 
 ## 9. Prerequisites, in order (none done)
