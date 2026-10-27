@@ -3684,3 +3684,18 @@ compute by this entry.
 - The E3 drafter is a fresh coordinator subagent, given the spec and
   rules only, and barred from reports/decisions/, reports/v2_survey/hep/,
   logs/decisions.md and any H-EP or nepac path.
+
+2026-10-27, 15:18. E3 EP frame floor (PR #46, select_e3_ep.py).
+Decided by John. No build, download or training.
+- The design's floor ("minimum per-storm frame count over the 19 train
+  storms") is 25 frames, from AL012024, built at 1h (about 24 h). EP
+  storms are built at 3h, where 25 frames would mean about 72 h.
+- Choice (c), duration equivalence: the Atlantic floor (25 hourly
+  frames, about 24 h) expressed at the 3-hourly EP cadence, i.e. 9
+  frames. It is computed from the manifests, not hard-coded.
+- The 1963-frame target is a consequence of this choice, not the reason
+  for it.
+- Tightenings added with it: the script refuses unless the 19 train
+  storms sum to 2081 frames; the EP counts are pre-build grid frames,
+  and the build re-applies the floor and reports the built total
+  without reselecting.
