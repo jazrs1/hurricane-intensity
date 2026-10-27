@@ -50,7 +50,8 @@ from pathlib import Path
 
 CHECKOUT_ROOT = Path(__file__).resolve().parents[1]
 CHECKOUT_SRC = CHECKOUT_ROOT / "src"
-MAIN_SHA = "fbb39c4"  # I6: main == origin/main == this commit, and site/ is unchanged since it
+MAIN_SHA = "fbb39c4"  # I6: main and origin/main are this commit, or a descendant of it as checked below
+SITE_SHA = "0f54536"  # I6: the reviewed site (PR #47); site/ at HEAD must be its tree exactly
 
 # I1: the protected files (FEATURES.md). Their expected hashes come from COORDINATOR.md, never from this repo.
 PROTECTED_PATHS = [
@@ -363,18 +364,28 @@ def check_git(main_root):
     status = git("status", "--porcelain", "--", "results/final_2025", cwd=main_root).stdout
     if status.strip():
         problems.append(f"results/final_2025 has changes:\n{status}")
-    want = git("rev-parse", f"{MAIN_SHA}^{{commit}}", cwd=main_root).stdout.strip()
+    base = git("rev-parse", f"{MAIN_SHA}^{{commit}}", cwd=main_root).stdout.strip()
+    site = git("rev-parse", f"{SITE_SHA}:site", cwd=main_root).stdout.strip()
+    head = git("rev-parse", "HEAD", cwd=CHECKOUT_ROOT).stdout.strip()
+    head_site = git("rev-parse", "HEAD:site", cwd=CHECKOUT_ROOT, check=False).stdout.strip()
+    if head_site != site:
+        diff = git("diff", "--stat", SITE_SHA, "HEAD", "--", "site", cwd=CHECKOUT_ROOT, check=False).stdout
+        problems.append(f"site/ at HEAD of {CHECKOUT_ROOT} differs from {SITE_SHA}:\n{diff}")
     for ref in ("main", "origin/main"):
-        got = git("rev-parse", ref, cwd=main_root).stdout.strip()
-        if got != want:
-            problems.append(f"{ref} is {got[:7]}, expected {MAIN_SHA}")
-    for root in sorted({main_root, CHECKOUT_ROOT}):
-        diff = git("diff", "--stat", MAIN_SHA, "HEAD", "--", "site", cwd=root).stdout
-        if diff.strip():
-            problems.append(f"site/ differs from {MAIN_SHA} at HEAD of {root}:\n{diff}")
+        got = git("rev-parse", f"{ref}^{{commit}}", cwd=main_root).stdout.strip()
+        if got == base:
+            continue
+        # A later main is allowed only if it descends from MAIN_SHA, is in HEAD's history and has the reviewed site.
+        descends = git("merge-base", "--is-ancestor", base, got, cwd=main_root, check=False).returncode == 0
+        in_head = git("merge-base", "--is-ancestor", got, head, cwd=CHECKOUT_ROOT, check=False).returncode == 0
+        got_site = git("rev-parse", f"{got}:site", cwd=main_root, check=False).stdout.strip()
+        if not (descends and in_head and got_site == site):
+            problems.append(f"{ref} is {got[:7]}: not {MAIN_SHA}, nor a descendant of it in HEAD's history "
+                            f"whose site/ is {SITE_SHA}'s (descends={descends}, in HEAD={in_head}, "
+                            f"site matches={got_site == site})")
     if problems:
         raise AssertionError("\n".join(problems))
-    return f"results/final_2025 clean; main == origin/main == {MAIN_SHA}; site/ unchanged"
+    return f"results/final_2025 clean; main, origin/main at or after {MAIN_SHA}; site/ == {SITE_SHA}'s"
 
 
 def check_gitignore(target):
