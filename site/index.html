@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tropical cyclone intensity from satellite imagery — John Azer</title>
-<meta name="description" content="A convolutional network that estimates a hurricane's maximum sustained wind from a single infrared satellite frame. 9.00 kt mean absolute error on held-out storms.">
+<meta name="description" content="Ten convolutional networks, averaged, estimate a hurricane's maximum sustained wind from a single infrared satellite frame. 9.78 kt mean absolute error on the untouched 2025 Atlantic storms, against 12.13 kt for the original single model.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,380;6..72,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -539,7 +539,7 @@
 
   <header>
     <span class="label">hurricane.johnazer.com</span>
-    <span class="label who">John Azer, September 2026</span>
+    <span class="label who">John Azer, October 2026</span>
   </header>
 
   <nav class="jump" aria-label="Sections">
@@ -549,6 +549,8 @@
     <span aria-hidden="true">&middot;</span>
     <a href="#ian-scrubber">Explore</a>
     <span aria-hidden="true">&middot;</span>
+    <a href="#phase2">Phase 2</a>
+    <span aria-hidden="true">&middot;</span>
     <a href="#gradcam">Attention</a>
     <span aria-hidden="true">&middot;</span>
     <a href="https://github.com/jazrs1/hurricane-intensity">Code</a>
@@ -556,22 +558,22 @@
 
   <span class="label kicker">Tropical cyclone intensity from satellite imagery</span>
 
-  <h1>A convolutional network estimates a hurricane's maximum sustained wind from a single infrared satellite frame.</h1>
+  <h1>Ten convolutional networks, averaged, estimate a hurricane's maximum sustained wind from a single infrared satellite frame.</h1>
 
-  <p class="standfirst">Trained on 2,092 storm-centered crops from 15 Atlantic storms between 2018 and 2024, labeled against the NOAA best track.</p>
+  <p class="standfirst">Trained on 2,081 storm-centered crops from 19 Atlantic storms between 2018 and 2024, after removing frames with missing data, labeled against the NOAA best track, and tested once on the 2025 season.</p>
 
   <div class="metrics">
     <div class="metric">
-      <span class="v">9.00 kt</span>
+      <span class="v">9.78 kt</span>
       <span class="k label">mean absolute error</span>
     </div>
     <div class="metric">
-      <span class="v">393</span>
-      <span class="k label">frames, unseen storms</span>
+      <span class="v">12.13 kt</span>
+      <span class="k label">original model</span>
     </div>
     <div class="metric">
-      <span class="v">&minus;19.5 kt</span>
-      <span class="k label">bias at category 4</span>
+      <span class="v">&minus;15.7 kt</span>
+      <span class="k label">bias at category 5</span>
     </div>
   </div>
 
@@ -607,7 +609,7 @@
       <li>
         <div>
           <h3 class="step-title">Match satellite scans</h3>
-          <p class="step-detail">Match each position to the nearest GOES-16 ABI band 13 scan, accepting a time offset of up to ten minutes and logging it.</p>
+          <p class="step-detail">Match each position to the nearest GOES-16 ABI band 13 scan (GOES-19 for the 2025 test), accepting a time offset of up to ten minutes and logging it.</p>
         </div>
       </li>
       <li>
@@ -628,35 +630,57 @@
           <p class="step-detail">Split the data by storm rather than by frame. Hourly frames of the same storm are near-duplicates, so a random split would leak the answer.</p>
         </div>
       </li>
+      <li>
+        <div>
+          <h3 class="step-title">Train ten, average them</h3>
+          <p class="step-detail">Train the same network ten times with different random seeds, keep each run's checkpoint with the lowest validation error, and average the ten predictions with equal weight. The ten are then frozen by hash.</p>
+        </div>
+      </li>
     </ol>
   </section>
 
   <section id="results">
     <h2>Results</h2>
-    <p class="lead">Three storms were held out entirely: Ian, Nicole and Claudette. The network never saw a frame of any of them during training.</p>
-    <figure>
-      <picture>
-        <source media="(max-width: 620px)" srcset="figures/heldout_scatter_narrow.png" width="633" height="601">
-        <img class="scatter" src="figures/heldout_scatter.png" alt="Scatter plot of predicted against best-track wind speed for 393 held-out frames, clustered around the one-to-one line and falling below it above about 120 knots, with the line labeled perfect agreement." width="1246" height="1213">
-      </picture>
-      <p class="caption">Each point is one frame. The diagonal is perfect agreement. Best-track winds are recorded in five-knot steps, which is why the points stand in columns. Interpolated labels are drawn open; the 77 true best-track fixes are filled.</p>
-    </figure>
+    <p class="lead">The ensemble was frozen, then run once on the six Atlantic storms of 2025: Dexter, Erin, Gabrielle, Humberto, Imelda and Melissa. Nothing in the work had touched them. That is 1,045 frames, all from GOES-19, a newer satellite than any training frame. Mean absolute error is 9.78 knots; the original single model scores 12.13 on the same frames.</p>
 
     <table>
       <thead>
-        <tr><th>Category</th><th>Frames</th><th>MAE (kt)</th><th>Bias (kt)</th></tr>
+        <tr><th>Category</th><th>Frames</th><th>MAE (kt)</th><th>Bias (kt)</th><th>Original MAE</th></tr>
       </thead>
       <tbody>
-        <tr><td>Depression</td><td>83</td><td>5.50</td><td>+2.38</td></tr>
-        <tr><td>Storm</td><td>187</td><td>7.59</td><td>&minus;2.74</td></tr>
-        <tr class="flag"><td>Category 1</td><td>58</td><td>15.76</td><td>&minus;14.58</td></tr>
-        <tr><td>Category 2</td><td>9</td><td>3.96</td><td>+0.24</td></tr>
-        <tr><td>Category 3</td><td>25</td><td>10.50</td><td>+7.68</td></tr>
-        <tr class="flag"><td>Category 4</td><td>15</td><td>19.49</td><td>&minus;19.49</td></tr>
-        <tr class="flag"><td>Category 5</td><td>4</td><td>18.25</td><td>&minus;18.25</td></tr>
+        <tr><td>Depression</td><td>22</td><td>7.59</td><td>+7.59</td><td>8.28</td></tr>
+        <tr><td>Storm</td><td>456</td><td>8.58</td><td>+3.62</td><td>10.84</td></tr>
+        <tr><td>Category 1</td><td>166</td><td>9.42</td><td>&minus;6.29</td><td>10.01</td></tr>
+        <tr><td>Category 2</td><td>129</td><td>8.78</td><td>&minus;6.42</td><td>13.28</td></tr>
+        <tr class="flag"><td>Category 3</td><td>84</td><td>15.29</td><td>&minus;7.90</td><td>17.84</td></tr>
+        <tr><td>Category 4</td><td>137</td><td>9.85</td><td>&minus;6.25</td><td>12.69</td></tr>
+        <tr class="flag"><td>Category 5</td><td>51</td><td>15.81</td><td>&minus;15.75</td><td>18.43</td></tr>
       </tbody>
     </table>
-    <p class="caption">Bias is the mean signed error, so a negative figure means the network guessed low.</p>
+    <p class="caption">The 2025 test, by Saffir&ndash;Simpson category of the best-track wind. Bias is the mean signed error, so a negative figure means the ensemble guessed low. The last column is the original single model on the same frames; the ensemble is better or equal in every category.</p>
+
+    <table>
+      <thead>
+        <tr><th>Storm</th><th>Frames</th><th>MAE (kt)</th><th>Original MAE</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Dexter</td><td>73</td><td>6.13</td><td>8.29</td></tr>
+        <tr><td>Erin</td><td>277</td><td>9.88</td><td>13.66</td></tr>
+        <tr><td>Gabrielle</td><td>185</td><td>8.24</td><td>10.37</td></tr>
+        <tr><td>Humberto</td><td>163</td><td>11.73</td><td>13.43</td></tr>
+        <tr><td>Imelda</td><td>103</td><td>8.91</td><td>10.71</td></tr>
+        <tr><td>Melissa</td><td>244</td><td>10.98</td><td>12.61</td></tr>
+      </tbody>
+    </table>
+    <p class="caption">The same test, storm by storm. The spread between storms, 6.1 to 11.7 knots, is larger than the 1.2-knot change from the development storms, so six storms from one season are a small sample.</p>
+
+    <figure>
+      <picture>
+        <source media="(max-width: 620px)" srcset="figures/heldout_scatter_narrow.png" width="633" height="601">
+        <img class="scatter" src="figures/heldout_scatter.png" alt="Scatter plot of the ensemble's predicted against best-track wind speed for 1,752 frames from nine storms held out during development, clustered around the one-to-one line and falling below it at the highest winds, with the line labeled perfect agreement." width="1246" height="1213">
+      </picture>
+      <p class="caption">The nine storms held out during development (2020&ndash;2024, GOES-16), not the 2025 test: 1,752 frames, each predicted by the ensemble. The diagonal is perfect agreement; the 315 true best-track fixes are filled and interpolated labels are drawn open. Best-track winds come in five-knot steps, which is why the points stand in columns. The ensemble's error here is 8.57 knots, but these storms helped choose the training setup, so that figure is optimistic; the 2025 number above is the one to quote.</p>
+    </figure>
   </section>
 
   <section id="ian-scrubber" hidden>
@@ -710,21 +734,41 @@
       </div>
       <p class="label scrub-status" id="ian-status">Loading frames&hellip;</p>
 
-      <p class="caption" id="ian-caption">Every hour of Hurricane Ian, from a depression east of the Windward Islands on 22 September 2022 to landfall in South Carolina on 30 September. Ian was held out of training, so every reading is an out-of-sample estimate from a single frame. The model tracks the intensification closely, undershoots the peak by fourteen knots, then falls away faster than the storm and stays about seventeen knots low through the weakening. Its line is the busier of the two: the best track is interpolated hourly between six-hourly fixes and can only bend in straight lines, while the model answers every frame on its own.</p>
+      <p class="caption" id="ian-caption">Every hour of Hurricane Ian, from a depression east of the Windward Islands on 22 September 2022 to landfall in South Carolina on 30 September. Ian is one of the nine storms held out during development, so every reading is the ensemble's out-of-sample estimate from a single frame. Before the peak it stays within about seven knots on average. At the 140-knot peak on 28 September it reads 118, and its highest reading anywhere is 126. After the peak it runs about eleven knots low. Its line is the busier of the two: the best track is interpolated hourly between six-hourly fixes and can only bend in straight lines, while the model answers every frame on its own.</p>
     </figure>
   </section>
 
   <section>
     <h2>Where it fails</h2>
-    <h3 class="subhead">Strong storms</h3>
-    <p>The network is accurate on weak systems and underestimates strong ones: roughly 19 knots low at category 4, about 18 at category 5. Those bands hold 15 and 4 frames against 270 below hurricane strength, so the likeliest explanation is that the model rarely saw a major hurricane and hedges toward the middle of the distribution it did see.</p>
-    <h3 class="subhead">Rapid intensity changes</h3>
-    <p>Category 1 is a separate problem. Its error is nearly as large, and most of those frames are Ian on either side of its rapid intensification, where the storm changed faster than a six-hourly best track resolves.</p>
-    <p>Both are testable, and neither is fixed here on purpose. Adding major hurricanes after seeing this failure would make the 9.00 knot figure hard to trust, so it stands as a baseline and the class-imbalance experiment comes next, measured against it.</p>
+    <h3 class="subhead">The strongest storms</h3>
+    <p>The ensemble underestimates category 5 by about 16 knots on 2025 and 19 on the development storms, and averaging ten networks cannot fix that: a shared bias survives the average. Melissa peaked at 165 knots, above anything in training (160), and her eight frames above 160 knots got 133 to 143. That looks like a ceiling, though it can't be separated from the general category 5 shortfall.</p>
+    <h3 class="subhead">Weak systems and the middle</h3>
+    <p>At the other end it reads weak systems high, by about eight knots for depressions and four for tropical storms in 2025. Category 3 is the worst band below category 5, at 15.3 knots.</p>
+    <h3 class="subhead">A new satellite, or new storms?</h3>
+    <p>Error on 2025 is 1.2 knots higher than on the development storms. Every 2025 frame comes from GOES-19 and every training frame from older storms on GOES-16, so the test can't say how much of that is the instrument and how much is the storms.</p>
+  </section>
+
+  <section id="phase2">
+    <h2>What changed in phase 2</h2>
+    <h3 class="subhead">The old headline was a lucky run</h3>
+    <p>The first version of this page quoted 9.00 knots from a single training run. Rerunning the same recipe 33 times with different random seeds gave a mean of 10.05 knots on the same held-out storms, and only one rerun in 33 did as well. Since then every result is an ensemble or a comparison across many seeds.</p>
+    <h3 class="subhead">More distinct storms: the clean win</h3>
+    <p>Training on 19 storms instead of 9 lowered error on the nine held-out development storms by 1.6 knots and cut the high-end underestimate by 5.4 knots, passing all three tests set in advance. The larger set also had more frames, so &ldquo;more storms&rdquo; and &ldquo;more data&rdquo; can't be fully separated.</p>
+    <h3 class="subhead">More storms again: no difference</h3>
+    <p>Going further, from 19 storms to 50 at the same training budget, made no significant difference (0.53 knots worse, not significant), and those runs were flagged as under-trained, so the honest reading is &ldquo;not at this budget&rdquo;.</p>
+    <h3 class="subhead">Longer training helps</h3>
+    <p>Training four times longer lowered error on the development storms by about one knot (0.99) across 20 paired seeds. A new ten-network ensemble trained that way is frozen and waits for its own one-time test on the 2026&ndash;2027 storms.</p>
+    <h3 class="subhead">Open problem: the high end</h3>
+    <p>No change so far has removed the category 5 shortfall, about 19 knots low on the development storms. Storms stronger than anything in training, like Melissa, make it worse.</p>
+    <h3 class="subhead">In progress: the East Pacific</h3>
+    <p>Work is under way on adding East Pacific storms to training. A separate East Pacific test set stays sealed under a protocol fixed in advance.</p>
+    <h3 class="subhead">How the work is checked</h3>
+    <p>Each phase-2 experiment's design, analysis script and pass thresholds are written down and committed before any training run, and the outcome is reported as the script prints it. A separate AI review session, instructed to break each design, recomputes the results before they are accepted.</p>
   </section>
 
   <section id="gradcam">
-    <h2>What the model looks at</h2>
+    <h2>What the original model looks at</h2>
+    <p class="caption">This section shows the original single model (best_model.pt), not the ensemble.</p>
     <p>Grad-CAM shows which regions pushed the model's estimate up. The network's last convolutional layer is the final place where what it detected still has a location attached, so weighting those feature maps by the gradient of the predicted wind speed shows which regions raised the estimate. That layer is a 7 by 7 grid before it is stretched back over the frame. Each cell covers roughly 85 kilometers of the 600 kilometer crop, so what follows shows regions, not fine structure.</p>
     <p>Across 454 frames above 96 knots from four storms the network never trained on, attribution overlaps the coldest cloud tops far more than chance: a mean correlation near +0.57, with almost no frame negative. Below hurricane strength the same measurement is noisy, with no reliable direction. The model attends most clearly at the intensities where it is least accurate.</p>
     <figure>
@@ -747,7 +791,7 @@
         </div>
       </div>
       <img class="gradcam-legend" src="figures/gradcam_legend.png" alt="Color scale: plasma, transparent below a CAM value of 0.5, ramping through rose to bright yellow at 1.0." width="760" height="76">
-      <p class="caption">Four different storms near peak intensity, all held out of training. In each, attribution concentrates on the central deep convection, a filled region over the dense overcast rather than a ring on the eyewall. The overlay is transparent below a threshold, so plain gray means attribution there was below it.</p>
+      <p class="caption">Original model (best_model.pt). Four different storms near peak intensity, all held out of its training. In each, attribution concentrates on the central deep convection, a filled region over the dense overcast rather than a ring on the eyewall. The overlay is transparent below a threshold, so plain gray means attribution there was below it.</p>
     </figure>
 
     <figure class="frame-weak">
