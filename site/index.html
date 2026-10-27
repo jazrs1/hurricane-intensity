@@ -753,17 +753,17 @@
     <h3 class="subhead">The old headline was a lucky run</h3>
     <p>The first version of this page quoted 9.00 knots from a single training run. Rerunning the same recipe 33 times with different random seeds gave a mean of 10.05 knots on the same held-out storms, and only one rerun in 33 did as well. Since then every result is an ensemble or a comparison across many seeds.</p>
     <h3 class="subhead">More distinct storms: the clean win</h3>
-    <p>Training on 19 storms instead of 9 lowered error on the nine development test storms by 1.6 knots and cut the high-end underestimate by 5.4 knots, passing all three tests set in advance. The larger set also had more frames, so &ldquo;more storms&rdquo; and &ldquo;more data&rdquo; can't be fully separated.</p>
+    <p>Training on 19 storms instead of 9 lowered error on the nine held-out development storms by 1.6 knots and cut the high-end underestimate by 5.4 knots, passing all three tests set in advance. The larger set also had more frames, so &ldquo;more storms&rdquo; and &ldquo;more data&rdquo; can't be fully separated.</p>
     <h3 class="subhead">More storms again: no difference</h3>
     <p>Going further, from 19 storms to 50 at the same training budget, made no significant difference (0.53 knots worse, not significant), and those runs were flagged as under-trained, so the honest reading is &ldquo;not at this budget&rdquo;.</p>
     <h3 class="subhead">Longer training helps</h3>
-    <p>Training four times longer lowered error by about one knot (0.99) across 20 paired seeds. A new ten-network ensemble trained that way is frozen and waits for its own one-time test on the 2026&ndash;2027 storms.</p>
+    <p>Training four times longer lowered error on the development storms by about one knot (0.99) across 20 paired seeds. A new ten-network ensemble trained that way is frozen and waits for its own one-time test on the 2026&ndash;2027 storms.</p>
     <h3 class="subhead">Open problem: the high end</h3>
     <p>No change so far has removed the category 5 shortfall, about 19 knots low on the development storms. Storms stronger than anything in training, like Melissa, make it worse.</p>
     <h3 class="subhead">In progress: the East Pacific</h3>
     <p>Work is under way on adding East Pacific storms to training. A separate East Pacific test set stays sealed under a protocol fixed in advance.</p>
     <h3 class="subhead">How the work is checked</h3>
-    <p>Each experiment's design, analysis script and pass thresholds are written down and committed before any training run, and the outcome is reported as the script prints it. A separate adversarial review tries to break each design and independently recomputes the results before they are accepted.</p>
+    <p>Each phase-2 experiment's design, analysis script and pass thresholds are written down and committed before any training run, and the outcome is reported as the script prints it. A separate AI review session, instructed to break each design, recomputes the results before they are accepted.</p>
   </section>
 
   <section id="gradcam">

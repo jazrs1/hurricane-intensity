@@ -63,14 +63,14 @@ Numbers this rewrite didn't touch (Michael's frames, the method steps 01–05 an
 | Page text | Value | Source |
 |---|---|---|
 | 33 reruns, mean 10.05 kt, one in 33 at or below 9.00 | | D:403–405 |
-| 19 storms instead of 9: −1.6 kt overall, high-end bias +5.4 kt, all three tests pass | | `results/storms/findings.md`:23, 29, 30; D:1476 |
+| 19 storms instead of 9: −1.6 kt overall on the nine held-out development storms (H9), high-end bias +5.4 kt, all three tests pass | | `results/storms/findings.md`:23, 29, 30; D:1476 |
 | more storms and more frames confounded | | D:1562–1565 |
 | 19 → 50 storms, same budget: +0.53 kt, not significant, under-trained | | D:2481, D:2483; `reports/v2_survey/n5/design.md`:25 |
-| four times longer: −0.99 kt over 20 paired seeds | | D:2850 |
+| four times longer: −0.99 kt over 20 paired seeds, on H9 | | D:2850 |
 | new ensemble frozen; tested only in 2026–2027 | | D:3511; D:3616 |
 | Cat 5 about 19 kt low on H9 | −18.85 | E:45 |
 | East Pacific work under way; test set sealed under a fixed protocol | | D:3638 (the East Pacific HURDAT2 download plan); D:3343 ("H-EP stays sealed under protocol.md 3901f4cf") |
-| design, script and thresholds committed before training; output reported as printed; separate adversarial review and recompute | | `results/storms/findings.md`:3–6 (script hash at launch); D:2837 ("pre-registered analysis, unedited"); D:2510 ("An independent recompute reproduces every number") |
+| phase-2 design, script and thresholds committed before training; output reported as printed; a separate AI review session (hc-adversary) tries to break each design and recomputes | | `results/storms/findings.md`:3–6 (script hash at launch); D:2837 ("pre-registered analysis, unedited"); D:2510 ("An independent recompute reproduces every number") |
 
 ## Figures
 
