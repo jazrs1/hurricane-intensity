@@ -53,7 +53,7 @@ EP03 = track(1, 3, 15.0, 100.0, 80.0, 60)  # runs past the VZA cap (GOES-18 at 1
 EP04 = track(1, 3, 15.0, 120.0, 120.0, 70)  # concurrent with FAKE_HEP on 08-02 00..18Z
 HEP = ([("20230801", "1800", "XX", "15.0N", "NaNW", "999")]  # NaN lon before the overlap (F-44)
        + track(2, 1, 15.0, 122.0, 122.0, 999, status="XX")
-       + [("20230802", "2130", "XX", "15.0N", "121.0W", "999")])  # off-synoptic; dropped (F-43)
+       + [("20230802", "2130", "XX", "15.0N", "121.0W", "999")])  # off-synoptic end: kept (F-43 option 2)
 FAR = track(1, 2, 15.0, 130.0, 131.0, 999, status="XX", year="2025")
 NEPAC = "\r\n".join(
     block("EP012023", "TESTA", EP01) + block("EP022023", "TESTB", EP02) + block("EP032023", "TESTC", EP03)
@@ -151,16 +151,24 @@ def test_off_synoptic_fixes_are_dropped():
     assert [t.strftime("%H:%M:%S") for t in kept["time"]] == ["00:00:00", "06:00:00", "18:00:00"]
 
 
-def test_reads_drop_off_synoptic_fixes_for_candidates_and_excluded_storms(env):
+def test_candidate_reads_drop_off_synoptic_fixes_and_excluded_reads_keep_them(env):
     fixes = S.read_track("EP012023", env["nepac"], 1)
     assert len(fixes) == 12 and fixes["wind_kt"].max() == 60.0  # the 03:30 fix (140 kt) is gone
     tr = S.excluded_tracks(env["nepac"])
-    assert all(np.isin(pd.DatetimeIndex(t["time"]).hour, [0, 6, 12, 18]).all()
-               and (pd.DatetimeIndex(t["time"]).minute == 0).all() for t in tr)
     assert all(list(t.columns) == ["time", "lat", "lon"] for t in tr)
+    assert sum((pd.DatetimeIndex(t["time"]).minute != 0).sum() for t in tr) == 1  # the 21:30 fix is kept
+    assert sum(len(t) for t in tr) == 5 + 8 + 8  # FAKE_HEP: 4 synoptic + 21:30 (NaN fix dropped); FAR x2
 
 
-def test_no_time_or_excluded_storm_field_in_outputs_or_logs(env, caplog, capsys):
+def test_a_frame_overlapping_only_an_off_synoptic_end_stretch_is_dropped(env):
+    tr = S.excluded_tracks(env["nepac"])
+    cand = frames(["2023-08-02 21:00", "2023-08-02 22:00"], 15.0, -120.0)  # after 18Z; 21Z is before 21:30
+    assert list(S.gate_mask(cand, tr)) == [True, False]
+    synoptic = [S.synoptic_only(t) for t in tr]  # what the shortened track would have missed
+    assert not S.gate_mask(cand, synoptic).any()
+
+
+def test_no_candidate_or_excluded_storm_time_or_field_in_outputs_or_logs(env, caplog, capsys):
     caplog.set_level(logging.DEBUG)
     out, rec = run(env)
     printed = capsys.readouterr()
@@ -224,8 +232,8 @@ def test_box_test_drops_overlap_keeps_651_km_and_other_times():
 def test_concurrent_frames_are_dropped_before_counting(env):
     _, rec = run(env)
     rows = {r["id"]: r for r in rec["candidates"]}
-    assert rows["EP042023"]["frames_dropped_concurrent"] == 7  # 08-02 00..18Z at 3h; NaN fix and 21:30 fix dropped
-    assert rows["EP042023"]["frames_kept"] == rows["EP042023"]["frames_grid"] - 7
+    assert rows["EP042023"]["frames_dropped_concurrent"] == 8  # 08-02 00..21Z at 3h (21:30 fix kept); NaN fix dropped
+    assert rows["EP042023"]["frames_kept"] == rows["EP042023"]["frames_grid"] - 8
     assert rows["EP012023"]["frames_dropped_concurrent"] == 0
 
 

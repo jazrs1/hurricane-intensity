@@ -13,15 +13,17 @@ passes on every kept frame, and an existing output with other bytes is never ove
 Pipeline per EP candidate (each step cites the design row it implements):
   EP headers of the pinned nepac file, years of §5 narrowed by §5a -> skip the sealed IDs (H-EP set and its
   concurrency exclusions, hurdat2.sealed_ids) before any read -> hurdat2.parse_storm with the default statuses
-  -> 00/06/12/18Z fixes only (F-43) -> NaN fixes dropped (F-44) -> pipeline.build_sample_grid at the Atlantic
-  expansion's interval -> frames past the VZA cap dropped -> frames before the satellite's operational start
+  -> 00/06/12/18Z fixes only (F-43; candidates and Atlantic reference) -> NaN fixes dropped (F-44)
+  -> pipeline.build_sample_grid at the Atlantic expansion's interval -> frames past the VZA cap dropped
+  -> frames before the satellite's operational start
   dropped -> frames concurrent with an excluded storm dropped (scripts/concurrency.py) -> floors -> SHA-256
   order and cap -> the gate re-run on every kept frame -> write.
 
 F-43 (binding): no fix or frame time, from either set, is printed, logged, written or put in an error. The
 frame-level drops are therefore not persisted; the EP crop build (§9 step 3) re-derives them with the same
 functions here (clean_fixes, ep_frames, gate_mask). The excluded storms are read as (time, lat, lon) only,
-through hurdat2.read_positions; nothing about them (ID, name, wind, position, count) reaches an output.
+through hurdat2.read_positions, with every fix kept (off-synoptic included, F-43's in-memory option) so the
+gate covers each whole track; nothing about them (ID, name, wind, position, time, count) reaches an output.
 """
 import argparse
 import contextlib
@@ -77,7 +79,7 @@ def drop_nan_fixes(fixes):
 
 
 def clean_fixes(fixes):
-    """F-43 then F-44, sorted by time. Applied to every track this script reads."""
+    """F-43 then F-44, sorted by time. Candidate and Atlantic tracks; excluded tracks keep every fix."""
     return drop_nan_fixes(synoptic_only(fixes.sort_values("time").reset_index(drop=True)))
 
 
@@ -138,18 +140,20 @@ def read_track(storm_id, path, line_no):
 
 def excluded_tracks(nepac):
     """§5 concurrency gate: every sealed storm (H-EP set + concurrency exclusions, hurdat2.sealed_ids) as
-    (time, lat, lon) only, via hurdat2.read_positions, then clean_fixes. Every fix, no status trim (Disclosure,
-    binding note 2), synoptic only (F-43). Fails closed if one is missing or has no usable fix. Errors name
-    neither the storm nor a time: only its index and the reader's line number."""
+    (time, lat, lon) only, via hurdat2.read_positions. Every fix, no status trim (Disclosure, binding note 2),
+    and off-synoptic fixes kept (F-43, its second option): the gate covers the whole track, and these times
+    stay in memory only, never saved, printed or logged. NaN fixes are dropped (F-44). Fails closed if one is
+    missing or has no usable fix. Errors name neither the storm nor a time: only its index and the reader's
+    line number."""
     tracks = []
     for k, sid in enumerate(sorted(hurdat2.sealed_ids()), 1):
         try:
             pos = hurdat2.read_positions(sid, nepac)
         except (ValueError, FileNotFoundError) as e:
             raise ValueError(f"excluded storm {k}: {str(e).replace(sid, '<excluded>')}") from None
-        pos = clean_fixes(pos[["time", "lat", "lon"]])
+        pos = drop_nan_fixes(pos[["time", "lat", "lon"]].sort_values("time").reset_index(drop=True))
         if not len(pos):
-            raise ValueError(f"excluded storm {k}: no usable synoptic fix; the gate cannot run")
+            raise ValueError(f"excluded storm {k}: no usable fix; the gate cannot run")
         tracks.append(pos)
     return tracks
 
