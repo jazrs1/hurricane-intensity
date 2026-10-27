@@ -118,9 +118,20 @@ The original commands were `gradcam.py <id> <timestamp>` for these frames. For t
    - Report the mean pearson against +0.5749, and the IoU vs chance as the original did.
 5. **GPU:** one GPU job at a time, throughout.
 
-## Open for hc-adversary
+## hc-adversary (item 48: CONCERN, resolved here)
 
-- **Reproduction tolerance.** For the arrays, the expected result is bit-identical. `logs/decisions.md` L247
-  records that the Michael arrays recomputed exactly. If they are not bit-identical, the proposal is that a max abs
-  difference of 1e-5 or less on the [0, 1] arrays, and an unchanged four-decimal mean, still count as reproduced.
-  Any difference is reported either way.
+- **C1, survey list.**
+  - The survey uses one explicit four-storm list in the script: AL092022, AL022024, AL132023 and AL182021.
+  - It does not use today's `--survey` default (`storms_holdout.txt`, 4 storms, now including Sam). Per
+    hc-adversary, rerunning the original two survey commands today counts Sam twice (642 frames).
+  - The script asserts n == 454, and that the (storm, time) set equals the original CSVs' valid rows. Both are
+    asserted for the control and for the ensemble.
+  - The stale `storms_gradcam.txt` header is corrected: the expanded ensemble trained on none of its storms.
+- **L1(i), control tolerance.**
+  - Each of the four peak frames' `.npy`: max abs difference 1e-3 or less.
+  - The 454-frame mean r: within 5e-4 of the original exact mean, +0.574891 (computed from the committed CSVs).
+  - On failure: stop and report; no ensemble run. Differences are reported either way.
+- **L1(ii), headline:** the mean r over the 454 frames. The median is secondary.
+- **L1(iii), threshold:** the IoU and the overlay are computed after the renormalization.
+- **L1(iv), prediction shown:** the members' mean prediction x 185.
+- **L2, weak panel:** the existing Ian 30 kt panel stays in the original section, labelled `best_model.pt`.
