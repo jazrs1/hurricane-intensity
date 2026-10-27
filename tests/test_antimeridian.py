@@ -1,9 +1,9 @@
-"""B-v2-1: tracks that cross the antimeridian (+-180 deg). Failing tests first; John writes the fix.
+"""B-v2-1: tracks that cross the antimeridian (+-180 deg).
 
-The tests marked xfail(strict=True, raises=AssertionError) fail today because longitude is interpolated or
-differenced linearly, so a track from 179.0E to 179.0W passes through 0 deg instead of 180 deg. A fix flips
-them to XPASS, which strict turns into an error until the mark is removed. The unmarked tests pass today and
-pin what must not change: HURDAT2 E/W parsing, an East Pacific track that never reaches 180 deg, and the crop
+The wrap-site tests failed (strict xfail) before the fix, when longitude was interpolated or differenced
+linearly, so a track from 179.0E to 179.0W passed through 0 deg instead of 180 deg. With the fix
+(pipeline.lon_diff in build_sample_grid, concurrency.position_at and boxes_overlap) they pass unmarked. The
+other tests pin what must not change: HURDAT2 E/W parsing, an East Pacific track that never reaches 180 deg, and the crop
 geometry, which is already wrap-safe given a correct centre (PROJ normalises longitude).
 
 Expected positions are computed here, independently of the code under test, by unwrapped-linear arithmetic:
@@ -32,7 +32,6 @@ C = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(C)
 
 TOL_DEG = 1e-6
-XFAIL = dict(strict=True, raises=AssertionError)
 
 
 def wrapped_diff(a, b):
@@ -214,7 +213,7 @@ def test_greenwich_boxes_overlap():
 @pytest.mark.parametrize("track", ["westward", "eastward"])
 def test_crossing_grid_lat_wind_rows_unchanged(track):
     """On a crossing track only lon is wrong today: lat and wind are linear, and the rows and is_interpolated
-    are right. Pinned here so a fix can't disturb them; lon stays in the xfail tests."""
+    are right. Pinned here so a fix can't disturb them; lon is checked in the wrap-site tests below."""
     fx = WESTWARD if track == "westward" else EASTWARD
     grid = pipeline.build_sample_grid(fx, "1h")
     assert len(grid) == 19
@@ -226,9 +225,8 @@ def test_crossing_grid_lat_wind_rows_unchanged(track):
                                    err_msg=col)
 
 
-# --- xfail today: the wrap sites --------------------------------------------------------------------------
+# --- the wrap sites (strict xfail before the B-v2-1 fix) ------------------------------------------------
 
-@pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: build_sample_grid interpolates lon linearly (westward)")
 def test_grid_crossing_westward():
     grid = pipeline.build_sample_grid(WESTWARD, "1h")
     want = expected_lon(WESTWARD["time"], WESTWARD["lon"].tolist(), grid["time"])
@@ -236,7 +234,6 @@ def test_grid_crossing_westward():
     assert err < TOL_DEG, msg
 
 
-@pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: build_sample_grid interpolates lon linearly (eastward)")
 def test_grid_crossing_eastward():
     grid = pipeline.build_sample_grid(EASTWARD, "1h")
     want = expected_lon(EASTWARD["time"], EASTWARD["lon"].tolist(), grid["time"])
@@ -255,7 +252,6 @@ SEAM_CASES = {
 }
 
 
-@pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: interpolation between fixes on either side of a fix at 180")
 @pytest.mark.parametrize("case", list(SEAM_CASES))
 def test_grid_fix_exactly_at_180(case):
     lons = SEAM_CASES[case]
@@ -267,16 +263,12 @@ def test_grid_fix_exactly_at_180(case):
     assert err < TOL_DEG, msg
 
 
-RANGE_XFAIL = pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: a fix at 180.0E is saved as +180.0, outside [-180, 180)")
-
-
 @pytest.mark.parametrize("track", [
     "westward", "eastward", "westward-180W", "eastward-180W",
-    pytest.param("westward-180E", marks=RANGE_XFAIL), pytest.param("eastward-180E", marks=RANGE_XFAIL)])
+    "westward-180E", "eastward-180E"])
 def test_grid_lon_in_range(track):
-    """John's convention: every saved longitude lies in [-180, 180). Today linear interpolation between
-    in-range fixes stays in range, so this passes except where a fix is +180.0 itself; a fix that unwraps
-    without re-wrapping (values like -180.7) fails it."""
+    """John's convention: every saved longitude lies in [-180, 180), including a fix at +180.0 itself; a fix
+    that unwraps without re-wrapping (values like -180.7) fails it."""
     if track in ("westward", "eastward"):
         fx = WESTWARD if track == "westward" else EASTWARD
         grid = pipeline.build_sample_grid(fx, "1h")
@@ -288,7 +280,6 @@ def test_grid_lon_in_range(track):
     assert bad.size == 0, f"{bad.size} lon(s) outside [-180, 180): {bad[:5].tolist()}"
 
 
-@pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: crop centre of an interpolated frame between 179E and 179W")
 @pytest.mark.parametrize("track", ["westward", "eastward"])
 def test_crop_centred_on_interpolated_crossing_frame(track):
     """End to end from fixes to crop: the pipeline passes the grid's lon to crop.process_one_scan, which crops
@@ -306,7 +297,6 @@ def test_crop_centred_on_interpolated_crossing_frame(track):
     assert not bad, "; ".join(bad)
 
 
-@pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: concurrency.position_at interpolates lon linearly")
 @pytest.mark.parametrize("track", ["westward", "eastward"])
 def test_concurrency_position_at_crossing(track):
     # Both directions: a fix that wraps only one way passes one of these and fails the other.
@@ -317,7 +307,6 @@ def test_concurrency_position_at_crossing(track):
     assert err < TOL_DEG, msg
 
 
-@pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: concurrency.position_at either side of a fix at 180")
 @pytest.mark.parametrize("case", list(SEAM_CASES))
 def test_concurrency_position_at_fix_exactly_at_180(case):
     lons = SEAM_CASES[case]
@@ -328,7 +317,6 @@ def test_concurrency_position_at_fix_exactly_at_180(case):
     assert err < TOL_DEG, msg
 
 
-@pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: concurrency.boxes_overlap differences lon without wrapping")
 @pytest.mark.parametrize("lon1, lon2", [(179.9, -179.9), (-179.9, 179.9)])
 def test_concurrency_boxes_overlap_across_180(lon1, lon2):
     # Two centres 0.2 deg of longitude apart (about 21 km at 18N) on either side of 180 deg, so the boxes overlap.
@@ -338,7 +326,6 @@ def test_concurrency_boxes_overlap_across_180(lon1, lon2):
     assert bool(C.boxes_overlap(18.0, lon1, 18.0, lon2)), f"{lon1} and {lon2} read as ~360 deg apart"
 
 
-@pytest.mark.xfail(**XFAIL, reason="B-v2-1 antimeridian: boxes_overlap, centres on opposite sides of 180, not near it")
 @pytest.mark.parametrize("lon1, lon2", [(178.5, -178.5), (-178.5, 178.5)])
 def test_concurrency_boxes_overlap_straddling_pair(lon1, lon2):
     # 3 deg of longitude apart at 18N: 3 * 111.32 * cos 18N = 317.6 km < 650 km, so the boxes overlap.
@@ -352,3 +339,20 @@ def test_concurrency_boxes_far_pair_across_180(lon1, lon2):
     # 10 deg apart at 18N: 1059 km > 650 km, so the boxes must not overlap. Passes today; a fix must keep it.
     assert 1000.0 < 10.0 * C.KM_PER_DEG * np.cos(np.radians(18.0))
     assert not bool(C.boxes_overlap(18.0, lon1, 18.0, lon2))
+
+
+# --- lon_diff at the edge of its range -----------------------------------------------------------------------
+
+@pytest.mark.parametrize("a, b", [(0.0, np.nextafter(180.0, np.inf)), (np.nextafter(-180.0, -np.inf), 0.0)],
+                         ids=["difference-just-below-minus-180", "value-just-below-minus-180"])
+def test_lon_diff_never_returns_plus_180(a, b):
+    """(d + 180) % 360 rounds to 360.0 for d just below -180, which would give +180.0; the guard maps it to -180."""
+    assert float(a) - float(b) < -180.0
+    assert float(pipeline.lon_diff(a, b)) == -180.0
+
+
+def test_lon_diff_stays_in_range_next_to_every_seam():
+    edges = np.array([-540.0, -360.0, -180.0, 0.0, 180.0, 360.0, 540.0])
+    d = np.concatenate([np.nextafter(edges, -np.inf), edges, np.nextafter(edges, np.inf)])
+    out = pipeline.lon_diff(d, 0.0)
+    assert ((out >= -180.0) & (out < 180.0)).all(), out[(out < -180.0) | (out >= 180.0)]

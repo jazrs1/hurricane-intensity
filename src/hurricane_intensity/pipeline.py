@@ -20,6 +20,29 @@ from . import config, crop, goes_index, hurdat2
 logger = logging.getLogger(__name__)
 
 
+def lon_diff(a, b) -> np.ndarray:
+    """a - b in degrees of longitude, the short way round, in [-180, 180) (B-v2-1).
+
+    Where a - b is already in range it is returned exactly, so tracks that never
+    cross 180 deg (every Atlantic storm) get bit-identical results. lon_diff(x, 0)
+    re-wraps a longitude into [-180, 180) (180.0E becomes -180.0).
+    """
+    d = np.asarray(a, dtype=float) - np.asarray(b, dtype=float)
+    w = np.where((d >= -180.0) & (d < 180.0), d, (d + 180.0) % 360.0 - 180.0)
+    # Just below -180 (e.g. nextafter(-180, -inf)), (d + 180) % 360 rounds to 360.0, giving +180.0.
+    return np.where(w >= 180.0, -180.0, w)
+
+
+def unwrap_lon(lon_fix) -> np.ndarray:
+    """Fix longitudes made continuous along the track: each fix is offset by the multiple of 360 deg that undoes
+    every 180 deg crossing before it (lon_diff decides each step). Fixes with no offset are returned as they are
+    (not + 0.0, which would turn a -0.0 fix into +0.0), so an uncrossed track is bit-identical."""
+    lon_fix = np.asarray(lon_fix, dtype=float)
+    step = 360.0 * np.round((lon_diff(lon_fix[1:], lon_fix[:-1]) - (lon_fix[1:] - lon_fix[:-1])) / 360.0)
+    offset = np.concatenate([[0.0], np.cumsum(step)])
+    return np.where(offset != 0.0, lon_fix + offset, lon_fix)
+
+
 def build_sample_grid(fixes: pd.DataFrame, interval: str) -> pd.DataFrame:
     """Build the set of sample times for a storm: a regular grid at
     `interval` plus every exact HURDAT2 fix time, unioned together, with
@@ -28,9 +51,10 @@ def build_sample_grid(fixes: pd.DataFrame, interval: str) -> pd.DataFrame:
     Columns: time, lat, lon, wind_kt, is_interpolated, status
     (status is the HURDAT2 code for exact fixes, NaN for interpolated ones).
 
-    Note: longitude is interpolated linearly, which would break across the
-    antimeridian (+-180). Not a concern for Atlantic-basin storms, but
-    worth knowing if this is ever pointed at a Pacific storm that crosses it.
+    Longitude is interpolated the short way round, linearly in time, and
+    re-wrapped to [-180, 180) (John, 2026-10-20): each fix is offset by the
+    multiple of 360 deg that unwraps the track, so a storm crossing 180 deg is
+    interpolated across the seam, not the long way round the globe.
     """
     fixes = fixes.sort_values("time").reset_index(drop=True)
     first, last = fixes["time"].iloc[0], fixes["time"].iloc[-1]
@@ -43,7 +67,7 @@ def build_sample_grid(fixes: pd.DataFrame, interval: str) -> pd.DataFrame:
     t_all = (all_times - first).total_seconds().to_numpy()
 
     lat = np.interp(t_all, t_fix, fixes["lat"].to_numpy())
-    lon = np.interp(t_all, t_fix, fixes["lon"].to_numpy())
+    lon = lon_diff(np.interp(t_all, t_fix, unwrap_lon(fixes["lon"].to_numpy(dtype=float))), 0.0)
     wind_kt = np.interp(t_all, t_fix, fixes["wind_kt"].to_numpy())
 
     exact_set = set(exact_times)
@@ -196,7 +220,7 @@ def run_pipeline(
             dqf=result.dqf,
             wind_kt=np.float32(row.wind_kt),
             lat=np.float32(row.lat),
-            lon=np.float32(row.lon),
+            lon=np.float32(lon_diff(np.float32(row.lon), 0.0)),  # re-wrapped after the cast: 179.99999999 -> -180
             sample_time_unix=np.int64(sample_time.timestamp()),
             scan_time_unix=np.int64(match.scan_time.timestamp()),
             offset_min=np.float32(match.offset_min),
