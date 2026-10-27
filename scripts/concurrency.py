@@ -11,6 +11,8 @@ pipeline builds its sample grid. Nothing here downloads or writes anything.
 import numpy as np
 import pandas as pd
 
+from hurricane_intensity.pipeline import lon_diff
+
 KM_PER_DEG = 111.32
 BOX_KM = 650.0  # 600 km crop box + 50 km margin (N4, A4)
 
@@ -19,7 +21,7 @@ def boxes_overlap(lat1, lon1, lat2, lon2, box_km=BOX_KM):
     """Flat-earth box test at the mean latitude: |dx| < box_km and |dy| < box_km (element-wise)."""
     lat1, lon1, lat2, lon2 = (np.asarray(v, float) for v in (lat1, lon1, lat2, lon2))
     dy = (lat2 - lat1) * KM_PER_DEG
-    dx = (lon2 - lon1) * KM_PER_DEG * np.cos(np.radians((lat1 + lat2) / 2))
+    dx = lon_diff(lon2, lon1) * KM_PER_DEG * np.cos(np.radians((lat1 + lat2) / 2))  # short way round (B-v2-1)
     return (np.abs(dx) < box_km) & (np.abs(dy) < box_km)
 
 
@@ -31,7 +33,10 @@ def position_at(fixes, times):
     t = (pd.DatetimeIndex(times) - pd.Timestamp(0, tz="UTC")).total_seconds().to_numpy()
     inside = (t >= t_fix[0]) & (t <= t_fix[-1])
     lat = np.where(inside, np.interp(t, t_fix, fixes["lat"].to_numpy()), np.nan)
-    lon = np.where(inside, np.interp(t, t_fix, fixes["lon"].to_numpy()), np.nan)
+    lon_fix = fixes["lon"].to_numpy(dtype=float)  # unwrapped and re-wrapped as build_sample_grid does (B-v2-1)
+    step = 360.0 * np.round((lon_diff(lon_fix[1:], lon_fix[:-1]) - (lon_fix[1:] - lon_fix[:-1])) / 360.0)
+    lon_u = lon_fix + np.concatenate([[0.0], np.cumsum(step)])
+    lon = np.where(inside, lon_diff(np.interp(t, t_fix, lon_u), 0.0), np.nan)
     return lat, lon
 
 
