@@ -7,6 +7,7 @@ returned window says exactly which frames it holds:
     AL031999  hours 0..19 then 25..59 (a 6 h gap 19->25)  starts 0..19 all cross the gap (20 skipped);
                                                            starts 25..35          -> 11 windows
 """
+import json
 import math
 
 import numpy as np
@@ -14,7 +15,8 @@ import pandas as pd
 import pytest
 import torch
 
-from hurricane_intensity.storm_windows import StormWindowDataset, delta_24h, make_loaders, rotate_window
+from hurricane_intensity.storm_windows import (
+    StormWindowDataset, delta_24h, make_loaders, make_loaders_from_split, rotate_window)
 
 H = W = 16
 T0 = pd.Timestamp("1999-08-01T00:00:00Z")
@@ -27,7 +29,15 @@ IDS = list(STORMS)
 EXPECTED = {"AL011999": (16, 0), "AL021999": (6, 0), "AL031999": (11, 20)}
 
 
-def write_storm(d, storm_id, hours, frames, minute_offsets=None):
+OCEAN = (25.0, -60.0)  # open Atlantic
+LAND = (30.0, -97.7)   # Austin, Texas
+
+
+def write_storm(d, storm_id, hours, frames=None, minute_offsets=None, land_hours=(), status=None,
+                not_fix_hours=()):
+    """Synthetic storm files; every frame at OCEAN with status HU unless land_hours / status say otherwise."""
+    if frames is None:
+        frames = np.full((len(hours), H, W), 250.0)
     times = [T0 + pd.Timedelta(hours=h) for h in hours]
     if minute_offsets:
         times = [t + pd.Timedelta(minutes=minute_offsets.get(i, 0)) for i, t in enumerate(times)]
@@ -36,7 +46,10 @@ def write_storm(d, storm_id, hours, frames, minute_offsets=None):
     pd.DataFrame({
         "time": [t.strftime("%Y-%m-%dT%H:%M:%SZ") for t in times],
         "intensity_kt": [1000.0 * s + h for h in hours],
-        "is_fix": [int(h % 6 == 0) for h in hours],
+        "is_fix": [int(h % 6 == 0 and h not in not_fix_hours) for h in hours],
+        "lat": [(LAND if h in land_hours else OCEAN)[0] for h in hours],
+        "lon": [(LAND if h in land_hours else OCEAN)[1] for h in hours],
+        "status": [(status or {}).get(h, "HU") for h in hours],
     }).to_csv(d / f"{storm_id}.csv", index=False)
 
 
@@ -71,7 +84,7 @@ def test_stride_and_step(data_dir):
 def test_tolerance(tmp_path):
     frames = np.full((12, H, W), 250.0)
     write_storm(tmp_path, "AL091999", list(range(12)), frames, minute_offsets={3: 6})
-    ds = StormWindowDataset(tmp_path, ["AL091999"], T=3, step_hours=3)
+    ds = StormWindowDataset(tmp_path, ["AL091999"], T=3, step_hours=3, exclude_land=False)
     # starts 0..5 end by hour 11; the hour-3 frame is 6 min late, so starts 0 and 3 are skipped
     assert sorted(w[1] for w in ds.windows) == [1, 2, 4, 5] and ds.n_skipped == 2
 
@@ -119,9 +132,10 @@ def test_same_rotation_across_window(tmp_path):
     base = 200.0 + 3.0 * xx + 1.0 * yy + rng.uniform(0, 5, size=(H, W))
     frames = np.stack([base + 2.0 * k for k in range(12)])
     write_storm(tmp_path, "AL091999", list(range(12)), frames)
-    plain = StormWindowDataset(tmp_path, ["AL091999"], T=4, step_hours=3)[0]["frames"]
+    plain = StormWindowDataset(tmp_path, ["AL091999"], T=4, step_hours=3, exclude_land=False)[0]["frames"]
     gen = torch.Generator().manual_seed(0)
-    aug = StormWindowDataset(tmp_path, ["AL091999"], T=4, step_hours=3, augment=True, generator=gen)
+    aug = StormWindowDataset(tmp_path, ["AL091999"], T=4, step_hours=3, augment=True,
+                             generator=gen, exclude_land=False)
     for i in range(5):
         f = aug[0]["frames"]
         assert f.shape == (4, 1, H, W)
@@ -153,3 +167,66 @@ def test_rejects_spent_and_malformed_ids(data_dir):
         StormWindowDataset(data_dir, ["AL042025"])
     with pytest.raises(ValueError, match="malformed"):
         StormWindowDataset(data_dir, ["BOGUS99"])
+
+
+def starts(ds):
+    return [w[1] for w in ds.windows]
+
+
+def test_land_filter(tmp_path):
+    # hours 0..29, T=9 at 3 h: starts 0..5. Land at hour 5 (a start), 26 (24 h after start 2) and 13
+    # (mid-window only, which the filter ignores).
+    write_storm(tmp_path, "AL091999", list(range(30)), land_hours={5, 13, 26})
+    ds = StormWindowDataset(tmp_path, ["AL091999"])
+    assert starts(ds) == [0, 1, 3, 4] and ds.n_valid == 6 and ds.n_land == 2
+    assert len(StormWindowDataset(tmp_path, ["AL091999"], exclude_land=False)) == 6
+
+
+def test_status_filter(tmp_path):
+    # start statuses: TD at 0 and 1, LO at 4, SS at 5 (not TS/HU) -> starts 2 and 3 kept; TS kept like HU
+    write_storm(tmp_path, "AL091999", list(range(30)), status={0: "TD", 1: "TD", 2: "TS", 4: "LO", 5: "SS"})
+    ds = StormWindowDataset(tmp_path, ["AL091999"])
+    assert starts(ds) == [2, 3] and ds.n_status == 4
+    assert len(StormWindowDataset(tmp_path, ["AL091999"], tropical_only=False)) == 6
+
+
+def test_filters_count_independently(tmp_path):
+    write_storm(tmp_path, "AL091999", list(range(30)), land_hours={0}, status={0: "TD"})
+    ds = StormWindowDataset(tmp_path, ["AL091999"])
+    assert (ds.n_land, ds.n_status, len(ds)) == (1, 1, 5)
+
+
+def test_eval_only(tmp_path):
+    # hours 0..47, starts 0..23. Fixes at 00/06/12/18 except hour 24, and an off-synoptic is_fix row
+    # cannot appear (the converter only flags synoptic fixes). Eligible starts: 6, 12, 18 (0 -> 24 is no fix).
+    write_storm(tmp_path, "AL091999", list(range(48)), not_fix_hours={24})
+    ds = StormWindowDataset(tmp_path, ["AL091999"])
+    assert len(ds) == 24 and ds.n_eval == 3
+    assert [s for s, e in zip(starts(ds), ds.eval_eligible) if e] == [6, 12, 18]
+    assert ds[6]["eval_eligible"] and not ds[0]["eval_eligible"]
+    only = StormWindowDataset(tmp_path, ["AL091999"], eval_only=True)
+    assert starts(only) == [6, 12, 18] and all(only.eval_eligible) and only.n_eval == 3
+
+
+def test_filters_need_the_24h_frame(tmp_path):
+    write_storm(tmp_path, "AL091999", list(range(30)))
+    with pytest.raises(ValueError, match="24 h"):
+        StormWindowDataset(tmp_path, ["AL091999"], T=5)
+    assert len(StormWindowDataset(tmp_path, ["AL091999"], T=5, exclude_land=False)) == 18
+
+
+def test_old_csv_without_filter_columns(tmp_path):
+    write_storm(tmp_path, "AL091999", list(range(30)))
+    p = tmp_path / "AL091999.csv"
+    pd.read_csv(p).drop(columns=["lat", "lon", "status"]).to_csv(p, index=False)
+    with pytest.raises(ValueError, match="rebuild"):
+        StormWindowDataset(tmp_path, ["AL091999"])
+    assert len(StormWindowDataset(tmp_path, ["AL091999"], exclude_land=False, tropical_only=False)) == 6
+
+
+def test_make_loaders_from_split(data_dir, tmp_path):
+    split = tmp_path / "split.json"
+    split.write_text(json.dumps({"train": ["AL011999"], "val": ["AL021999"], "test": ["AL031999"], "note": "x"}))
+    train, val, test = make_loaders_from_split(split, data_dir, batch_size=4, num_workers=0)
+    assert [len(dl.dataset) for dl in (train, val, test)] == [16, 6, 11]
+    assert train.dataset.augment and not test.dataset.augment

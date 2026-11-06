@@ -1,4 +1,5 @@
 boto3==1.43.73
+global-land-mask==1.0.0
 metpy==1.7.1
 netCDF4==1.7.4
 numpy==2.5.2

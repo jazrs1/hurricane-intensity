@@ -9,7 +9,10 @@ writes, per storm, to --out_dir (default data/storm_windows/, gitignored like th
 
     <ID>.npy  float32 [N, 224, 224], brightness temperature in kelvin (not clipped or scaled), sorted by time
     <ID>.csv  time (ISO UTC, the manifest's sample_time), intensity_kt (manifest wind_kt: HURDAT2 linearly
-              interpolated to that time), is_fix (1 only for a non-interpolated row at 00/06/12/18 UTC)
+              interpolated to that time), is_fix (1 only for a non-interpolated row at 00/06/12/18 UTC),
+              lat, lon (interpolated best-track center; lon wrapped to [-180, 180)), status (HURDAT2 status of
+              the most recent best-track record at or before the frame: the manifest leaves status empty on
+              interpolated rows, so it is carried forward from the last fix, before any frame is dropped)
 
 Conventions kept from TCDataset (src/hurricane_intensity/dataset.py):
   * rows with no crop, and crops listed in excluded_crops.txt (frames with NaN pixels), are dropped, which
@@ -46,8 +49,12 @@ def convert_storm(storm_id, processed_root, out_dir, excluded):
     df = pd.read_csv(Path(processed_root) / storm_id / "manifest.csv")
     if (df["atcf_id"].astype(str) != storm_id).any():
         raise ValueError(f"{storm_id}: manifest rows belong to another storm")
-    df = df[df["crop_path"].notna() & ~df["crop_path"].isin(excluded)]
     df = df.assign(time=pd.to_datetime(df["sample_time"], utc=True)).sort_values("time")
+    status = df["status"].where(df["status"].notna() & (df["status"].astype(str).str.strip() != ""))
+    if pd.isna(status.iloc[0]):
+        raise ValueError(f"{storm_id}: first manifest row has no status (expected a best-track fix)")
+    df = df.assign(status=status.ffill())
+    df = df[df["crop_path"].notna() & ~df["crop_path"].isin(excluded)]
     if df["time"].duplicated().any():
         raise ValueError(f"{storm_id}: duplicate sample_time rows")
 
@@ -69,6 +76,9 @@ def convert_storm(storm_id, processed_root, out_dir, excluded):
         "time": t.dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "intensity_kt": df["wind_kt"].astype(float),
         "is_fix": is_fix.astype(int),
+        "lat": df["lat"].astype(float).round(4),
+        "lon": ((df["lon"].astype(float) + 180.0) % 360.0 - 180.0).round(4),
+        "status": df["status"].astype(str),
     })
     out_dir.mkdir(parents=True, exist_ok=True)
     np.save(out_dir / f"{storm_id}.npy", frames)

@@ -11,6 +11,7 @@ excluded_crops.txt) is skipped and counted in `n_skipped`.
 """
 from __future__ import annotations
 
+import json
 import math
 from pathlib import Path
 
@@ -20,9 +21,12 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
+from global_land_mask import globe
+
 from hurricane_intensity.dataset import SPENT_2025, STORM_ID
 
 TOLERANCE_S = 5 * 60
+TROPICAL = ("TS", "HU")
 
 
 def rotate_window(frames, angle):
@@ -55,13 +59,25 @@ def delta_24h(intensities, step_hours):
 
 class StormWindowDataset(Dataset):
     def __init__(self, data_dir, storm_ids, T=9, step_hours=3, stride=1, augment=False,
-                 tb_min=180.0, tb_max=320.0, generator=None):
+                 tb_min=180.0, tb_max=320.0, generator=None, exclude_land=True, tropical_only=True,
+                 eval_only=False):
         """Index every valid (storm_id, start) window. stride steps over start rows of each storm's file.
 
         n_skipped counts start rows whose window would end inside the storm's time range (start time +
         (T-1)*step_hours <= its last frame, within tolerance) but is missing at least one frame; start rows
         too close to the end of the storm are not windows at all and are not counted. generator (optional)
         seeds the rotation angle, for reproducible tests.
+
+        Filters, applied to the gap-free windows (n_valid of them):
+          exclude_land   drop a window whose best-track center (csv lat/lon) is over land, by global-land-mask,
+                         at the start frame or at the frame 24 h later.
+          tropical_only  drop a window whose start-frame status (csv status) is not TS or HU.
+          eval_only      keep only eval-eligible windows: the start frame and the frame 24 h later are both
+                         real 00/06/12/18 UTC best-track fixes (is_fix).
+        n_land and n_status count the valid windows each filter rejects (independently, so a window over
+        land with a TD status is in both); n_eval counts eval-eligible windows among those kept. Every kept
+        window's flag is in self.eval_eligible (and item["eval_eligible"]). The land and eval rules need
+        24 h to be a whole number of steps inside the window; otherwise construction raises ValueError.
         """
         ids = list(storm_ids)
         for storm_id in ids:
@@ -78,13 +94,21 @@ class StormWindowDataset(Dataset):
         self.T, self.step_hours, self.stride, self.augment = T, step_hours, stride, augment
         self.tb_min, self.tb_max = float(tb_min), float(tb_max)
         self.generator = generator
+        self.exclude_land, self.tropical_only, self.eval_only = exclude_land, tropical_only, eval_only
         self._arrays = {}
+        k24 = 24 / step_hours
+        self.k24 = int(k24) if k24 == int(k24) and k24 < T else None
+        if self.k24 is None and (exclude_land or eval_only):
+            raise ValueError(f"exclude_land/eval_only need the frame 24 h after the start: T={T} frames at "
+                             f"{step_hours} h steps do not contain it")
 
         step_s = step_hours * 3600
         self.meta = {}
         self.windows = []  # (storm_id, start row, frame rows [T])
+        self.eval_eligible = []
         self.n_skipped = 0
         self.skipped_per_storm = {}
+        self.n_valid = self.n_land = self.n_status = self.n_eval = 0
         for storm_id in ids:
             df = pd.read_csv(self.data_dir / f"{storm_id}.csv")
             times = pd.to_datetime(df["time"], utc=True)
@@ -99,6 +123,20 @@ class StormWindowDataset(Dataset):
                 "intensity": df["intensity_kt"].to_numpy(np.float32),
                 "is_fix": df["is_fix"].to_numpy().astype(bool),
             }
+            if exclude_land or tropical_only:
+                missing = [c for c in ("lat", "lon", "status") if c not in df]
+                if missing:
+                    raise ValueError(f"{storm_id}.csv has no {missing} columns: rebuild it with "
+                                     "scripts/build_storm_windows.py, or pass exclude_land=False, tropical_only=False")
+            if exclude_land:
+                lon = df["lon"].to_numpy(float)
+                if np.any((lon < -180) | (lon > 180)):
+                    raise ValueError(f"{storm_id}.csv: lon outside [-180, 180]")
+                on_land = np.asarray(globe.is_land(df["lat"].to_numpy(float), lon), dtype=bool)
+            if tropical_only:
+                tropical = df["status"].astype(str).str.strip().isin(TROPICAL).to_numpy()
+            synoptic = (times.dt.hour % 6 == 0) & (times.dt.minute == 0) & (times.dt.second == 0)
+            fix_start = self.meta[storm_id]["is_fix"] & synoptic.to_numpy()
             skipped = 0
             offsets = np.arange(T) * step_s
             for start in range(0, len(secs), stride):
@@ -109,10 +147,23 @@ class StormWindowDataset(Dataset):
                 hi = np.minimum(np.searchsorted(secs, targets), len(secs) - 1)
                 lo = np.maximum(hi - 1, 0)
                 rows = np.where(np.abs(secs[lo] - targets) <= np.abs(secs[hi] - targets), lo, hi)
-                if (np.abs(secs[rows] - targets) <= TOLERANCE_S).all():
-                    self.windows.append((storm_id, start, rows))
-                else:
+                if not (np.abs(secs[rows] - targets) <= TOLERANCE_S).all():
                     skipped += 1
+                    continue
+                self.n_valid += 1
+                keep = True
+                if exclude_land and (on_land[rows[0]] or on_land[rows[self.k24]]):
+                    self.n_land += 1
+                    keep = False
+                if tropical_only and not tropical[rows[0]]:
+                    self.n_status += 1
+                    keep = False
+                eligible = self.k24 is not None and bool(fix_start[rows[0]] and fix_start[rows[self.k24]])
+                if not keep or (eval_only and not eligible):
+                    continue
+                self.windows.append((storm_id, start, rows))
+                self.eval_eligible.append(eligible)
+                self.n_eval += eligible
             self.skipped_per_storm[storm_id] = skipped
             self.n_skipped += skipped
 
@@ -146,6 +197,7 @@ class StormWindowDataset(Dataset):
             "is_fix": torch.from_numpy(m["is_fix"][rows].copy()),
             "storm_id": storm_id,
             "start_time": str(m["time"][start]),
+            "eval_eligible": self.eval_eligible[idx],
         }
 
 
@@ -168,3 +220,14 @@ def make_loaders(data_dir, train_ids, val_ids, test_ids, batch_size=16, num_work
     test = DataLoader(StormWindowDataset(data_dir, test_ids, augment=False, **dataset_kwargs),
                       shuffle=False, **common)
     return train, val, test
+
+
+def make_loaders_from_split(split_path, data_dir, batch_size=16, num_workers=4, **dataset_kwargs):
+    """make_loaders with the storm lists from a split file such as configs/analog_splits.json, which holds
+    {"train": [...], "val": [...], "test": [...]} (other keys are ignored)."""
+    split = json.loads(Path(split_path).read_text())
+    missing = [k for k in ("train", "val", "test") if k not in split]
+    if missing:
+        raise ValueError(f"{split_path}: no {missing} lists")
+    return make_loaders(data_dir, split["train"], split["val"], split["test"], batch_size=batch_size,
+                        num_workers=num_workers, **dataset_kwargs)
