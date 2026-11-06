@@ -17,6 +17,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
+import torch  # noqa: E402
 
 from hurricane_intensity.config import PROJECT_ROOT  # noqa: E402
 from hurricane_intensity.storm_windows import StormWindowDataset, delta_24h  # noqa: E402
@@ -27,19 +28,33 @@ def main(argv=None):
     p.add_argument("--data_dir", type=Path, required=True)
     p.add_argument("--storm_id", required=True)
     p.add_argument("--window", type=int, default=None,
-                   help="window number within the storm (default: the one with the largest |dI24|)")
+                   help="window number within the storm (default: chosen by --pick)")
+    p.add_argument("--pick", choices=("abs", "max", "min"), default="abs",
+                   help="without --window: the window with the largest |dI24| (abs), the largest increase "
+                        "(max, e.g. rapid intensification) or the largest decrease (min)")
+    p.add_argument("--no_filters", action="store_true",
+                   help="index all gap-free windows (exclude_land=False, tropical_only=False); "
+                        "default: the dataset's default land and status filters")
     p.add_argument("--T", type=int, default=9)
     p.add_argument("--step_hours", type=float, default=3)
     p.add_argument("--out", type=Path, default=None, help="PNG path (default data/exports/previews/<ID>_<start>.png)")
     args = p.parse_args(argv)
 
-    ds = StormWindowDataset(args.data_dir, [args.storm_id], T=args.T, step_hours=args.step_hours)
+    reaches_24h = (24 / args.step_hours).is_integer() and 24 / args.step_hours < args.T
+    ds = StormWindowDataset(args.data_dir, [args.storm_id], T=args.T, step_hours=args.step_hours,
+                            exclude_land=reaches_24h and not args.no_filters, tropical_only=not args.no_filters)
     if len(ds) == 0:
-        raise SystemExit(f"{args.storm_id}: no valid windows ({ds.n_skipped} skipped)")
+        raise SystemExit(f"{args.storm_id}: no windows ({ds.n_skipped} with gaps, {ds.n_land} over land, "
+                         f"{ds.n_status} not TS/HU)")
     if args.window is None:
-        reaches_24h = (24 / args.step_hours).is_integer() and 24 / args.step_hours < args.T
-        idx = max(range(len(ds)), key=lambda i: abs(float(delta_24h(ds[i]["intensities"], args.step_hours)))
-                  ) if reaches_24h else 0
+        sign = {"abs": None, "max": 1.0, "min": -1.0}[args.pick]
+
+        def score(i):
+            d = float(delta_24h(torch.from_numpy(ds.meta[args.storm_id]["intensity"][ds.windows[i][2]]),
+                                args.step_hours))
+            return abs(d) if sign is None else sign * d
+
+        idx = max(range(len(ds)), key=score) if reaches_24h else 0
     else:
         idx = args.window
     item = ds[idx]
