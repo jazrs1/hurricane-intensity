@@ -230,3 +230,35 @@ def test_make_loaders_from_split(data_dir, tmp_path):
     train, val, test = make_loaders_from_split(split, data_dir, batch_size=4, num_workers=0)
     assert [len(dl.dataset) for dl in (train, val, test)] == [16, 6, 11]
     assert train.dataset.augment and not test.dataset.augment
+
+
+def test_history_windows(tmp_path):
+    # hours 0..39, frame value = 200 + hour K. history=2, T=9, 3 h: anchors need t-6 >= 0 and t+24 <= 39 -> 6..15.
+    # Land at hour 0 (only ever a history frame) does not drop anything: filters apply at t and t+24 h.
+    hours = list(range(40))
+    frames = np.stack([np.full((H, W), 200.0 + h) for h in hours])
+    write_storm(tmp_path, "AL091999", hours, frames, land_hours={0}, status={7: "TD"})
+    ds = StormWindowDataset(tmp_path, ["AL091999"], history=2, load_positions=(0, 1, 2))
+    assert ds.anchor == 2 and starts(ds) == [6, 8, 9, 10, 11, 12, 13, 14, 15]  # anchor 7 is TD
+    item = ds[0]
+    assert item["frames"].shape == (3, 1, H, W) and item["intensities"].shape == (11,)
+    hour_of = item["frames"][:, 0, 0, 0] * 140.0 + 180.0 - 200.0
+    assert torch.allclose(hour_of, torch.tensor([0.0, 3.0, 6.0]), atol=1e-3)
+    assert item["anchor_time"].endswith("T06:00:00Z") and item["start_time"].endswith("T00:00:00Z")
+    assert item["intensities"][ds.anchor].item() % 1000 == 6
+    # eval flag at the anchor: t = 6 and t + 24 = 30 are fixes; t = 9 is not
+    assert ds.eval_eligible[0] and not ds.eval_eligible[2]
+    # history=0 as before: starts 0..15 minus 0 (land at its start) and 7 (TD)
+    assert len(StormWindowDataset(tmp_path, ["AL091999"])) == 14
+
+
+def test_history_requires_its_frames(tmp_path):
+    # gap at hour 4: anchors whose t-6 / t-3 land on hour 4 (t = 7 and 10) are skipped like any gap
+    hours = [h for h in range(40) if h != 4]
+    write_storm(tmp_path, "AL091999", hours)
+    ds = StormWindowDataset(tmp_path, ["AL091999"], history=2)
+    anchor_hours = [int(ds.meta["AL091999"]["intensity"][w[1]]) % 1000 for w in ds.windows]
+    assert anchor_hours == [6] + list(range(8, 10)) + list(range(11, 16))  # 7 and 10 need hour 4
+    assert ds.n_skipped == 2  # anchors 7 and 10; hour 4 has no row, so it is never an anchor
+    with pytest.raises(ValueError, match="load_positions"):
+        StormWindowDataset(tmp_path, ["AL091999"], history=2, load_positions=(11,))

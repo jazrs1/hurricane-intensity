@@ -60,7 +60,7 @@ def delta_24h(intensities, step_hours):
 class StormWindowDataset(Dataset):
     def __init__(self, data_dir, storm_ids, T=9, step_hours=3, stride=1, augment=False,
                  tb_min=180.0, tb_max=320.0, generator=None, exclude_land=True, tropical_only=True,
-                 eval_only=False):
+                 eval_only=False, history=0, load_positions=None):
         """Index every valid (storm_id, start) window. stride steps over start rows of each storm's file.
 
         n_skipped counts start rows whose window would end inside the storm's time range (start time +
@@ -78,6 +78,16 @@ class StormWindowDataset(Dataset):
         land with a TD status is in both); n_eval counts eval-eligible windows among those kept. Every kept
         window's flag is in self.eval_eligible (and item["eval_eligible"]). The land and eval rules need
         24 h to be a whole number of steps inside the window; otherwise construction raises ValueError.
+
+        history adds that many frames before the anchor frame t, at the same step: a window is then
+        history + T frames, t - history*step_hours ... t + (T-1)*step_hours, and all of them must exist. Every rule
+        above (land, status, eval) is applied at the anchor t and at t + 24 h, not at the first frame. Windows are
+        enumerated by anchor row; an anchor without its history frames before the storm's first frame is not a
+        window and is not counted as skipped. With history=0 nothing changes. self.anchor is the anchor's
+        position in a window (= history).
+
+        load_positions (optional) lists the window positions whose frames __getitem__ reads and returns (e.g.
+        (0, 1, 2) for the three frames up to t when history=2); intensities and is_fix are still all positions.
         """
         ids = list(storm_ids)
         for storm_id in ids:
@@ -87,8 +97,13 @@ class StormWindowDataset(Dataset):
                 raise ValueError(f"{storm_id} is a spent 2025 test storm and is never loaded")
         if len(set(ids)) != len(ids):
             raise ValueError("storm_ids lists a storm more than once")
-        if T < 1 or stride < 1 or step_hours <= 0:
-            raise ValueError("T and stride must be >= 1 and step_hours > 0")
+        if T < 1 or stride < 1 or step_hours <= 0 or history < 0:
+            raise ValueError("T and stride must be >= 1, step_hours > 0 and history >= 0")
+        self.history = self.anchor = int(history)
+        n_win = self.history + T
+        self.load_positions = None if load_positions is None else np.asarray(load_positions, dtype=int)
+        if self.load_positions is not None and (self.load_positions.min() < 0 or self.load_positions.max() >= n_win):
+            raise ValueError(f"load_positions must lie in 0..{n_win - 1}")
         self.data_dir = Path(data_dir)
         self.storm_ids = ids
         self.T, self.step_hours, self.stride, self.augment = T, step_hours, stride, augment
@@ -138,10 +153,11 @@ class StormWindowDataset(Dataset):
             synoptic = (times.dt.hour % 6 == 0) & (times.dt.minute == 0) & (times.dt.second == 0)
             fix_start = self.meta[storm_id]["is_fix"] & synoptic.to_numpy()
             skipped = 0
-            offsets = np.arange(T) * step_s
-            for start in range(0, len(secs), stride):
+            offsets = np.arange(-self.history, T) * step_s
+            a = self.anchor
+            for start in range(0, len(secs), stride):  # start = the anchor row
                 targets = secs[start] + offsets
-                if targets[-1] > secs[-1] + TOLERANCE_S:
+                if targets[-1] > secs[-1] + TOLERANCE_S or targets[0] < secs[0] - TOLERANCE_S:
                     continue
                 # Nearest frame to each target time (off-grid rows, e.g. a landfall record, can sit nearby).
                 hi = np.minimum(np.searchsorted(secs, targets), len(secs) - 1)
@@ -152,13 +168,13 @@ class StormWindowDataset(Dataset):
                     continue
                 self.n_valid += 1
                 keep = True
-                if exclude_land and (on_land[rows[0]] or on_land[rows[self.k24]]):
+                if exclude_land and (on_land[rows[a]] or on_land[rows[a + self.k24]]):
                     self.n_land += 1
                     keep = False
-                if tropical_only and not tropical[rows[0]]:
+                if tropical_only and not tropical[rows[a]]:
                     self.n_status += 1
                     keep = False
-                eligible = self.k24 is not None and bool(fix_start[rows[0]] and fix_start[rows[self.k24]])
+                eligible = self.k24 is not None and bool(fix_start[rows[a]] and fix_start[rows[a + self.k24]])
                 if not keep or (eval_only and not eligible):
                     continue
                 self.windows.append((storm_id, start, rows))
@@ -184,7 +200,8 @@ class StormWindowDataset(Dataset):
 
     def __getitem__(self, idx):
         storm_id, start, rows = self.windows[idx]
-        bt = np.asarray(self._array(storm_id)[rows], dtype=np.float32)  # reads only these T frames
+        load = rows if self.load_positions is None else rows[self.load_positions]
+        bt = np.asarray(self._array(storm_id)[load], dtype=np.float32)  # reads only these frames
         bt = (np.clip(bt, self.tb_min, self.tb_max) - self.tb_min) / (self.tb_max - self.tb_min)
         frames = torch.from_numpy(bt).unsqueeze(1)  # [T, 1, H, W]
         if self.augment:
@@ -196,7 +213,8 @@ class StormWindowDataset(Dataset):
             "intensities": torch.from_numpy(m["intensity"][rows].copy()),
             "is_fix": torch.from_numpy(m["is_fix"][rows].copy()),
             "storm_id": storm_id,
-            "start_time": str(m["time"][start]),
+            "start_time": str(m["time"][rows[0]]),
+            "anchor_time": str(m["time"][start]),
             "eval_eligible": self.eval_eligible[idx],
         }
 
