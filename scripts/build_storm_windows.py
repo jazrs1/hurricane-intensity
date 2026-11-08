@@ -55,6 +55,8 @@ def convert_storm(storm_id, processed_root, out_dir, excluded):
         raise ValueError(f"{storm_id}: first manifest row has no status (expected a best-track fix)")
     df = df.assign(status=status.ffill())
     df = df[df["crop_path"].notna() & ~df["crop_path"].isin(excluded)]
+    # As TCDataset does, a row whose crop file is gone is dropped (e.g. empty off-disk crops removed by hand).
+    df = df[[(Path(processed_root) / str(p).replace("\\", "/")).is_file() for p in df["crop_path"]]]
     if df["time"].duplicated().any():
         raise ValueError(f"{storm_id}: duplicate sample_time rows")
 
