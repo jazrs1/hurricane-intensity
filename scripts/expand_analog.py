@@ -21,6 +21,7 @@ import argparse
 import functools
 import logging
 import multiprocessing as mp
+import socket
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -57,7 +58,7 @@ class NetworkDown(BaseException):
 
 def network_errors():
     import botocore.exceptions as be
-    return (be.ConnectionError, be.HTTPClientError, ConnectionError, TimeoutError)
+    return (be.ConnectionError, be.HTTPClientError, ConnectionError, TimeoutError, socket.gaierror)
 
 
 def with_retry(fn, i, what):
