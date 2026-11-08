@@ -15,7 +15,8 @@ writes, per storm, to --out_dir (default data/storm_windows/, gitignored like th
               interpolated rows, so it is carried forward from the last fix, before any frame is dropped)
 
 Conventions kept from TCDataset (src/hurricane_intensity/dataset.py):
-  * rows with no crop, and crops listed in excluded_crops.txt (frames with NaN pixels), are dropped, which
+  * rows with no crop, and crops listed in excluded_crops.txt or configs/analog_excluded_crops.txt (frames
+    with NaN pixels), are dropped, which
     leaves gaps in the time series; StormWindowDataset skips any window across one.
   * native crops vary in size (e.g. 268x312), so each is resized to 224x224 with the same
     F.interpolate(bilinear, align_corners=False) call TCDataset uses at load time.
@@ -39,7 +40,9 @@ from hurricane_intensity.config import PROCESSED_DIR, PROJECT_ROOT
 from hurricane_intensity.dataset import SIZE, SPENT_2025, STORM_ID
 
 DEFAULT_OUT = PROJECT_ROOT / "data" / "storm_windows"
-EXCLUDED = PROJECT_ROOT / "excluded_crops.txt"
+# excluded_crops.txt is pinned by the frozen v2 recipe (run_v2_recipe.py guard 4), so NaN frames found in the
+# analog storms by check_nan.py are listed separately in configs/analog_excluded_crops.txt; both are applied.
+EXCLUDED = (PROJECT_ROOT / "excluded_crops.txt", PROJECT_ROOT / "configs" / "analog_excluded_crops.txt")
 
 
 def convert_storm(storm_id, processed_root, out_dir, excluded):
@@ -96,7 +99,7 @@ def main(argv=None):
     args = p.parse_args(argv)
 
     ids = args.ids or sorted(d.name for d in args.processed_root.iterdir() if (d / "manifest.csv").is_file())
-    excluded = set(EXCLUDED.read_text().split()) if EXCLUDED.exists() else set()
+    excluded = {line for f in EXCLUDED if f.exists() for line in f.read_text().split()}
     total = 0
     for storm_id in ids:
         if not STORM_ID.fullmatch(storm_id):
