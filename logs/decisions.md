@@ -3699,3 +3699,8 @@ Decided by John. No build, download or training.
   storms sum to 2081 frames; the EP counts are pre-build grid frames,
   and the build re-applies the floor and reports the built total
   without reselecting.
+
+2026-11-12, 12:37. H-EP exposure note: tc-analogs session feab43f6.
+Recorded at John's request. No build, download, training or evaluation is involved.
+- While tracing why Otis (EP182023) is missing from the tc-analogs analog dataset, a repo-wide text search in Claude Code session feab43f6 printed lines from reports/decisions/HEP.md, reports/decisions/N1.md and reports/v2_survey/hep/protocol.md (copies in a .claude/worktrees checkout). The lines included per-storm facts about the sealed H-EP storms (intensities, frame counts and viewing angles). None of these values was written to any file, commit or report.
+- That session must not be used for any H-EP or E3 design, drafting or review work.
