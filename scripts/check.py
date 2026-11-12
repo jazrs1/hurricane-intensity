@@ -51,9 +51,9 @@ from pathlib import Path
 CHECKOUT_ROOT = Path(__file__).resolve().parents[1]
 CHECKOUT_SRC = CHECKOUT_ROOT / "src"
 MAIN_SHA = "fbb39c4"  # I6: main and origin/main are this commit, or a descendant of it as checked below
-# I6: the reviewed sites, oldest first: 0f54536 (PR #47), 7092cf1 (PR #48, ensemble Grad-CAM). site/ at HEAD must be
-# the last one's tree exactly; main and origin/main may carry any of them.
-REVIEWED_SITE_SHAS = ("0f54536", "7092cf1")
+# I6: the reviewed sites, oldest first: 0f54536 (PR #47), 7092cf1 (PR #48, ensemble Grad-CAM), 097ba93 (v1 cleanup,
+# approved by John 2026-11-12). site/ at HEAD must be the last one's tree exactly; main and origin/main may carry any.
+REVIEWED_SITE_SHAS = ("0f54536", "7092cf1", "097ba93")
 
 # I1: the protected files (FEATURES.md). Their expected hashes come from COORDINATOR.md, never from this repo.
 PROTECTED_PATHS = [
