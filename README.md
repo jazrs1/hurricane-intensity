@@ -1,4 +1,4 @@
-# Estimating hurricane intensity from GOES infrared imagery
+# Estimating hurricane intensity from GOES infrared imagery (v1)
 
 Ten convolutional networks, averaged, estimate a tropical cyclone's maximum
 sustained wind from a single infrared satellite frame. Labels come from
@@ -34,7 +34,9 @@ HURDAT2 gives a storm's position and intensity every six hours as text.
 GOES gives a full-disk image every few minutes as NetCDF. Most of the
 work is matching them.
 
-Samples fall between best-track fixes, so center position and wind speed
+Samples are hourly, except for the ten storms added to reach the
+19-storm training set, which are 3-hourly. Most samples fall between
+best-track fixes, so center position and wind speed
 are linearly interpolated, and every sample carries a flag saying whether
 it came from a real fix or an interpolation. Scoring against interpolated
 labels is partly scoring against the interpolation, so results are also
@@ -116,34 +118,37 @@ Where it fails:
   H9. Every 2025 frame is from GOES-19 and every training frame from
   GOES-16, so the test can't separate the instrument from the storms.
 
-## Phase 2 in brief
+## What I learned
 
-The full account is on the site:
-<https://hurricane.johnazer.com/#phase2>.
-
-- **The old 9.00 kt headline was a lucky run.** Rerunning that recipe 33
-  times gave a mean of 10.05 kt on the same held-out storms, and only one
-  rerun in 33 did as well. Since then every result is an ensemble or a
-  comparison across many seeds.
-- **More distinct storms helped.** Training on 19 storms instead of 9
-  lowered error on H9 by 1.6 kt and cut the high-end underestimate by
-  5.4 kt, passing all three tests set in advance. The larger set also had
-  more frames, so "more storms" and "more data" can't be fully separated.
-- **More storms again made no difference.** From 19 storms to 50 at the
-  same training budget: 0.53 kt worse, not significant, and the runs were
-  flagged as under-trained, so the reading is "not at this budget".
-- **Longer training helps.** Training four times longer lowered error on
-  H9 by about one knot (0.99) across 20 paired seeds. A new ten-network
-  ensemble trained that way is frozen and waits for its own one-time test
-  on the 2026–2027 storms.
-- **East Pacific, in progress.** Work is under way on adding East Pacific
-  storms to training. A separate East Pacific test set stays sealed under
-  a protocol fixed in advance.
-
-Each phase-2 experiment's design, analysis script and pass thresholds were
-committed before any training run, and the outcome is reported as the
-script prints it. A separate AI review session, instructed to break each
-design, recomputes the results before they are accepted.
+- **The first headline was a favorable draw.** The first version of this
+  project quoted 9.00 kt from one training run of the original model on
+  three held-out storms (the 12.13 kt above is the same model on the 2025
+  storms). Retraining that recipe 33 times with different seeds gave a
+  mean of 10.05 kt on those three storms, sd 0.59 kt, and only one rerun
+  in 33 did as well. A typical run is about 10 kt, which is why the
+  headline now comes from a ten-network ensemble.
+- **More distinct storms helped most.** Going from
+  the original 9 training storms to 19 shrank the underestimate on frames
+  above 96 kt from 13.1 to 7.7 kt (5.4 kt) and lowered overall error by
+  1.6 kt on H9, across ten seeds each (`results/storms/findings.md`). A
+  follow-up that held the frame count and intensity mix fixed got most of
+  that gain (4.3 and 1.2 kt) from the extra storms alone
+  (`results/variety/findings.md`), so the variety of storms, not the
+  number of frames, did most of the work. The ensemble is ten networks
+  trained on those 19 storms.
+- **Adding a few major hurricanes did not fix the high end.** By
+  contrast, adding two
+  category 5 storms, Beryl and Lee, to the nine original training storms
+  did not reduce the category 4–5 underestimate on the held-out storms,
+  across ten seeds per setup. Most of the strong-storm frames they added
+  were category 3, so the test was weaker than planned. It is reported as
+  a negative result in `results/imbalance/findings.md`.
+- **Category 4–5 storms are still underestimated**, by about 6 kt at
+  category 4 and 16 kt at category 5 on the 2025 test.
+- **The networks look at the cold central overcast.** Grad-CAM
+  attribution on strong storms overlaps the coldest cloud tops far more
+  than chance, for both the original model and the ensemble. The maps are
+  on the site.
 
 ## Reproducing
 
@@ -160,8 +165,8 @@ install them for your platform.
 
 Data is not committed. `scripts/build_batch.py --ids-file <list>` rebuilds
 crops from public NOAA sources for the storms in a list; the header of each
-`storms_*.txt` file says how it was built (the ten storms added in phase 2
-use 3-hourly sampling).
+`storms_*.txt` file says how it was built (the ten storms added to reach
+the 19-storm training set use 3-hourly sampling).
 
 `scripts/check.py` runs the repository's invariant checks:
 
@@ -182,5 +187,10 @@ reports/                   designs, reviews and decision records
 site/                      the published page
 ```
 
-Where each number in this README comes from is listed in
-`reports/site_v2/sources.md`.
+Where the numbers in this README come from: the 2025 test is
+`results/final_2025/findings.md`, the 33-rerun spread is
+`logs/decisions.md` (2026-10-13), and the experiments behind "What I
+learned" are in `results/storms/`, `results/variety/` and
+`results/imbalance/`, each with a `findings.md`.
+
+v2 — a research version — is in progress.
