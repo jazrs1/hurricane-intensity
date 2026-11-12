@@ -113,6 +113,12 @@
     max-width: 33em;
   }
 
+  .v2-note { font-size: 15px; color: var(--muted); margin: 14px 0 0; }
+
+  ul.learned { max-width: 33em; padding-left: 1.2em; margin: 0; }
+  ul.learned li { color: var(--body); margin: 0 0 14px; }
+  ul.learned li strong { color: var(--ink); font-weight: 500; }
+
   .metrics {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -549,18 +555,20 @@
     <span aria-hidden="true">&middot;</span>
     <a href="#ian-scrubber">Explore</a>
     <span aria-hidden="true">&middot;</span>
-    <a href="#phase2">Phase 2</a>
+    <a href="#learned">What I learned</a>
     <span aria-hidden="true">&middot;</span>
     <a href="#gradcam">Attention</a>
     <span aria-hidden="true">&middot;</span>
     <a href="https://github.com/jazrs1/hurricane-intensity">Code</a>
   </nav>
 
-  <span class="label kicker">Tropical cyclone intensity from satellite imagery</span>
+  <span class="label kicker">Tropical cyclone intensity from satellite imagery &middot; v1</span>
 
   <h1>Ten convolutional networks, averaged, estimate a hurricane's maximum sustained wind from a single infrared satellite frame.</h1>
 
   <p class="standfirst">Trained on 2,081 storm-centered crops from 19 Atlantic storms between 2018 and 2024, after removing frames with missing data, labeled against the NOAA best track, and tested once on the 2025 season.</p>
+
+  <p class="v2-note">v2 &mdash; a research version &mdash; is in progress.</p>
 
   <div class="metrics">
     <div class="metric">
@@ -748,22 +756,14 @@
     <p>Error on 2025 is 1.2 knots higher than on the development storms. Every 2025 frame comes from GOES-19 and every training frame from older storms on GOES-16, so the test can't say how much of that is the instrument and how much is the storms.</p>
   </section>
 
-  <section id="phase2">
-    <h2>What changed in phase 2</h2>
-    <h3 class="subhead">The old headline was a lucky run</h3>
-    <p>The first version of this page quoted 9.00 knots from a single training run. Rerunning the same recipe 33 times with different random seeds gave a mean of 10.05 knots on the same held-out storms, and only one rerun in 33 did as well. Since then every result is an ensemble or a comparison across many seeds.</p>
-    <h3 class="subhead">More distinct storms: the clean win</h3>
-    <p>Training on 19 storms instead of 9 lowered error on the nine held-out development storms by 1.6 knots and cut the high-end underestimate by 5.4 knots, passing all three tests set in advance. The larger set also had more frames, so &ldquo;more storms&rdquo; and &ldquo;more data&rdquo; can't be fully separated.</p>
-    <h3 class="subhead">More storms again: no difference</h3>
-    <p>Going further, from 19 storms to 50 at the same training budget, made no significant difference (0.53 knots worse, not significant), and those runs were flagged as under-trained, so the honest reading is &ldquo;not at this budget&rdquo;.</p>
-    <h3 class="subhead">Longer training helps</h3>
-    <p>Training four times longer lowered error on the development storms by about one knot (0.99) across 20 paired seeds. A new ten-network ensemble trained that way is frozen and waits for its own one-time test on the 2026&ndash;2027 storms.</p>
-    <h3 class="subhead">Open problem: the high end</h3>
-    <p>No change so far has removed the category 5 shortfall, about 19 knots low on the development storms. Storms stronger than anything in training, like Melissa, make it worse.</p>
-    <h3 class="subhead">In progress: the East Pacific</h3>
-    <p>Work is under way on adding East Pacific storms to training. A separate East Pacific test set stays sealed under a protocol fixed in advance.</p>
-    <h3 class="subhead">How the work is checked</h3>
-    <p>Each phase-2 experiment's design, analysis script and pass thresholds are written down and committed before any training run, and the outcome is reported as the script prints it. A separate AI review session, instructed to break each design, recomputes the results before they are accepted.</p>
+  <section id="learned">
+    <h2>What I learned</h2>
+    <ul class="learned">
+      <li><strong>The first headline was a favorable draw.</strong> The first version of this page quoted 9.00 knots from one training run of the original model on three held-out storms (the 12.13 above is the same model on the 2025 storms). Retraining that recipe 33 times with different random seeds gave a mean of 10.05 knots on those three storms, with a spread of about 0.6 knots, and only one rerun in 33 did as well. A typical run is about 10 knots, which is why the headline now comes from averaging ten networks.</li>
+      <li><strong>Adding major hurricanes did not fix the high end.</strong> Adding two category 5 storms, Beryl and Lee, to the nine original training storms did not reduce the category 4&ndash;5 underestimate on the held-out storms, across ten seeds per setup. Most of the strong-storm frames they added were category 3, so the test was weaker than planned. It is reported as a negative result.</li>
+      <li><strong>Category 4&ndash;5 storms are still underestimated.</strong> On the 2025 test the ensemble reads category 4 about 6 knots low and category 5 about 16 knots low. Averaging ten networks cannot remove a bias they share.</li>
+      <li><strong>The networks look at the cold central overcast.</strong> Grad-CAM attribution on strong storms overlaps the coldest cloud tops far more than chance, for both the original model and the ensemble, and is clearest at the intensities where the error is largest. <a href="#gradcam">The maps are below.</a></li>
+    </ul>
   </section>
 
   <section id="gradcam">
