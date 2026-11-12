@@ -611,7 +611,7 @@
       <li>
         <div>
           <h3 class="step-title">Prepare storm records</h3>
-          <p class="step-detail">Parse the NOAA HURDAT2 best track, drop entries the record marks extratropical, and interpolate the six-hourly fixes to hourly.</p>
+          <p class="step-detail">Parse the NOAA HURDAT2 best track, drop entries the record marks extratropical, and interpolate the six-hourly fixes to hourly samples (3-hourly for ten of the 19 training storms).</p>
         </div>
       </li>
       <li>
@@ -641,7 +641,7 @@
       <li>
         <div>
           <h3 class="step-title">Train ten, average them</h3>
-          <p class="step-detail">Train the same network ten times with different random seeds, keep each run's checkpoint with the lowest validation error, and average the ten predictions with equal weight. The ten are then frozen by hash.</p>
+          <p class="step-detail">Train the same network ten times on the 19 training storms (L1 loss, 25 epochs) with different random seeds, keep each run's checkpoint with the lowest validation error, and average the ten predictions with equal weight. The ten are then frozen by hash.</p>
         </div>
       </li>
     </ol>
@@ -760,7 +760,8 @@
     <h2>What I learned</h2>
     <ul class="learned">
       <li><strong>The first headline was a favorable draw.</strong> The first version of this page quoted 9.00 knots from one training run of the original model on three held-out storms (the 12.13 above is the same model on the 2025 storms). Retraining that recipe 33 times with different random seeds gave a mean of 10.05 knots on those three storms, with a spread of about 0.6 knots, and only one rerun in 33 did as well. A typical run is about 10 knots, which is why the headline now comes from averaging ten networks.</li>
-      <li><strong>Adding major hurricanes did not fix the high end.</strong> Adding two category 5 storms, Beryl and Lee, to the nine original training storms did not reduce the category 4&ndash;5 underestimate on the held-out storms, across ten seeds per setup. Most of the strong-storm frames they added were category 3, so the test was weaker than planned. It is reported as a negative result.</li>
+      <li><strong>More distinct storms helped most.</strong> Going from the original 9 training storms to 19 shrank the underestimate on frames above 96 knots from 13.1 to 7.7 knots (5.4 knots) and lowered overall error by 1.6 knots on the nine development storms, across ten seeds each. A follow-up that held the frame count and intensity mix fixed got most of that gain (4.3 and 1.2 knots) from the extra storms alone, so the variety of storms, not the number of frames, did most of the work. The ensemble is ten networks trained on those 19 storms.</li>
+      <li><strong>Adding a few major hurricanes did not fix the high end.</strong> By contrast, adding two category 5 storms, Beryl and Lee, to the nine original training storms did not reduce the category 4&ndash;5 underestimate on the held-out storms, across ten seeds per setup. Most of the strong-storm frames they added were category 3, so the test was weaker than planned. It is reported as a negative result.</li>
       <li><strong>Category 4&ndash;5 storms are still underestimated.</strong> On the 2025 test the ensemble reads category 4 about 6 knots low and category 5 about 16 knots low. Averaging ten networks cannot remove a bias they share.</li>
       <li><strong>The networks look at the cold central overcast.</strong> Grad-CAM attribution on strong storms overlaps the coldest cloud tops far more than chance, for both the original model and the ensemble, and is clearest at the intensities where the error is largest. <a href="#gradcam">The maps are below.</a></li>
     </ul>

@@ -34,7 +34,9 @@ HURDAT2 gives a storm's position and intensity every six hours as text.
 GOES gives a full-disk image every few minutes as NetCDF. Most of the
 work is matching them.
 
-Samples fall between best-track fixes, so center position and wind speed
+Samples are hourly, except for the ten storms added to reach the
+19-storm training set, which are 3-hourly. Most samples fall between
+best-track fixes, so center position and wind speed
 are linearly interpolated, and every sample carries a flag saying whether
 it came from a real fix or an interpolation. Scoring against interpolated
 labels is partly scoring against the interpolation, so results are also
@@ -125,7 +127,17 @@ Where it fails:
   mean of 10.05 kt on those three storms, sd 0.59 kt, and only one rerun
   in 33 did as well. A typical run is about 10 kt, which is why the
   headline now comes from a ten-network ensemble.
-- **Adding major hurricanes did not fix the high end.** Adding two
+- **More distinct storms helped most.** Going from
+  the original 9 training storms to 19 shrank the underestimate on frames
+  above 96 kt from 13.1 to 7.7 kt (5.4 kt) and lowered overall error by
+  1.6 kt on H9, across ten seeds each (`results/storms/findings.md`). A
+  follow-up that held the frame count and intensity mix fixed got most of
+  that gain (4.3 and 1.2 kt) from the extra storms alone
+  (`results/variety/findings.md`), so the variety of storms, not the
+  number of frames, did most of the work. The ensemble is ten networks
+  trained on those 19 storms.
+- **Adding a few major hurricanes did not fix the high end.** By
+  contrast, adding two
   category 5 storms, Beryl and Lee, to the nine original training storms
   did not reduce the category 4–5 underestimate on the held-out storms,
   across ten seeds per setup. Most of the strong-storm frames they added
@@ -177,7 +189,8 @@ site/                      the published page
 
 Where the numbers in this README come from: the 2025 test is
 `results/final_2025/findings.md`, the 33-rerun spread is
-`logs/decisions.md` (2026-10-13), and the class-imbalance experiment is
-`results/imbalance/findings.md`.
+`logs/decisions.md` (2026-10-13), and the experiments behind "What I
+learned" are in `results/storms/`, `results/variety/` and
+`results/imbalance/`, each with a `findings.md`.
 
 v2 — a research version — is in progress.
